@@ -338,6 +338,13 @@ namespace GownSite.Web.Controllers
             return Ok(repo.GetAll());
         }
 
+        [HttpGet("owners")]
+        public IActionResult GetOwners()
+        {
+            var repo = new OwnerRepository(_connectionString);
+            return Ok(repo.GetAll());
+        }
+
         [HttpPost("promocodes/create")]
         public IActionResult CreatePromoCode([FromBody] PromoCode request)
         {

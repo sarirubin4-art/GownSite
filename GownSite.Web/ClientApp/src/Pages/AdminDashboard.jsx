@@ -4,7 +4,7 @@ import axios from 'axios';
 import {
     Box, Typography, Tabs, Tab, Grid, Card, CardMedia, CardContent, Button, Stack,
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert, MenuItem,
-    Table, TableHead, TableBody, TableRow, TableCell, Switch
+    Table, TableHead, TableBody, TableRow, TableCell, Switch, Chip
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { useAdLane } from '../context/AdLaneContext';
@@ -132,6 +132,7 @@ const AdminDashboard = () => {
     const [promoForm, setPromoForm] = useState(emptyPromoForm);
     const [promoError, setPromoError] = useState('');
     const [editingPromoId, setEditingPromoId] = useState(null);
+    const [owners, setOwners] = useState([]);
 
     const loadPending = async () => {
         const [gowns, ads] = await Promise.all([
@@ -156,6 +157,11 @@ const AdminDashboard = () => {
         setPromoCodes(data);
     };
 
+    const loadOwners = async () => {
+        const { data } = await axios.get('/api/admin/owners');
+        setOwners(data);
+    };
+
     useEffect(() => {
         if (!loading && !owner?.isAdmin) {
             navigate('/');
@@ -165,6 +171,7 @@ const AdminDashboard = () => {
             loadPending();
             loadActive();
             loadPromoCodes();
+            loadOwners();
         }
     }, [loading, owner]);
 
@@ -265,6 +272,7 @@ const AdminDashboard = () => {
                 <Tab label={`Live Gowns${activeGowns.length ? ` (${activeGowns.length})` : ''}`} />
                 <Tab label={`Live Ads${activeAds.length ? ` (${activeAds.length})` : ''}`} />
                 <Tab label="Promo Codes" />
+                <Tab label={`Patrons${owners.length ? ` (${owners.length})` : ''}`} />
             </Tabs>
 
             {tab === 0 && (
@@ -346,6 +354,38 @@ const AdminDashboard = () => {
                                 ))}
                             </TableBody>
                         </Table>
+                        </Box>
+                    )}
+                </Box>
+            )}
+            {tab === 5 && (
+                <Box sx={{ mt: 3 }}>
+                    {owners.length === 0 ? (
+                        <Typography color="text.secondary">No patrons yet.</Typography>
+                    ) : (
+                        <Box sx={{ overflowX: 'auto' }}>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>Name</TableCell>
+                                        <TableCell>Email</TableCell>
+                                        <TableCell>Phone</TableCell>
+                                        <TableCell>Role</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {owners.map((o) => (
+                                        <TableRow key={o.id}>
+                                            <TableCell>{o.name}</TableCell>
+                                            <TableCell>{o.email}</TableCell>
+                                            <TableCell>{o.number || '—'}</TableCell>
+                                            <TableCell>
+                                                {o.isAdmin ? <Chip size="small" label="Admin" color="primary" /> : 'Patron'}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
                         </Box>
                     )}
                 </Box>

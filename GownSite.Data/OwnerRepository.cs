@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 
 namespace GownSite.Data
@@ -8,6 +9,12 @@ namespace GownSite.Data
         public OwnerRepository(string connectionString)
         {
             _connectionString = connectionString;
+        }
+
+        public List<Owner> GetAll()
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Owners.OrderBy(o => o.Name).ToList();
         }
 
         public Owner FindByEmail(string email)
