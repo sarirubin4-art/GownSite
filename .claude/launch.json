@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gownsite",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run"],
+      "cwd": "GownSite.Web",
+      "port": 5200,
+      "url": "http://localhost:3000"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "GownSite-Backend",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "GownSite.Web.csproj"],
+      "port": 5200
+    },
+    {
+      "name": "GownSite-Frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "ClientApp", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}

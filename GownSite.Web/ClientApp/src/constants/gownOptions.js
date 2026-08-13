@@ -1,0 +1,43 @@
+export const COLOR_OPTIONS = [
+    'Ivory/White', 'Blush', 'Champagne', 'Black', 'Navy', 'Burgundy',
+    'Emerald', 'Blue', 'Silver', 'Gold', 'Pink', 'Red', 'Purple', 'Floral', 'Other'
+];
+
+export const SIZE_OPTIONS = [
+    '00', '0', '2', '4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24', '26',
+    'Maternity XS', 'Maternity S', 'Maternity M', 'Maternity L', 'Maternity XL'
+];
+
+export const STYLE_OPTIONS = [
+    { value: 'MotherOfBrideOrGroom', label: 'Mother of the Bride/Groom' },
+    { value: 'SisterOfBrideOrGroom', label: 'Sister of the Bride/Groom' },
+    { value: 'Bridal', label: 'Bridal' },
+    { value: 'Evening', label: 'Evening Gown' },
+    { value: 'BallGown', label: 'Ball Gown' },
+    { value: 'ALine', label: 'A-Line' },
+    { value: 'Maternity', label: 'Maternity' },
+];
+
+export const LISTING_TYPE_OPTIONS = [
+    { value: 'Rent', label: 'For Rent' },
+    { value: 'Sale', label: 'For Sale' },
+];
+
+export const AD_CATEGORY_OPTIONS = [
+    { value: 'Makeup', label: 'Makeup Artist' },
+    { value: 'Hair', label: 'Hair Stylist' },
+    { value: 'Alterations', label: 'Alterations' },
+    { value: 'GownRental', label: 'Gown Rental/Sales' },
+    { value: 'Photography', label: 'Photography' },
+    { value: 'PartyPlanners', label: 'Party Planners' },
+    { value: 'Gemachs', label: 'Gemachs' },
+    { value: 'Other', label: 'Simcha Services' },
+];
+
+export const formatUsd = (n) => {
+    const num = Number(n);
+    return `$${num % 1 === 0 ? num : num.toFixed(2)}`;
+};
+
+export const styleLabel = (value) => STYLE_OPTIONS.find(s => s.value === value)?.label || value;
+export const adCategoryLabel = (value) => AD_CATEGORY_OPTIONS.find(c => c.value === value)?.label || value;

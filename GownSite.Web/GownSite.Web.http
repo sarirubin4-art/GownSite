@@ -1,0 +1,6 @@
+@GownSite.Web_HostAddress = http://localhost:5200
+
+GET {{GownSite.Web_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
