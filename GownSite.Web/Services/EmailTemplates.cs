@@ -13,6 +13,14 @@ namespace GownSite.Web.Services
                 $"<p style=\"font-size:13px;color:#8A6D72;\">If the button doesn't work, copy and paste this link into your browser:<br>{verifyUrl}</p>",
                 frontendBaseUrl);
 
+        public static string ResetPassword(string ownerName, string resetUrl, string frontendBaseUrl) =>
+            EmailLayout.Wrap(
+                EmailLayout.Heading("Reset Your Password") +
+                $"<p>Hi {ownerName}, we received a request to reset your Regowned password. This link expires in 1 hour.</p>" +
+                EmailLayout.Button("Reset Password", resetUrl) +
+                $"<p style=\"font-size:13px;color:#8A6D72;\">If you didn't request this, you can safely ignore this email — your password won't change.</p>",
+                frontendBaseUrl);
+
         public static string NewSubmissionAdmin(string type, string ownerName, string description, string adminUrl, string frontendBaseUrl) =>
             EmailLayout.Wrap(
                 $"<p>A new {type} was submitted by <strong>{ownerName}</strong> and is awaiting your review.</p>" +

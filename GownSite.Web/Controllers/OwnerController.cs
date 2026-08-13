@@ -24,6 +24,17 @@ namespace GownSite.Web.Controllers
         public string Password { get; set; }
     }
 
+    public class ForgotPasswordRequest
+    {
+        public string Email { get; set; }
+    }
+
+    public class ResetPasswordRequest
+    {
+        public string Token { get; set; }
+        public string NewPassword { get; set; }
+    }
+
     public class OwnerViewModel
     {
         public int Id { get; set; }
@@ -119,6 +130,47 @@ namespace GownSite.Web.Controllers
                 "Please verify your email — Regowned",
                 EmailTemplates.VerifyEmail(owner.Name, verifyUrl, FrontendBaseUrl())
             );
+        }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            var repo = new OwnerRepository(_connectionString);
+            var owner = repo.FindByEmail(request.Email ?? "");
+            // Always return Ok, whether or not the email is registered, so this endpoint
+            // can't be used to check which emails have an account.
+            if (owner == null) return Ok();
+
+            var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            var expiresAt = DateTime.UtcNow.AddHours(1);
+            repo.SetPasswordResetToken(owner.Id, token, expiresAt);
+
+            var resetUrl = $"{FrontendBaseUrl()}/reset-password?token={token}";
+            await _emailSender.SendAsync(
+                owner.Email,
+                "Reset your password — Regowned",
+                EmailTemplates.ResetPassword(owner.Name, resetUrl, FrontendBaseUrl())
+            );
+
+            return Ok();
+        }
+
+        [HttpPost("reset-password")]
+        public IActionResult ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.NewPassword))
+                return BadRequest(new { message = "A new password is required." });
+            if (request.NewPassword.Length < 8)
+                return BadRequest(new { message = "Password must be at least 8 characters." });
+
+            var repo = new OwnerRepository(_connectionString);
+            var owner = repo.FindByValidPasswordResetToken(request.Token);
+            if (owner == null)
+                return BadRequest(new { message = "This reset link is invalid or has expired. Please request a new one." });
+
+            var newHash = _hasher.HashPassword(owner, request.NewPassword);
+            repo.ResetPassword(request.Token, newHash);
+            return Ok();
         }
 
         [HttpPost("login")]

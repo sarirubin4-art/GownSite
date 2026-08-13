@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -63,6 +64,42 @@ namespace GownSite.Data
 
             owner.EmailVerificationToken = token;
             context.SaveChanges();
+        }
+
+        public void SetPasswordResetToken(int id, string token, DateTime expiresAt)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o => o.Id == id);
+            if (owner == null) return;
+
+            owner.PasswordResetToken = token;
+            owner.PasswordResetTokenExpiresAt = expiresAt;
+            context.SaveChanges();
+        }
+
+        public Owner FindByValidPasswordResetToken(string token)
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Owners.FirstOrDefault(o =>
+                o.PasswordResetToken == token &&
+                o.PasswordResetTokenExpiresAt != null &&
+                o.PasswordResetTokenExpiresAt > DateTime.UtcNow);
+        }
+
+        public bool ResetPassword(string token, string newPasswordHash)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o =>
+                o.PasswordResetToken == token &&
+                o.PasswordResetTokenExpiresAt != null &&
+                o.PasswordResetTokenExpiresAt > DateTime.UtcNow);
+            if (owner == null) return false;
+
+            owner.PasswordHash = newPasswordHash;
+            owner.PasswordResetToken = null;
+            owner.PasswordResetTokenExpiresAt = null;
+            context.SaveChanges();
+            return true;
         }
     }
 }

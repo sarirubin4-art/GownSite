@@ -16,6 +16,10 @@ namespace GownSite.Data
         public bool EmailVerified { get; set; }
         [JsonIgnore]
         public string EmailVerificationToken { get; set; }
+        [JsonIgnore]
+        public string PasswordResetToken { get; set; }
+        [JsonIgnore]
+        public DateTime? PasswordResetTokenExpiresAt { get; set; }
     }
 
     public enum ListingType

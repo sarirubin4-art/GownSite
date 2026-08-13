@@ -5,6 +5,8 @@ import { AuthProvider } from './context/AuthContext';
 import Home from './Pages/Home';
 import Login from './Pages/Login';
 import Signup from './Pages/Signup';
+import ForgotPassword from './Pages/ForgotPassword';
+import ResetPassword from './Pages/ResetPassword';
 import PostGownTerms from './Pages/PostGownTerms';
 import GownPostingForm from './Pages/GownPostingForm';
 import PaymentPage from './Pages/PaymentPage';
@@ -37,6 +39,8 @@ const App = () => {
                 <Routes>
                     <Route path='/' element={<Home />} />
                     <Route path='/login' element={<Login />} />
+                    <Route path='/forgot-password' element={<ForgotPassword />} />
+                    <Route path='/reset-password' element={<ResetPassword />} />
                     <Route path='/signup' element={<Signup />} />
                     <Route path='/postagown' element={<PostGownTerms />} />
                     <Route path='/postagown/terms' element={<PostGownTerms />} />

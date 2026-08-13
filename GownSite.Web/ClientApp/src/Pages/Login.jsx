@@ -47,6 +47,9 @@ const Login = () => {
                 />
                 <Button variant="contained" size="large" onClick={onLoginClick}>Log In</Button>
                 <Typography variant="body2" color="text.secondary">
+                    <Link to="/forgot-password">Forgot password?</Link>
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
                     Don't have an account? <Link to="/signup">Create one</Link>
                 </Typography>
             </Stack>
