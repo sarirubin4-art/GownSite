@@ -13,6 +13,9 @@ namespace GownSite.Data
         [JsonIgnore]
         public string PasswordHash { get; set; }
         public bool IsAdmin { get; set; }
+        public bool EmailVerified { get; set; }
+        [JsonIgnore]
+        public string EmailVerificationToken { get; set; }
     }
 
     public enum ListingType

@@ -36,5 +36,33 @@ namespace GownSite.Data
             context.SaveChanges();
             return owner.Id;
         }
+
+        public Owner FindByVerificationToken(string token)
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Owners.FirstOrDefault(o => o.EmailVerificationToken == token);
+        }
+
+        public bool MarkVerified(string token)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o => o.EmailVerificationToken == token);
+            if (owner == null) return false;
+
+            owner.EmailVerified = true;
+            owner.EmailVerificationToken = null;
+            context.SaveChanges();
+            return true;
+        }
+
+        public void SetVerificationToken(int id, string token)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o => o.Id == id);
+            if (owner == null) return;
+
+            owner.EmailVerificationToken = token;
+            context.SaveChanges();
+        }
     }
 }

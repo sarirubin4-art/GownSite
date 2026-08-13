@@ -1,8 +1,12 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Box, Typography, Button, Stack } from '@mui/material';
+import React, { useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Box, Typography, Button, Stack, Snackbar, Alert } from '@mui/material';
 
 const Home = () => {
+    const [searchParams] = useSearchParams();
+    const verified = searchParams.get('verified');
+    const [noticeOpen, setNoticeOpen] = useState(!!verified);
+
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', py: 10 }}>
             <Box
@@ -23,6 +27,23 @@ const Home = () => {
                     Post a Gown
                 </Button>
             </Stack>
+
+            <Snackbar
+                open={noticeOpen}
+                autoHideDuration={6000}
+                onClose={() => setNoticeOpen(false)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert
+                    onClose={() => setNoticeOpen(false)}
+                    severity={verified === '1' ? 'success' : 'warning'}
+                    variant="filled"
+                >
+                    {verified === '1'
+                        ? 'Email verified! Your account is fully active.'
+                        : 'That verification link is invalid or has expired.'}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

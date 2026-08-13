@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Security.Cryptography;
 
 namespace GownSite.Web.Controllers
 {
@@ -30,6 +31,7 @@ namespace GownSite.Web.Controllers
         public string Number { get; set; }
         public string Email { get; set; }
         public bool IsAdmin { get; set; }
+        public bool EmailVerified { get; set; }
     }
 
     [Route("api/[controller]")]
@@ -68,19 +70,55 @@ namespace GownSite.Web.Controllers
             {
                 Name = request.Name,
                 Number = request.Number,
-                Email = request.Email
+                Email = request.Email,
+                EmailVerified = false,
+                EmailVerificationToken = GenerateVerificationToken()
             };
             owner.PasswordHash = _hasher.HashPassword(owner, request.Password);
             repo.Create(owner);
 
-            await _emailSender.SendAsync(
-                owner.Email,
-                "Welcome to Regowned!",
-                EmailTemplates.Welcome(owner.Name, $"{FrontendBaseUrl()}/search")
-            );
+            await SendVerificationEmail(owner);
 
             await SignInOwner(owner);
             return Ok(ToViewModel(owner));
+        }
+
+        [HttpGet("verify-email")]
+        public IActionResult VerifyEmail([FromQuery] string token)
+        {
+            var repo = new OwnerRepository(_connectionString);
+            var verified = !string.IsNullOrEmpty(token) && repo.MarkVerified(token);
+            return Redirect($"{FrontendBaseUrl()}/?verified={(verified ? "1" : "0")}");
+        }
+
+        [HttpPost("resend-verification")]
+        [Authorize]
+        public async Task<IActionResult> ResendVerification()
+        {
+            var idClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var repo = new OwnerRepository(_connectionString);
+            var owner = repo.Get(int.Parse(idClaim));
+            if (owner == null) return Unauthorized();
+            if (owner.EmailVerified) return Ok();
+
+            var token = GenerateVerificationToken();
+            repo.SetVerificationToken(owner.Id, token);
+            owner.EmailVerificationToken = token;
+
+            await SendVerificationEmail(owner);
+            return Ok();
+        }
+
+        private static string GenerateVerificationToken() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+
+        private Task SendVerificationEmail(Owner owner)
+        {
+            var verifyUrl = $"{Request.Scheme}://{Request.Host}/api/owner/verify-email?token={owner.EmailVerificationToken}";
+            return _emailSender.SendAsync(
+                owner.Email,
+                "Please verify your email — Regowned",
+                EmailTemplates.VerifyEmail(owner.Name, verifyUrl, FrontendBaseUrl())
+            );
         }
 
         [HttpPost("login")]
@@ -139,7 +177,8 @@ namespace GownSite.Web.Controllers
             Name = owner.Name,
             Number = owner.Number,
             Email = owner.Email,
-            IsAdmin = owner.IsAdmin
+            IsAdmin = owner.IsAdmin,
+            EmailVerified = owner.EmailVerified
         };
     }
 }

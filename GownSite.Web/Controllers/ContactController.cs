@@ -27,6 +27,12 @@ namespace GownSite.Web.Controllers
             _emailSender = emailSender;
         }
 
+        private string FrontendBaseUrl()
+        {
+            var frontendBaseUrl = _configuration["Frontend:BaseUrl"];
+            return string.IsNullOrEmpty(frontendBaseUrl) ? $"{Request.Scheme}://{Request.Host}" : frontendBaseUrl;
+        }
+
         [HttpPost("business-inquiry")]
         public async Task<IActionResult> BusinessInquiry([FromBody] BusinessInquiryRequest request)
         {
@@ -44,7 +50,7 @@ namespace GownSite.Web.Controllers
             await _emailSender.SendAsync(
                 adminEmail,
                 "Bulk discount inquiry — Regowned",
-                EmailTemplates.BusinessInquiry(owner.Name, owner.Email, owner.Number, request.Message)
+                EmailTemplates.BusinessInquiry(owner.Name, owner.Email, owner.Number, request.Message, FrontendBaseUrl())
             );
 
             return Ok();

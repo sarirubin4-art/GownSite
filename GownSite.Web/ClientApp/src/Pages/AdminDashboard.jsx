@@ -133,6 +133,14 @@ const AdminDashboard = () => {
     const [promoError, setPromoError] = useState('');
     const [editingPromoId, setEditingPromoId] = useState(null);
     const [owners, setOwners] = useState([]);
+    const [promoEmailSubject, setPromoEmailSubject] = useState('');
+    const [promoEmailMessage, setPromoEmailMessage] = useState('');
+    const [promoEmailSending, setPromoEmailSending] = useState(false);
+    const [promoEmailResult, setPromoEmailResult] = useState(null);
+    const [promoEmailConfirmOpen, setPromoEmailConfirmOpen] = useState(false);
+    const [spreadEmails, setSpreadEmails] = useState('');
+    const [spreadSending, setSpreadSending] = useState(false);
+    const [spreadResult, setSpreadResult] = useState(null);
 
     const loadPending = async () => {
         const [gowns, ads] = await Promise.all([
@@ -225,6 +233,40 @@ const AdminDashboard = () => {
         await loadPromoCodes();
     };
 
+    const onSendPromoEmail = async () => {
+        setPromoEmailConfirmOpen(false);
+        setPromoEmailSending(true);
+        setPromoEmailResult(null);
+        try {
+            const { data } = await axios.post('/api/admin/email/promo', {
+                subject: promoEmailSubject.trim(),
+                message: promoEmailMessage.trim()
+            });
+            setPromoEmailResult({ type: 'success', text: `Sent to ${data.sent} of ${data.total} patrons.` });
+            setPromoEmailSubject('');
+            setPromoEmailMessage('');
+        } catch (err) {
+            setPromoEmailResult({ type: 'error', text: err?.response?.data?.message || 'Could not send the email.' });
+        } finally {
+            setPromoEmailSending(false);
+        }
+    };
+
+    const onSendSpreadTheWord = async () => {
+        setSpreadSending(true);
+        setSpreadResult(null);
+        const emails = spreadEmails.split(/[\n,]/).map(e => e.trim()).filter(Boolean);
+        try {
+            const { data } = await axios.post('/api/admin/email/spread-the-word', { emails });
+            setSpreadResult({ type: 'success', text: `Sent to ${data.sent} of ${data.total} addresses.` });
+            setSpreadEmails('');
+        } catch (err) {
+            setSpreadResult({ type: 'error', text: err?.response?.data?.message || 'Could not send the email.' });
+        } finally {
+            setSpreadSending(false);
+        }
+    };
+
     const onApprove = async (type, id) => {
         setError('');
         try {
@@ -273,6 +315,7 @@ const AdminDashboard = () => {
                 <Tab label={`Live Ads${activeAds.length ? ` (${activeAds.length})` : ''}`} />
                 <Tab label="Promo Codes" />
                 <Tab label={`Patrons${owners.length ? ` (${owners.length})` : ''}`} />
+                <Tab label="Send Emails" />
             </Tabs>
 
             {tab === 0 && (
@@ -390,6 +433,83 @@ const AdminDashboard = () => {
                     )}
                 </Box>
             )}
+            {tab === 6 && (
+                <Stack spacing={4} sx={{ mt: 3, maxWidth: 640 }}>
+                    <Box sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                        <Typography variant="h6" gutterBottom>Promotional Email</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Sends a styled email to every registered patron ({owners.length}). Good for sale announcements or site news.
+                        </Typography>
+                        {promoEmailResult && (
+                            <Alert severity={promoEmailResult.type === 'success' ? 'success' : 'error'} sx={{ mb: 2 }}>
+                                {promoEmailResult.text}
+                            </Alert>
+                        )}
+                        <Stack spacing={2}>
+                            <TextField
+                                label="Subject" fullWidth value={promoEmailSubject}
+                                onChange={(e) => setPromoEmailSubject(e.target.value)}
+                            />
+                            <TextField
+                                label="Message" fullWidth multiline rows={5} value={promoEmailMessage}
+                                onChange={(e) => setPromoEmailMessage(e.target.value)}
+                                helperText="Each line becomes its own paragraph. A 'Shop Now' button is added automatically."
+                            />
+                            <Box>
+                                <Button
+                                    variant="contained"
+                                    disabled={promoEmailSending || !promoEmailSubject.trim() || !promoEmailMessage.trim()}
+                                    onClick={() => setPromoEmailConfirmOpen(true)}
+                                >
+                                    {promoEmailSending ? 'Sending...' : `Send to All Patrons (${owners.length})`}
+                                </Button>
+                            </Box>
+                        </Stack>
+                    </Box>
+
+                    <Box sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                        <Typography variant="h6" gutterBottom>Spread the Word</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Sends a ready-made showcase email (featuring the site's own ad creatives, with a link to Regowned) to any addresses you paste below — great for inviting people who aren't on the site yet.
+                        </Typography>
+                        {spreadResult && (
+                            <Alert severity={spreadResult.type === 'success' ? 'success' : 'error'} sx={{ mb: 2 }}>
+                                {spreadResult.text}
+                            </Alert>
+                        )}
+                        <Stack spacing={2}>
+                            <TextField
+                                label="Recipient emails" fullWidth multiline rows={4} value={spreadEmails}
+                                onChange={(e) => setSpreadEmails(e.target.value)}
+                                helperText="One per line, or comma-separated."
+                                placeholder={'friend1@example.com\nfriend2@example.com'}
+                            />
+                            <Box>
+                                <Button
+                                    variant="contained"
+                                    disabled={spreadSending || !spreadEmails.trim()}
+                                    onClick={onSendSpreadTheWord}
+                                >
+                                    {spreadSending ? 'Sending...' : 'Send Invite Email'}
+                                </Button>
+                            </Box>
+                        </Stack>
+                    </Box>
+                </Stack>
+            )}
+
+            <Dialog open={promoEmailConfirmOpen} onClose={() => setPromoEmailConfirmOpen(false)} maxWidth="xs" fullWidth fullScreen={fullScreen}>
+                <DialogTitle>Send to All Patrons?</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        This will email all {owners.length} registered patrons with the subject "{promoEmailSubject}". This can't be undone.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setPromoEmailConfirmOpen(false)}>Cancel</Button>
+                    <Button variant="contained" color="primary" onClick={onSendPromoEmail}>Send</Button>
+                </DialogActions>
+            </Dialog>
 
             <Dialog open={!!rejectTarget} onClose={() => setRejectTarget(null)} maxWidth="sm" fullWidth fullScreen={fullScreen}>
                 <DialogTitle>Reject Submission</DialogTitle>

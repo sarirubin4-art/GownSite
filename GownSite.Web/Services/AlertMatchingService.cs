@@ -29,7 +29,7 @@ namespace GownSite.Web.Services
                     await _emailSender.SendAsync(
                         alert.Email,
                         "A gown matching your search is now live — Regowned",
-                        EmailTemplates.AlertMatch(gownUrl, unsubscribeUrl)
+                        EmailTemplates.AlertMatch(gownUrl, unsubscribeUrl, frontendBaseUrl)
                     );
                 }
                 catch

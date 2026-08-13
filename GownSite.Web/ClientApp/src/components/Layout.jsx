@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
-    AppBar, Toolbar, Typography, Button, Box, Container,
+    AppBar, Toolbar, Typography, Button, Box, Container, Alert,
     Avatar, IconButton, Menu, MenuItem, Divider, Drawer, List, ListItemButton, ListItemText
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -31,6 +32,18 @@ const Layout = ({ children }) => {
     const [menuAnchor, setMenuAnchor] = useState(null);
     const [adVisible, setAdVisible] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
+    const [verifyBannerDismissed, setVerifyBannerDismissed] = useState(false);
+    const [resendState, setResendState] = useState('idle'); // idle | sending | sent
+
+    const onResendVerification = async () => {
+        setResendState('sending');
+        try {
+            await axios.post('/api/owner/resend-verification');
+            setResendState('sent');
+        } catch {
+            setResendState('idle');
+        }
+    };
 
     const onLogoutClick = async () => {
         setMenuAnchor(null);
@@ -194,6 +207,25 @@ const Layout = ({ children }) => {
                     </List>
                 </Box>
             </Drawer>
+            {owner && !owner.emailVerified && !verifyBannerDismissed && (
+                <Alert
+                    severity="warning"
+                    onClose={() => setVerifyBannerDismissed(true)}
+                    action={
+                        <Button
+                            color="inherit"
+                            size="small"
+                            disabled={resendState !== 'idle'}
+                            onClick={onResendVerification}
+                        >
+                            {resendState === 'sent' ? 'Email Sent' : resendState === 'sending' ? 'Sending...' : 'Resend Email'}
+                        </Button>
+                    }
+                    sx={{ borderRadius: 0 }}
+                >
+                    Please verify your email to activate your account — check your inbox for the link.
+                </Alert>
+            )}
             {/* Backgrounds live here, not on the outer Box, so the top-left bloom
                 always starts right below the navbar regardless of its rendered
                 height (e.g. if the nav wraps to two lines on a narrower screen). */}

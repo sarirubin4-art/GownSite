@@ -11,6 +11,17 @@ namespace GownSite.Web.Controllers
         public string Reason { get; set; }
     }
 
+    public class SendPromoEmailRequest
+    {
+        public string Subject { get; set; }
+        public string Message { get; set; }
+    }
+
+    public class SendSpreadTheWordRequest
+    {
+        public List<string> Emails { get; set; }
+    }
+
     [Route("api/[controller]")]
     [ApiController]
     [Authorize(Roles = "Admin")]
@@ -141,7 +152,7 @@ namespace GownSite.Web.Controllers
             await _emailSender.SendAsync(
                 posting.Owner.Email,
                 "Your gown listing is approved — Regowned",
-                EmailTemplates.Approved("gown listing", $"{frontendBaseUrl}/gown/{id}")
+                EmailTemplates.Approved("gown listing", $"{frontendBaseUrl}/gown/{id}", frontendBaseUrl)
             );
 
             var alertMatcher = new AlertMatchingService(_connectionString, _emailSender);
@@ -164,7 +175,7 @@ namespace GownSite.Web.Controllers
             await _emailSender.SendAsync(
                 posting.Owner.Email,
                 "About your gown submission — Regowned",
-                EmailTemplates.Rejected("gown listing", request.Reason)
+                EmailTemplates.Rejected("gown listing", request.Reason, FrontendBaseUrl())
             );
 
             return Ok();
@@ -203,7 +214,7 @@ namespace GownSite.Web.Controllers
             await _emailSender.SendAsync(
                 posting.Owner.Email,
                 "Your gown listing has been taken down — Regowned",
-                EmailTemplates.Removed("gown listing", request.Reason)
+                EmailTemplates.Removed("gown listing", request.Reason, FrontendBaseUrl())
             );
 
             return Ok();
@@ -255,7 +266,7 @@ namespace GownSite.Web.Controllers
                 await _emailSender.SendAsync(
                     owner.Email,
                     "Your ad is approved — Regowned",
-                    EmailTemplates.Approved("ad", $"{FrontendBaseUrl()}/ad/{id}")
+                    EmailTemplates.Approved("ad", $"{FrontendBaseUrl()}/ad/{id}", FrontendBaseUrl())
                 );
             }
 
@@ -280,7 +291,7 @@ namespace GownSite.Web.Controllers
                 await _emailSender.SendAsync(
                     owner.Email,
                     "About your ad submission — Regowned",
-                    EmailTemplates.Rejected("ad", request.Reason)
+                    EmailTemplates.Rejected("ad", request.Reason, FrontendBaseUrl())
                 );
             }
 
@@ -324,7 +335,7 @@ namespace GownSite.Web.Controllers
                 await _emailSender.SendAsync(
                     owner.Email,
                     "Your ad has been taken down — Regowned",
-                    EmailTemplates.Removed("ad", request.Reason)
+                    EmailTemplates.Removed("ad", request.Reason, FrontendBaseUrl())
                 );
             }
 
@@ -343,6 +354,64 @@ namespace GownSite.Web.Controllers
         {
             var repo = new OwnerRepository(_connectionString);
             return Ok(repo.GetAll());
+        }
+
+        [HttpPost("email/promo")]
+        public async Task<IActionResult> SendPromoEmail([FromBody] SendPromoEmailRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Subject) || string.IsNullOrWhiteSpace(request.Message))
+                return BadRequest(new { message = "Subject and message are required." });
+
+            var frontendBaseUrl = FrontendBaseUrl();
+            var body = EmailTemplates.Promotional(request.Message, frontendBaseUrl);
+            var owners = new OwnerRepository(_connectionString).GetAll();
+
+            var sent = 0;
+            foreach (var recipient in owners)
+            {
+                try
+                {
+                    await _emailSender.SendAsync(recipient.Email, request.Subject, body);
+                    sent++;
+                }
+                catch
+                {
+                    // one failed send shouldn't block the rest of the blast
+                }
+            }
+
+            return Ok(new { sent, total = owners.Count });
+        }
+
+        [HttpPost("email/spread-the-word")]
+        public async Task<IActionResult> SendSpreadTheWordEmail([FromBody] SendSpreadTheWordRequest request)
+        {
+            var emails = (request.Emails ?? new List<string>())
+                .Select(e => e.Trim())
+                .Where(e => !string.IsNullOrEmpty(e))
+                .Distinct()
+                .ToList();
+            if (emails.Count == 0)
+                return BadRequest(new { message = "Enter at least one email address." });
+
+            var frontendBaseUrl = FrontendBaseUrl();
+            var body = EmailTemplates.SpreadTheWord(frontendBaseUrl);
+
+            var sent = 0;
+            foreach (var email in emails)
+            {
+                try
+                {
+                    await _emailSender.SendAsync(email, "Have you heard about Regowned?", body);
+                    sent++;
+                }
+                catch
+                {
+                    // one failed send shouldn't block the rest of the batch
+                }
+            }
+
+            return Ok(new { sent, total = emails.Count });
         }
 
         [HttpPost("promocodes/create")]

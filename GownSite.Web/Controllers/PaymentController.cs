@@ -312,7 +312,7 @@ namespace GownSite.Web.Controllers
                 await _emailSender.SendAsync(
                     adminEmail,
                     "New gown submitted for review — Regowned",
-                    EmailTemplates.NewSubmissionAdmin("gown", posting.Owner.Name, posting.Description, $"{FrontendBaseUrl()}/admin")
+                    EmailTemplates.NewSubmissionAdmin("gown", posting.Owner.Name, posting.Description, $"{FrontendBaseUrl()}/admin", FrontendBaseUrl())
                 );
             }
 
@@ -407,7 +407,7 @@ namespace GownSite.Web.Controllers
                 await _emailSender.SendAsync(
                     adminEmail,
                     "New gown batch submitted for review — Regowned",
-                    EmailTemplates.NewSubmissionAdminBatch(postings[0].Owner.Name, postings.Select(p => p.Description).ToList(), $"{FrontendBaseUrl()}/admin")
+                    EmailTemplates.NewSubmissionAdminBatch(postings[0].Owner.Name, postings.Select(p => p.Description).ToList(), $"{FrontendBaseUrl()}/admin", FrontendBaseUrl())
                 );
             }
 
@@ -558,7 +558,7 @@ namespace GownSite.Web.Controllers
                 await _emailSender.SendAsync(
                     adminEmail,
                     "New ad submitted for review — Regowned",
-                    EmailTemplates.NewSubmissionAdmin("ad", owner?.Name ?? "an advertiser", ad.Title, $"{FrontendBaseUrl()}/admin")
+                    EmailTemplates.NewSubmissionAdmin("ad", owner?.Name ?? "an advertiser", ad.Title, $"{FrontendBaseUrl()}/admin", FrontendBaseUrl())
                 );
             }
 
