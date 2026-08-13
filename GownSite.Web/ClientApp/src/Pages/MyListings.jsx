@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
     Box, Typography, Grid, Card, CardMedia, CardContent, Chip, Button, Stack,
-    Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Autocomplete, createFilterOptions
+    Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Autocomplete, createFilterOptions,
+    Checkbox, FormControlLabel, FormGroup
 } from '@mui/material';
-import { COLOR_OPTIONS, SIZE_OPTIONS, LISTING_TYPE_OPTIONS } from '../constants/gownOptions';
+import { COLOR_OPTIONS, SIZE_OPTIONS, LISTING_TYPE_OPTIONS, STYLE_OPTIONS } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 
@@ -62,10 +63,18 @@ const MyListings = () => {
             color: editTarget.colors.join(','),
             size: editTarget.sizes.join(','),
             price: Number(editTarget.price),
-            pricePaid: editTarget.pricePaid === '' ? null : Number(editTarget.pricePaid)
+            pricePaid: editTarget.pricePaid === '' ? null : Number(editTarget.pricePaid),
+            styleTags: editTarget.styleTags.join(',')
         });
         setEditTarget(null);
         load();
+    };
+
+    const toggleEditStyle = (value) => {
+        setEditTarget((prev) => {
+            const has = prev.styleTags.includes(value);
+            return { ...prev, styleTags: has ? prev.styleTags.filter(s => s !== value) : [...prev.styleTags, value] };
+        });
     };
 
     const onCloseEditDialog = () => {
@@ -143,7 +152,8 @@ const MyListings = () => {
                                         id: g.id, description: g.description, colors: (g.color || '').split(',').filter(Boolean), sizes: (g.size || '').split(',').filter(Boolean),
                                         price: g.price, location: g.location, listingType: g.listingType,
                                         displayOwnerName: g.displayOwnerName, brand: g.brand || '', pricePaid: g.pricePaid || '',
-                                        condition: g.condition || '', length: g.length || '', styleTags: g.styleTags || '', notes: g.notes || '',
+                                        condition: g.condition || '', length: g.length || '',
+                                        styleTags: (g.styleTags || '').split(',').filter(Boolean), notes: g.notes || '',
                                         isActive: g.isActive
                                     })}>
                                         Edit
@@ -238,6 +248,32 @@ const MyListings = () => {
                                 onInputChange={(e, value) => setEditTarget({ ...editTarget, location: value })}
                                 renderInput={(params) => <TextField {...params} label="Location" />}
                             />
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                <TextField label="Brand" fullWidth value={editTarget.brand}
+                                    onChange={(e) => setEditTarget({ ...editTarget, brand: e.target.value })} />
+                                <TextField label="Original Gown Value" type="number" fullWidth value={editTarget.pricePaid}
+                                    onChange={(e) => setEditTarget({ ...editTarget, pricePaid: e.target.value })} />
+                            </Stack>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                <TextField label="Condition" fullWidth value={editTarget.condition}
+                                    placeholder="e.g. Like new, worn once"
+                                    onChange={(e) => setEditTarget({ ...editTarget, condition: e.target.value })} />
+                                <TextField label="Height/Length" fullWidth value={editTarget.length}
+                                    onChange={(e) => setEditTarget({ ...editTarget, length: e.target.value })} />
+                            </Stack>
+                            <Box>
+                                <Typography variant="subtitle2" sx={{ mb: 1 }}>Style Tags (select all that apply)</Typography>
+                                <FormGroup row>
+                                    {STYLE_OPTIONS.map(s => (
+                                        <FormControlLabel
+                                            key={s.value}
+                                            control={<Checkbox checked={editTarget.styleTags.includes(s.value)} onChange={() => toggleEditStyle(s.value)} />}
+                                            label={s.label}
+                                            sx={{ width: { xs: '100%', sm: '50%' } }}
+                                        />
+                                    ))}
+                                </FormGroup>
+                            </Box>
                             <TextField label="Notes" multiline rows={2} value={editTarget.notes}
                                 onChange={(e) => setEditTarget({ ...editTarget, notes: e.target.value })} />
                         </Stack>

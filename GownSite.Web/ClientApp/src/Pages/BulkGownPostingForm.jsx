@@ -330,7 +330,7 @@ const BulkGownPostingForm = () => {
                                 <TextField label="Brand" value={g.brand} onChange={(e) => updateGown(g.localId, { brand: e.target.value })} fullWidth size="small" />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField label="Price Paid" type="number" value={g.pricePaid} onChange={(e) => updateGown(g.localId, { pricePaid: e.target.value })} fullWidth size="small" />
+                                <TextField label="Original Gown Value" type="number" value={g.pricePaid} onChange={(e) => updateGown(g.localId, { pricePaid: e.target.value })} fullWidth size="small" />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <TextField label="Condition" value={g.condition} onChange={(e) => updateGown(g.localId, { condition: e.target.value })} fullWidth size="small" placeholder="e.g. Like new, worn once" />

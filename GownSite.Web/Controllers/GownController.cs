@@ -131,6 +131,13 @@ namespace GownSite.Web.Controllers
                 monthlyFeeOverride = resolved.ResolvedFee;
                 promoDurationMonths = resolved.DurationMonths;
             }
+            else if (request.BatchId.HasValue)
+            {
+                // Bulk posts (2+ gowns in one batch) get the volume-tiered per-gown rate
+                // automatically — no promo code needed, matching every other gown in the batch.
+                var quantity = request.BatchSize ?? 1;
+                monthlyFeeOverride = PromoCodeCalculator.VolumeTiers.First(t => quantity >= t.MinQuantity).PricePerGown;
+            }
 
             var primaryUrl = await _storage.SaveAsync(request.PrimaryPicture, "gowns");
 

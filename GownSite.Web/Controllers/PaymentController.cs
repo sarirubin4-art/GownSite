@@ -33,6 +33,7 @@ namespace GownSite.Web.Controllers
     {
         public decimal GownMonthlyFee { get; set; }
         public decimal AdMonthlyFee { get; set; }
+        public decimal GownPostingSetupFee { get; set; }
     }
 
     public class ApplyPromoRequest
@@ -69,7 +70,8 @@ namespace GownSite.Web.Controllers
             return Ok(new PricingResponse
             {
                 GownMonthlyFee = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m),
-                AdMonthlyFee = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m)
+                AdMonthlyFee = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m),
+                GownPostingSetupFee = _configuration.GetValue<decimal>("Stripe:GownPostingSetupFeeUsd", 0m)
             });
         }
 

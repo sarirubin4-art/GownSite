@@ -129,6 +129,30 @@ namespace GownSite.Web.Controllers
 
             var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m);
 
+            // A solo listing (not part of a batch) with no promo/tier applied gets a one-time
+            // setup fee added to its first invoice, so the first bill is (base + setup) and
+            // every bill after is just the base monthly fee. Batches already get their own
+            // discounted per-gown rate and skip this; promo'd listings are unaffected too.
+            var isSoloDefaultPricing = !posting.BatchId.HasValue && !posting.MonthlyFeeOverride.HasValue;
+            var setupFeeUsd = _configuration.GetValue<decimal>("Stripe:GownPostingSetupFeeUsd", 0m);
+            if (isSoloDefaultPricing && setupFeeUsd > 0)
+            {
+                try
+                {
+                    await new InvoiceItemService().CreateAsync(new InvoiceItemCreateOptions
+                    {
+                        Customer = posting.StripeCustomerId,
+                        Amount = (long)Math.Round(setupFeeUsd * 100, MidpointRounding.AwayFromZero),
+                        Currency = "usd",
+                        Description = "Regowned One-Time Listing Setup Fee"
+                    });
+                }
+                catch (StripeException ex)
+                {
+                    return BadRequest(new { message = $"Payment could not be processed: {ex.Message}" });
+                }
+            }
+
             Subscription subscription;
             try
             {

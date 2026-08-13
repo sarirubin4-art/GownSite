@@ -5,12 +5,13 @@ import { formatUsd } from '../constants/gownOptions';
 // Shopping-cart-style price breakdown for the payment-setup pages.
 // When a promo lowers the fee, the original price is struck through and the
 // discounted price is highlighted in the brand accent color.
-const PriceSummary = ({ label, fullFee, resolvedFee, quantity = 1, durationMonths }) => {
+const PriceSummary = ({ label, fullFee, resolvedFee, quantity = 1, durationMonths, oneTimeFee = 0 }) => {
     if (fullFee == null || resolvedFee == null) return null;
 
     const hasPromo = resolvedFee < fullFee;
     const total = resolvedFee * quantity;
     const fullTotal = fullFee * quantity;
+    const hasOneTimeFee = oneTimeFee > 0;
 
     return (
         <Box
@@ -46,11 +47,18 @@ const PriceSummary = ({ label, fullFee, resolvedFee, quantity = 1, durationMonth
                 </Typography>
             )}
 
+            {hasOneTimeFee && (
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.75 }}>
+                    <Typography variant="body2" color="text.secondary">One-Time Posting Fee</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 700 }}>{formatUsd(oneTimeFee)}</Typography>
+                </Stack>
+            )}
+
             <Divider sx={{ my: 1.25 }} />
 
             <Stack direction="row" justifyContent="space-between" alignItems="baseline">
                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Total / month
+                    {hasOneTimeFee ? 'Total for Your First Month' : 'Total / month'}
                 </Typography>
                 <Stack direction="row" spacing={1} alignItems="baseline">
                     {hasPromo && quantity > 1 && (
@@ -59,10 +67,16 @@ const PriceSummary = ({ label, fullFee, resolvedFee, quantity = 1, durationMonth
                         </Typography>
                     )}
                     <Typography variant="subtitle1" sx={{ fontWeight: 700, color: hasPromo ? 'primary.dark' : 'text.primary' }}>
-                        {formatUsd(total)}
+                        {formatUsd(total + oneTimeFee)}
                     </Typography>
                 </Stack>
             </Stack>
+
+            {hasOneTimeFee && (
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                    then {formatUsd(total)}/month after
+                </Typography>
+            )}
 
             {hasPromo && (
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1.25 }}>

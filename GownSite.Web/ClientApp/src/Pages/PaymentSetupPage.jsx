@@ -14,6 +14,7 @@ const PaymentSetupPage = () => {
     const [gownFee, setGownFee] = useState(null);
     const [fullFee, setFullFee] = useState(null);
     const [durationMonths, setDurationMonths] = useState(null);
+    const [oneTimeFee, setOneTimeFee] = useState(0);
 
     useEffect(() => {
         if (searchParams.get('canceled')) {
@@ -32,6 +33,10 @@ const PaymentSetupPage = () => {
                 setGownFee(posting?.monthlyFeeOverride ?? pricing.gownMonthlyFee);
                 setFullFee(pricing.gownMonthlyFee);
                 setDurationMonths(posting?.promoDurationMonths ?? null);
+                // The one-time setup fee only applies to a solo listing with no promo/batch
+                // pricing already discounting it — matches the backend's charge-time logic.
+                const isSoloDefaultPricing = !posting?.batchId && posting?.monthlyFeeOverride == null;
+                setOneTimeFee(isSoloDefaultPricing ? pricing.gownPostingSetupFee : 0);
             } catch {
                 // leave gownFee null; the fallback copy still reads fine without a number
             }
@@ -75,7 +80,7 @@ const PaymentSetupPage = () => {
                 <Typography color="text.secondary" sx={{ mb: 3 }}>
                     Every listing is reviewed before it goes live. Add a card to hold your spot — here's what you'll be charged once it's approved:
                 </Typography>
-                <PriceSummary label="Monthly Listing Fee" fullFee={fullFee} resolvedFee={gownFee} durationMonths={durationMonths} />
+                <PriceSummary label="Monthly Listing Fee" fullFee={fullFee} resolvedFee={gownFee} durationMonths={durationMonths} oneTimeFee={oneTimeFee} />
                 {error && <Alert severity="warning" sx={{ mb: 2, textAlign: 'left' }}>{error}</Alert>}
                 {stripeUnavailable ? (
                     <Stack spacing={2}>

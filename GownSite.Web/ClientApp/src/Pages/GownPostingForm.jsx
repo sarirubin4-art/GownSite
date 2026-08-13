@@ -247,7 +247,7 @@ const GownPostingForm = () => {
                         <TextField label="Brand" value={form.brand} onChange={onChange('brand')} fullWidth />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                        <TextField label="Price Paid" type="number" value={form.pricePaid} onChange={onChange('pricePaid')} fullWidth />
+                        <TextField label="Original Gown Value" type="number" value={form.pricePaid} onChange={onChange('pricePaid')} fullWidth />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                         <TextField label="Condition" value={form.condition} onChange={onChange('condition')} fullWidth placeholder="e.g. Like new, worn once" />

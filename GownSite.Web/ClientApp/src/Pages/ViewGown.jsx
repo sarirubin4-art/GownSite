@@ -7,10 +7,12 @@ import {
 } from '@mui/material';
 import { styleLabel } from '../constants/gownOptions';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
+import { useAdLane } from '../context/AdLaneContext';
 
 const ViewGown = () => {
     const { id } = useParams();
     const fullScreen = useFullScreenDialog();
+    const { adVisible, laneWidth } = useAdLane();
     const [gown, setGown] = useState(null);
     const [activeImage, setActiveImage] = useState(null);
     const [contactInfo, setContactInfo] = useState(null);
@@ -44,7 +46,7 @@ const ViewGown = () => {
 
     return (
         <Box>
-            <Grid container spacing={4}>
+            <Grid container spacing={4} sx={{ mr: { xs: 0, md: adVisible ? `${laneWidth}px` : 0 } }}>
                 <Grid size={{ xs: 12, md: 7 }}>
                     <Box sx={{ display: 'flex', gap: 2 }}>
                         <Stack spacing={1} sx={{ width: 72 }}>
@@ -119,7 +121,7 @@ const ViewGown = () => {
                         {gown.brand && <Typography><strong>Brand:</strong> {gown.brand}</Typography>}
                         {gown.condition && <Typography><strong>Condition:</strong> {gown.condition}</Typography>}
                         {gown.length && <Typography><strong>Height/Length:</strong> {gown.length}</Typography>}
-                        {gown.pricePaid && <Typography><strong>Original Price Paid:</strong> ${gown.pricePaid}</Typography>}
+                        {gown.pricePaid && <Typography><strong>Original Gown Value:</strong> ${gown.pricePaid}</Typography>}
                     </Stack>
 
                     {styleTags.length > 0 && (

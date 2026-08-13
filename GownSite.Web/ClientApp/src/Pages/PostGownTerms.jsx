@@ -9,6 +9,7 @@ const PostGownTerms = () => {
     const { owner, loading } = useAuth();
     const navigate = useNavigate();
     const [gownFee, setGownFee] = useState(null);
+    const [setupFee, setSetupFee] = useState(0);
 
     useEffect(() => {
         if (!loading && !owner) {
@@ -17,7 +18,10 @@ const PostGownTerms = () => {
     }, [loading, owner]);
 
     useEffect(() => {
-        axios.get('/api/payment/pricing').then(({ data }) => setGownFee(data.gownMonthlyFee)).catch(() => {});
+        axios.get('/api/payment/pricing').then(({ data }) => {
+            setGownFee(data.gownMonthlyFee);
+            setSetupFee(data.gownPostingSetupFee || 0);
+        }).catch(() => {});
     }, []);
 
     if (loading || !owner) return null;
@@ -30,9 +34,15 @@ const PostGownTerms = () => {
                     <ListItem>
                         <ListItemText primary={
                             gownFee != null
-                                ? `Listing a gown costs ${formatUsd(gownFee)}/month to keep your posting live and support the upkeep of the site.`
+                                ? `Posting a single gown costs ${formatUsd(gownFee + setupFee)} for your first month, then ${formatUsd(gownFee)}/month after — this keeps your posting live and supports the upkeep of the site.`
                                 : 'Listing a gown requires a small monthly fee to keep your posting live and support the upkeep of the site.'
                         } />
+                    </ListItem>
+                    <ListItem>
+                        <ListItemText primary="Posting multiple gowns at once? You'll automatically get a lower per-gown rate the more you post in one batch — no promo code needed." />
+                    </ListItem>
+                    <ListItem>
+                        <ListItemText primary="Most gowns take about 5 minutes to post if you have your photos ready — just fill in the basics, and add extra details later if you'd like." />
                     </ListItem>
                     <ListItem>
                         <ListItemText primary="After you add a card, your listing is reviewed before it goes live — you won't be charged unless it's approved. Once live, you can take it down and cancel the subscription any time from My Listings." />
