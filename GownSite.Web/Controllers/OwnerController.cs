@@ -1,4 +1,5 @@
 using GownSite.Data;
+using GownSite.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -36,11 +37,21 @@ namespace GownSite.Web.Controllers
     public class OwnerController : ControllerBase
     {
         private readonly string _connectionString;
+        private readonly IConfiguration _configuration;
+        private readonly IEmailSender _emailSender;
         private static readonly PasswordHasher<Owner> _hasher = new();
 
-        public OwnerController(IConfiguration configuration)
+        public OwnerController(IConfiguration configuration, IEmailSender emailSender)
         {
+            _configuration = configuration;
             _connectionString = configuration.GetConnectionString("ConStr");
+            _emailSender = emailSender;
+        }
+
+        private string FrontendBaseUrl()
+        {
+            var frontendBaseUrl = _configuration["Frontend:BaseUrl"];
+            return string.IsNullOrEmpty(frontendBaseUrl) ? $"{Request.Scheme}://{Request.Host}" : frontendBaseUrl;
         }
 
         [HttpPost("signup")]
@@ -61,6 +72,12 @@ namespace GownSite.Web.Controllers
             };
             owner.PasswordHash = _hasher.HashPassword(owner, request.Password);
             repo.Create(owner);
+
+            await _emailSender.SendAsync(
+                owner.Email,
+                "Welcome to Regowned!",
+                EmailTemplates.Welcome(owner.Name, $"{FrontendBaseUrl()}/search")
+            );
 
             await SignInOwner(owner);
             return Ok(ToViewModel(owner));

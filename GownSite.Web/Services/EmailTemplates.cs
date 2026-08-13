@@ -33,6 +33,11 @@ namespace GownSite.Web.Services
             $"<p><strong>Reason:</strong> {reason}</p>" +
             $"<p>You're welcome to submit a new listing that addresses this.</p>";
 
+        public static string Welcome(string ownerName, string browseUrl) =>
+            $"<p>Welcome to Regowned, {ownerName}!</p>" +
+            $"<p>Your account is all set. Buy, sell, or rent gently-loved gowns, or browse trusted simcha vendors — whenever you're ready.</p>" +
+            $"<p><a href=\"{browseUrl}\">Start browsing gowns</a></p>";
+
         public static string AlertMatch(string gownUrl, string unsubscribeUrl) =>
             $"<p>A gown matching your saved search just went live on Regowned!</p>" +
             $"<p><a href=\"{gownUrl}\">View the listing</a></p>" +
