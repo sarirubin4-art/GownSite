@@ -1,4 +1,5 @@
 using GownSite.Data;
+using GownSite.Web.Filters;
 using GownSite.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -34,6 +35,7 @@ namespace GownSite.Web.Controllers
         }
 
         [HttpPost("business-inquiry")]
+        [RequireVerifiedEmail]
         public async Task<IActionResult> BusinessInquiry([FromBody] BusinessInquiryRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Message))

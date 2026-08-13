@@ -1,4 +1,5 @@
 using GownSite.Data;
+using GownSite.Web.Filters;
 using GownSite.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -105,6 +106,7 @@ namespace GownSite.Web.Controllers
 
         [HttpPost("create")]
         [Authorize]
+        [RequireVerifiedEmail]
         [RequestSizeLimit(100_000_000)]
         public async Task<IActionResult> Create([FromForm] CreateGownRequest request)
         {

@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
-    AppBar, Toolbar, Typography, Button, Box, Container, Alert,
+    AppBar, Toolbar, Typography, Button, Box, Container, Paper,
     Avatar, IconButton, Menu, MenuItem, Divider, Drawer, List, ListItemButton, ListItemText
 } from '@mui/material';
+import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useAuth } from '../context/AuthContext';
 import { AdLaneProvider } from '../context/AdLaneContext';
@@ -32,7 +33,6 @@ const Layout = ({ children }) => {
     const [menuAnchor, setMenuAnchor] = useState(null);
     const [adVisible, setAdVisible] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
-    const [verifyBannerDismissed, setVerifyBannerDismissed] = useState(false);
     const [resendState, setResendState] = useState('idle'); // idle | sending | sent
 
     const onResendVerification = async () => {
@@ -207,39 +207,43 @@ const Layout = ({ children }) => {
                     </List>
                 </Box>
             </Drawer>
-            {owner && !owner.emailVerified && !verifyBannerDismissed && (
-                <Alert
-                    severity="warning"
-                    onClose={() => setVerifyBannerDismissed(true)}
-                    action={
-                        <Button
-                            color="inherit"
-                            size="small"
-                            disabled={resendState !== 'idle'}
-                            onClick={onResendVerification}
-                        >
-                            {resendState === 'sent' ? 'Email Sent' : resendState === 'sending' ? 'Sending...' : 'Resend Email'}
-                        </Button>
-                    }
-                    sx={{ borderRadius: 0 }}
-                >
-                    Please verify your email to activate your account — check your inbox for the link.
-                </Alert>
-            )}
             {/* Backgrounds live here, not on the outer Box, so the top-left bloom
                 always starts right below the navbar regardless of its rendered
                 height (e.g. if the nav wraps to two lines on a narrower screen). */}
             <Box sx={{ ...wallpaperBackground, minHeight: 'calc(100vh - 64px)' }}>
-                {/* The page itself always stays centered on the full viewport — the ad floats
-                    over it rather than displacing it. AdLaneProvider passes adVisible down so
-                    the rare row that actually reaches the right edge (a filter bar's trailing
-                    button, a tab strip) can reserve just enough space to clear the ad, without
-                    the whole page shifting off-center to make permanent room for it. */}
-                <Container maxWidth="lg" sx={{ pt: { xs: adVisible ? '108px' : 4, md: 4 }, pb: 24 }}>
-                    <AdLaneProvider adVisible={adVisible}>
-                        {children}
-                    </AdLaneProvider>
-                </Container>
+                {owner && !owner.emailVerified ? (
+                    // A hard gate, not a dismissable nudge: unverified accounts can't use the
+                    // site at all (browsing while logged out is unaffected) until they click
+                    // the link in their verification email. Accounts that existed before this
+                    // feature shipped were grandfathered in as verified, so this only applies
+                    // to new signups going forward.
+                    <Container maxWidth="xs" sx={{ pt: 8, pb: 8 }}>
+                        <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
+                            <MarkEmailUnreadIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+                            <Typography variant="h5" gutterBottom>Verify Your Email</Typography>
+                            <Typography color="text.secondary" sx={{ mb: 3 }}>
+                                We sent a verification link to <strong>{owner.email}</strong>. Click it to activate your account — you'll need to verify before you can use Regowned.
+                            </Typography>
+                            <Button
+                                variant="contained" fullWidth disabled={resendState !== 'idle'} onClick={onResendVerification} sx={{ mb: 1.5 }}
+                            >
+                                {resendState === 'sent' ? 'Email Sent' : resendState === 'sending' ? 'Sending...' : 'Resend Email'}
+                            </Button>
+                            <Button variant="text" fullWidth onClick={onLogoutClick}>Log Out</Button>
+                        </Paper>
+                    </Container>
+                ) : (
+                    /* The page itself always stays centered on the full viewport — the ad floats
+                       over it rather than displacing it. AdLaneProvider passes adVisible down so
+                       the rare row that actually reaches the right edge (a filter bar's trailing
+                       button, a tab strip) can reserve just enough space to clear the ad, without
+                       the whole page shifting off-center to make permanent room for it. */
+                    <Container maxWidth="lg" sx={{ pt: { xs: adVisible ? '108px' : 4, md: 4 }, pb: 24 }}>
+                        <AdLaneProvider adVisible={adVisible}>
+                            {children}
+                        </AdLaneProvider>
+                    </Container>
+                )}
             </Box>
             <Box sx={{ py: 3, textAlign: 'center', borderTop: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
                 <Typography variant="body2" color="text.secondary">
