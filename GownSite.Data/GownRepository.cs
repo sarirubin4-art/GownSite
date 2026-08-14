@@ -135,6 +135,16 @@ namespace GownSite.Data
             context.SaveChanges();
         }
 
+        public void SetPrimaryPicture(int id, string url)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var existing = context.Gowns.FirstOrDefault(g => g.Id == id);
+            if (existing == null) return;
+
+            existing.PrimaryPictureUrl = url;
+            context.SaveChanges();
+        }
+
         public void ActivateListing(int id, string stripeSubscriptionId, string stripeCustomerId)
         {
             using var context = new GownDataContext(_connectionString);

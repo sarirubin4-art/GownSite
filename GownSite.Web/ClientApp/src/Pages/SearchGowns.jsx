@@ -165,7 +165,10 @@ const SearchGowns = () => {
                     {results.map((gown) => (
                         <Grid key={gown.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
                             <Card sx={{ position: 'relative' }}>
-                                <CardActionArea onClick={() => navigate(`/gown/${gown.id}`)}>
+                                <CardActionArea
+                                    onClick={() => navigate(`/gown/${gown.id}`)}
+                                    sx={{ '&:hover .gown-card-image': { objectFit: 'contain' } }}
+                                >
                                     {gown.isSold && (
                                         <Box sx={{
                                             position: 'absolute', top: 0, left: 0, width: '100%', height: 220, zIndex: 1,
@@ -183,7 +186,18 @@ const SearchGowns = () => {
                                             </Typography>
                                         </Box>
                                     )}
-                                    <CardMedia component="img" height="220" image={gown.primaryPictureUrl} alt={gown.description} sx={{ objectFit: 'cover', filter: gown.isSold ? 'grayscale(40%)' : 'none' }} />
+                                    <CardMedia
+                                        component="img"
+                                        height="220"
+                                        image={gown.primaryPictureUrl}
+                                        alt={gown.description}
+                                        className="gown-card-image"
+                                        sx={{
+                                            objectFit: 'cover',
+                                            bgcolor: 'background.default',
+                                            filter: gown.isSold ? 'grayscale(40%)' : 'none'
+                                        }}
+                                    />
                                     <CardContent>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
                                             <Typography variant="h6">${gown.price}</Typography>

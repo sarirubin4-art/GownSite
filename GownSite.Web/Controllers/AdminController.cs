@@ -2,6 +2,7 @@ using GownSite.Data;
 using GownSite.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Stripe;
 
 namespace GownSite.Web.Controllers
@@ -378,6 +379,23 @@ namespace GownSite.Web.Controllers
         {
             var repo = new OwnerRepository(_connectionString);
             return Ok(repo.GetAll());
+        }
+
+        [HttpPost("owners/{id}/delete")]
+        public IActionResult DeleteOwner(int id)
+        {
+            var repo = new OwnerRepository(_connectionString);
+            try
+            {
+                var deleted = repo.Delete(id);
+                if (!deleted) return NotFound();
+                return Ok();
+            }
+            catch (DbUpdateException)
+            {
+                // FK relationships to gowns/ads are Restrict — this patron has postings on record.
+                return BadRequest(new { message = "This patron has gowns or ads on record and can't be deleted. Remove those first." });
+            }
         }
 
         [HttpPost("email/promo")]

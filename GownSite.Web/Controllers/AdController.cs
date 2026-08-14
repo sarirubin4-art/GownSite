@@ -15,6 +15,9 @@ namespace GownSite.Web.Controllers
         public string Category { get; set; }
         public string PromoCode { get; set; }
         public IFormFile Image { get; set; }
+        // Set when finalizing a draft that autosave already created, so this submit
+        // updates that same row (and resolves any promo now) instead of making a new one.
+        public int? Id { get; set; }
     }
 
     public class EditAdRequest
@@ -24,6 +27,19 @@ namespace GownSite.Web.Controllers
         public string Description { get; set; }
         public string TargetUrl { get; set; }
         public string Category { get; set; }
+        public IFormFile Image { get; set; }
+    }
+
+    // No required fields — saved silently in the background while the owner is still
+    // filling out the ad form, so partial progress survives a closed tab.
+    public class SaveDraftAdRequest
+    {
+        public int? Id { get; set; }
+        public string Title { get; set; }
+        public string Description { get; set; }
+        public string TargetUrl { get; set; }
+        public string Category { get; set; }
+        public IFormFile Image { get; set; }
     }
 
     public class AdIdRequest
@@ -79,7 +95,17 @@ namespace GownSite.Web.Controllers
         [RequestSizeLimit(50_000_000)]
         public async Task<IActionResult> Create([FromForm] CreateAdRequest request)
         {
-            if (request.Image == null)
+            var repo = new AdRepository(_connectionString);
+            Ad existingDraft = null;
+            if (request.Id.HasValue)
+            {
+                existingDraft = repo.Get(request.Id.Value);
+                if (existingDraft == null || existingDraft.OwnerId != CurrentOwnerId()) return Forbid();
+                if (existingDraft.ModerationStatus != ModerationStatus.Draft)
+                    return BadRequest(new { message = "This ad has already been submitted." });
+            }
+
+            if (request.Image == null && existingDraft?.ImageUrl == null)
                 return BadRequest(new { message = "An ad image is required." });
             if (!Enum.TryParse<AdCategory>(request.Category, out var category))
                 return BadRequest(new { message = "Please choose a valid category." });
@@ -101,29 +127,49 @@ namespace GownSite.Web.Controllers
                 promoDurationMonths = resolved.DurationMonths;
             }
 
-            var imageUrl = await _storage.SaveAsync(request.Image, "ads");
+            var imageUrl = request.Image != null
+                ? await _storage.SaveAsync(request.Image, "ads")
+                : existingDraft.ImageUrl;
 
-            var ad = new Ad
+            int id;
+            if (existingDraft != null)
             {
-                OwnerId = CurrentOwnerId(),
-                Title = request.Title,
-                Description = request.Description,
-                TargetUrl = request.TargetUrl,
-                Category = category,
-                ImageUrl = imageUrl,
-                PromoCodeId = promoCodeId,
-                MonthlyFeeOverride = monthlyFeeOverride,
-                PromoDurationMonths = promoDurationMonths
-            };
+                repo.Update(new Ad
+                {
+                    Id = existingDraft.Id,
+                    Title = request.Title,
+                    Description = request.Description,
+                    TargetUrl = request.TargetUrl,
+                    Category = category
+                });
+                if (request.Image != null) repo.SetImage(existingDraft.Id, imageUrl);
+                if (promoCodeId.HasValue) repo.ApplyPromo(existingDraft.Id, promoCodeId.Value, monthlyFeeOverride, promoDurationMonths);
+                id = existingDraft.Id;
+            }
+            else
+            {
+                var ad = new Ad
+                {
+                    OwnerId = CurrentOwnerId(),
+                    Title = request.Title,
+                    Description = request.Description,
+                    TargetUrl = request.TargetUrl,
+                    Category = category,
+                    ImageUrl = imageUrl,
+                    PromoCodeId = promoCodeId,
+                    MonthlyFeeOverride = monthlyFeeOverride,
+                    PromoDurationMonths = promoDurationMonths
+                };
+                id = repo.Create(ad);
+            }
 
-            var repo = new AdRepository(_connectionString);
-            var id = repo.Create(ad);
             return Ok(new { id });
         }
 
         [HttpPost("edit")]
         [Authorize]
-        public IActionResult Edit([FromBody] EditAdRequest request)
+        [RequestSizeLimit(50_000_000)]
+        public async Task<IActionResult> Edit([FromForm] EditAdRequest request)
         {
             var repo = new AdRepository(_connectionString);
             var existing = repo.Get(request.Id);
@@ -140,7 +186,58 @@ namespace GownSite.Web.Controllers
                 TargetUrl = request.TargetUrl,
                 Category = category
             });
+            if (request.Image != null)
+                repo.SetImage(request.Id, await _storage.SaveAsync(request.Image, "ads"));
+
             return Ok();
+        }
+
+        [HttpPost("draft")]
+        [Authorize]
+        [RequireVerifiedEmail]
+        [RequestSizeLimit(50_000_000)]
+        public async Task<IActionResult> SaveDraft([FromForm] SaveDraftAdRequest request)
+        {
+            var repo = new AdRepository(_connectionString);
+            Enum.TryParse<AdCategory>(request.Category, out var category);
+
+            string imageUrl = null;
+            if (request.Image != null)
+                imageUrl = await _storage.SaveAsync(request.Image, "ads");
+
+            if (request.Id.HasValue)
+            {
+                var existing = repo.Get(request.Id.Value);
+                if (existing == null || existing.OwnerId != CurrentOwnerId()) return Forbid();
+                if (existing.ModerationStatus != ModerationStatus.Draft)
+                    return BadRequest(new { message = "This ad is no longer a draft." });
+
+                repo.Update(new Ad
+                {
+                    Id = existing.Id,
+                    Title = request.Title,
+                    Description = request.Description,
+                    TargetUrl = request.TargetUrl,
+                    Category = category
+                });
+                if (imageUrl != null) repo.SetImage(existing.Id, imageUrl);
+
+                return Ok(new { id = existing.Id });
+            }
+            else
+            {
+                var ad = new Ad
+                {
+                    OwnerId = CurrentOwnerId(),
+                    Title = request.Title,
+                    Description = request.Description,
+                    TargetUrl = request.TargetUrl,
+                    Category = category,
+                    ImageUrl = imageUrl
+                };
+                var id = repo.Create(ad);
+                return Ok(new { id });
+            }
         }
 
         [HttpPost("activate-test")]

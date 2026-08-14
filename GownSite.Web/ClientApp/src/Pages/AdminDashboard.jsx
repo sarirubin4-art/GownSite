@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
-    Box, Typography, Tabs, Tab, Grid, Card, CardMedia, CardContent, Button, Stack,
+    Box, Typography, Tabs, Tab, Grid, Card, CardMedia, CardContent, CardActionArea, Button, Stack,
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert, MenuItem,
-    Table, TableHead, TableBody, TableRow, TableCell, Switch, Chip
+    Table, TableHead, TableBody, TableRow, TableCell, Switch, Chip, Divider
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { useAdLane } from '../context/AdLaneContext';
@@ -21,11 +21,75 @@ const VOLUME_TIER_DESCRIPTION = '$5/gown for 1-4, $4/gown for 5-9, $3.50/gown fo
 
 const emptyPromoForm = { code: '', discountType: 'PercentOff', discountValue: '', maxUses: '', expiresAt: '', durationMonths: '' };
 
-const PendingList = ({ items, type, onApprove, onRejectClick, error }) => {
+const DetailRow = ({ label, value }) => {
+    if (value === null || value === undefined || value === '') return null;
+    return (
+        <Stack direction="row" spacing={1} sx={{ py: 0.5 }}>
+            <Typography variant="body2" sx={{ fontWeight: 700, minWidth: 140 }}>{label}</Typography>
+            <Typography variant="body2" color="text.secondary">{value}</Typography>
+        </Stack>
+    );
+};
+
+const ItemDetailDialog = ({ item, type, onClose, fullScreen }) => (
+    <Dialog open={!!item} onClose={onClose} maxWidth="sm" fullWidth fullScreen={fullScreen}>
+        <DialogTitle>{type === 'gown' ? 'Gown Details' : 'Ad Details'}</DialogTitle>
+        {item && (
+            <DialogContent>
+                <Box
+                    component="img"
+                    src={type === 'gown' ? item.primaryPictureUrl : item.imageUrl}
+                    alt=""
+                    sx={{ width: '100%', maxHeight: 360, objectFit: 'contain', borderRadius: 2, bgcolor: 'background.default', mb: 2 }}
+                />
+                {item.morePictures?.length > 0 && (
+                    <Stack direction="row" spacing={1} sx={{ mb: 2, overflowX: 'auto' }}>
+                        {item.morePictures.map((p) => (
+                            <Box key={p.url} component="img" src={p.url} alt="" sx={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }} />
+                        ))}
+                    </Stack>
+                )}
+                <Divider sx={{ mb: 1.5 }} />
+                <DetailRow label="Owner" value={item.owner ? `${item.owner.name} (${item.owner.email}${item.owner.number ? `, ${item.owner.number}` : ''})` : null} />
+                {type === 'gown' ? (
+                    <>
+                        <DetailRow label="Description" value={item.description} />
+                        <DetailRow label="Price" value={`$${item.price}`} />
+                        <DetailRow label="Rent/Sale" value={item.listingType} />
+                        <DetailRow label="Color(s)" value={(item.color || '').split(',').join(', ')} />
+                        <DetailRow label="Size(s)" value={(item.size || '').split(',').join(', ')} />
+                        <DetailRow label="Location" value={item.location} />
+                        <DetailRow label="Brand" value={item.brand} />
+                        <DetailRow label="Original Gown Value" value={item.pricePaid != null ? `$${item.pricePaid}` : null} />
+                        <DetailRow label="Condition" value={item.condition} />
+                        <DetailRow label="Height/Length" value={item.length} />
+                        <DetailRow label="Style Tags" value={(item.styleTags || '').split(',').filter(Boolean).join(', ')} />
+                        <DetailRow label="Notes" value={item.notes} />
+                        <DetailRow label="Show Owner Name" value={item.displayOwnerName ? 'Yes' : 'No'} />
+                        <DetailRow label="Batch" value={item.batchId ? 'Part of a bulk batch' : null} />
+                    </>
+                ) : (
+                    <>
+                        <DetailRow label="Title" value={item.title} />
+                        <DetailRow label="Description" value={item.description} />
+                        <DetailRow label="Category" value={item.category} />
+                        <DetailRow label="Website/Contact" value={item.targetUrl} />
+                    </>
+                )}
+            </DialogContent>
+        )}
+        <DialogActions>
+            <Button onClick={onClose}>Close</Button>
+        </DialogActions>
+    </Dialog>
+);
+
+const PendingList = ({ items, type, onApprove, onRejectClick, error, fullScreen }) => {
     const batchCounts = items.reduce((acc, i) => {
         if (i.batchId) acc[i.batchId] = (acc[i.batchId] || 0) + 1;
         return acc;
     }, {});
+    const [detailItem, setDetailItem] = React.useState(null);
 
     return (
     <Box sx={{ mt: 3 }}>
@@ -37,39 +101,42 @@ const PendingList = ({ items, type, onApprove, onRejectClick, error }) => {
                 {items.map((item) => (
                     <Grid key={item.id} size={{ xs: 12, sm: 6, md: 4 }}>
                         <Card>
-                            <CardMedia
-                                component="img"
-                                height={type === 'gown' ? '180' : undefined}
-                                image={type === 'gown' ? item.primaryPictureUrl : item.imageUrl}
-                                sx={{ objectFit: 'cover', ...(type === 'ad' ? { aspectRatio: '1 / 1' } : {}) }}
-                            />
-                            <CardContent>
-                                <Typography variant="subtitle2" color="text.secondary">
-                                    {item.owner?.name} &middot; {item.owner?.email}
-                                </Typography>
-                                <Typography variant="body1" sx={{ mt: 0.5 }}>
-                                    {type === 'gown' ? item.description : item.title}
-                                </Typography>
-                                {type === 'gown' && <Typography variant="h6" sx={{ mt: 0.5 }}>${item.price}</Typography>}
-                                {item.batchId && batchCounts[item.batchId] > 1 && (
-                                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                        Part of a {batchCounts[item.batchId]}-gown batch
+                            <CardActionArea onClick={() => setDetailItem(item)}>
+                                <CardMedia
+                                    component="img"
+                                    height={type === 'gown' ? '180' : undefined}
+                                    image={type === 'gown' ? item.primaryPictureUrl : item.imageUrl}
+                                    sx={{ objectFit: 'cover', ...(type === 'ad' ? { aspectRatio: '1 / 1' } : {}) }}
+                                />
+                                <CardContent>
+                                    <Typography variant="subtitle2" color="text.secondary">
+                                        {item.owner?.name} &middot; {item.owner?.email}
                                     </Typography>
-                                )}
-                                <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-                                    <Button size="small" variant="contained" color="success" onClick={() => onApprove(item.id)}>
-                                        Approve
-                                    </Button>
-                                    <Button size="small" variant="outlined" color="error" onClick={() => onRejectClick(item.id)}>
-                                        Reject
-                                    </Button>
-                                </Stack>
-                            </CardContent>
+                                    <Typography variant="body1" sx={{ mt: 0.5 }}>
+                                        {type === 'gown' ? item.description : item.title}
+                                    </Typography>
+                                    {type === 'gown' && <Typography variant="h6" sx={{ mt: 0.5 }}>${item.price}</Typography>}
+                                    {item.batchId && batchCounts[item.batchId] > 1 && (
+                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                            Part of a {batchCounts[item.batchId]}-gown batch
+                                        </Typography>
+                                    )}
+                                </CardContent>
+                            </CardActionArea>
+                            <Stack direction="row" spacing={1} sx={{ p: 2, pt: 0 }}>
+                                <Button size="small" variant="contained" color="success" onClick={() => onApprove(item.id)}>
+                                    Approve
+                                </Button>
+                                <Button size="small" variant="outlined" color="error" onClick={() => onRejectClick(item.id)}>
+                                    Reject
+                                </Button>
+                            </Stack>
                         </Card>
                     </Grid>
                 ))}
             </Grid>
         )}
+        <ItemDetailDialog item={detailItem} type={type} onClose={() => setDetailItem(null)} fullScreen={fullScreen} />
     </Box>
     );
 };
@@ -141,6 +208,9 @@ const AdminDashboard = () => {
     const [spreadEmails, setSpreadEmails] = useState('');
     const [spreadSending, setSpreadSending] = useState(false);
     const [spreadResult, setSpreadResult] = useState(null);
+    const [deleteOwnerTarget, setDeleteOwnerTarget] = useState(null);
+    const [deleteOwnerError, setDeleteOwnerError] = useState('');
+    const [deleteOwnerSending, setDeleteOwnerSending] = useState(false);
 
     const loadPending = async () => {
         const [gowns, ads] = await Promise.all([
@@ -303,6 +373,21 @@ const AdminDashboard = () => {
         }
     };
 
+    const onDeleteOwnerConfirm = async () => {
+        if (!deleteOwnerTarget) return;
+        setDeleteOwnerError('');
+        setDeleteOwnerSending(true);
+        try {
+            await axios.post(`/api/admin/owners/${deleteOwnerTarget.id}/delete`);
+            setDeleteOwnerTarget(null);
+            await loadOwners();
+        } catch (err) {
+            setDeleteOwnerError(err?.response?.data?.message || 'Could not delete this patron.');
+        } finally {
+            setDeleteOwnerSending(false);
+        }
+    };
+
     if (loading || !owner?.isAdmin) return null;
 
     return (
@@ -325,6 +410,7 @@ const AdminDashboard = () => {
                     error={error}
                     onApprove={(id) => onApprove('gown', id)}
                     onRejectClick={(id) => setRejectTarget({ type: 'gown', id })}
+                    fullScreen={fullScreen}
                 />
             )}
             {tab === 1 && (
@@ -334,6 +420,7 @@ const AdminDashboard = () => {
                     error={error}
                     onApprove={(id) => onApprove('ad', id)}
                     onRejectClick={(id) => setRejectTarget({ type: 'ad', id })}
+                    fullScreen={fullScreen}
                 />
             )}
             {tab === 2 && (
@@ -414,6 +501,7 @@ const AdminDashboard = () => {
                                         <TableCell>Email</TableCell>
                                         <TableCell>Phone</TableCell>
                                         <TableCell>Role</TableCell>
+                                        <TableCell />
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -424,6 +512,14 @@ const AdminDashboard = () => {
                                             <TableCell>{o.number || '—'}</TableCell>
                                             <TableCell>
                                                 {o.isAdmin ? <Chip size="small" label="Admin" color="primary" /> : 'Patron'}
+                                            </TableCell>
+                                            <TableCell align="right">
+                                                <Button
+                                                    size="small" color="error" variant="outlined"
+                                                    onClick={() => { setDeleteOwnerError(''); setDeleteOwnerTarget(o); }}
+                                                >
+                                                    Delete
+                                                </Button>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -553,6 +649,25 @@ const AdminDashboard = () => {
                     <Button onClick={() => setTakeDownTarget(null)}>Cancel</Button>
                     <Button variant="contained" color="error" disabled={!takeDownReason.trim()} onClick={onTakeDownConfirm}>
                         Take Down
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={!!deleteOwnerTarget} onClose={() => setDeleteOwnerTarget(null)} maxWidth="sm" fullWidth fullScreen={fullScreen}>
+                <DialogTitle>Delete Patron?</DialogTitle>
+                <DialogContent>
+                    {deleteOwnerError && <Alert severity="error" sx={{ mt: 1, mb: 2 }}>{deleteOwnerError}</Alert>}
+                    <Typography variant="body2">
+                        This permanently deletes <strong>{deleteOwnerTarget?.name}</strong> ({deleteOwnerTarget?.email}). This can't be undone.
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Patrons with any gowns or ads on record — active or not — can't be deleted; remove those listings first.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteOwnerTarget(null)}>Cancel</Button>
+                    <Button variant="contained" color="error" disabled={deleteOwnerSending} onClick={onDeleteOwnerConfirm}>
+                        {deleteOwnerSending ? 'Deleting...' : 'Delete'}
                     </Button>
                 </DialogActions>
             </Dialog>

@@ -95,6 +95,16 @@ namespace GownSite.Data
             context.SaveChanges();
         }
 
+        public void SetImage(int id, string url)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var existing = context.Ads.FirstOrDefault(a => a.Id == id);
+            if (existing == null) return;
+
+            existing.ImageUrl = url;
+            context.SaveChanges();
+        }
+
         public void Activate(int id, string stripeSubscriptionId, string stripeCustomerId)
         {
             using var context = new GownDataContext(_connectionString);

@@ -5,8 +5,10 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 
 namespace GownSite.Web.Controllers
 {
@@ -67,11 +69,20 @@ namespace GownSite.Web.Controllers
             return string.IsNullOrEmpty(frontendBaseUrl) ? $"{Request.Scheme}://{Request.Host}" : frontendBaseUrl;
         }
 
+        private static readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
+
         [HttpPost("signup")]
         public async Task<IActionResult> Signup([FromBody] SignupRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password) || string.IsNullOrWhiteSpace(request.Name))
-                return BadRequest(new { message = "Name, email, and password are required." });
+            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password) ||
+                string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Number))
+                return BadRequest(new { message = "Name, email, phone number, and password are required." });
+
+            if (!EmailRegex.IsMatch(request.Email.Trim()))
+                return BadRequest(new { message = "Please enter a valid email address." });
+
+            if (request.Number.Count(char.IsDigit) < 10)
+                return BadRequest(new { message = "Please enter a valid phone number." });
 
             var repo = new OwnerRepository(_connectionString);
             if (repo.FindByEmail(request.Email) != null)

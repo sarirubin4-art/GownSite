@@ -86,6 +86,17 @@ namespace GownSite.Data
                 o.PasswordResetTokenExpiresAt > DateTime.UtcNow);
         }
 
+        public bool Delete(int id)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o => o.Id == id);
+            if (owner == null) return false;
+
+            context.Owners.Remove(owner);
+            context.SaveChanges();
+            return true;
+        }
+
         public bool ResetPassword(string token, string newPasswordHash)
         {
             using var context = new GownDataContext(_connectionString);

@@ -22,6 +22,8 @@ const MyListings = () => {
     const [promoCodeInput, setPromoCodeInput] = useState('');
     const [promoApplying, setPromoApplying] = useState(false);
     const [promoMessage, setPromoMessage] = useState(null); // { type: 'success'|'error', text }
+    const [newPrimaryPicture, setNewPrimaryPicture] = useState(null);
+    const [newPrimaryPreview, setNewPrimaryPreview] = useState(null);
 
     const load = async () => {
         const { data } = await axios.get('/api/gown/mylistings');
@@ -58,16 +60,34 @@ const MyListings = () => {
     };
 
     const onSaveEdit = async () => {
-        await axios.post('/api/gown/edit', {
-            ...editTarget,
-            color: editTarget.colors.join(','),
-            size: editTarget.sizes.join(','),
-            price: Number(editTarget.price),
-            pricePaid: editTarget.pricePaid === '' ? null : Number(editTarget.pricePaid),
-            styleTags: editTarget.styleTags.join(',')
-        });
+        const data = new FormData();
+        data.append('Id', editTarget.id);
+        data.append('Description', editTarget.description);
+        data.append('Color', editTarget.colors.join(','));
+        data.append('Size', editTarget.sizes.join(','));
+        data.append('Price', Number(editTarget.price));
+        data.append('Location', editTarget.location);
+        data.append('ListingType', editTarget.listingType);
+        data.append('DisplayOwnerName', editTarget.displayOwnerName);
+        data.append('Brand', editTarget.brand);
+        if (editTarget.pricePaid !== '') data.append('PricePaid', Number(editTarget.pricePaid));
+        data.append('Condition', editTarget.condition);
+        data.append('Length', editTarget.length);
+        data.append('StyleTags', editTarget.styleTags.join(','));
+        data.append('Notes', editTarget.notes);
+        if (newPrimaryPicture) data.append('PrimaryPicture', newPrimaryPicture);
+
+        await axios.post('/api/gown/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
         setEditTarget(null);
+        setNewPrimaryPicture(null);
+        setNewPrimaryPreview(null);
         load();
+    };
+
+    const onEditPictureChange = (e) => {
+        const file = e.target.files[0];
+        setNewPrimaryPicture(file || null);
+        setNewPrimaryPreview(file ? URL.createObjectURL(file) : null);
     };
 
     const toggleEditStyle = (value) => {
@@ -81,6 +101,8 @@ const MyListings = () => {
         setEditTarget(null);
         setPromoCodeInput('');
         setPromoMessage(null);
+        setNewPrimaryPicture(null);
+        setNewPrimaryPreview(null);
     };
 
     const onApplyPromo = async () => {
@@ -154,12 +176,12 @@ const MyListings = () => {
                                         displayOwnerName: g.displayOwnerName, brand: g.brand || '', pricePaid: g.pricePaid || '',
                                         condition: g.condition || '', length: g.length || '',
                                         styleTags: (g.styleTags || '').split(',').filter(Boolean), notes: g.notes || '',
-                                        isActive: g.isActive
+                                        isActive: g.isActive, primaryPictureUrl: g.primaryPictureUrl
                                     })}>
                                         Edit
                                     </Button>
                                     {g.moderationStatus === 'Draft' ? (
-                                        <Button size="small" color="success" variant="outlined" onClick={() => navigate(`/postagown/payment-setup/${g.id}`)}>
+                                        <Button size="small" color="success" variant="outlined" onClick={() => navigate(`/postagown/form?resume=${g.id}`)}>
                                             Complete Setup
                                         </Button>
                                     ) : g.moderationStatus === 'PendingReview' || g.moderationStatus === 'Rejected' || g.moderationStatus === 'Removed' ? null : g.isSold ? null : g.isActive ? (
@@ -210,6 +232,21 @@ const MyListings = () => {
                                     </Stack>
                                 </Box>
                             )}
+                            <Stack direction="row" spacing={2} alignItems="center">
+                                <Box
+                                    component="img"
+                                    src={newPrimaryPreview || editTarget.primaryPictureUrl}
+                                    alt="Primary"
+                                    sx={{
+                                        width: 100, height: 100, borderRadius: 2, objectFit: 'cover',
+                                        border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper'
+                                    }}
+                                />
+                                <Button variant="outlined" component="label" size="small">
+                                    Change Photo
+                                    <input type="file" accept="image/*" hidden onChange={onEditPictureChange} />
+                                </Button>
+                            </Stack>
                             <TextField label="Description" multiline rows={2} value={editTarget.description}
                                 onChange={(e) => setEditTarget({ ...editTarget, description: e.target.value })} />
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>

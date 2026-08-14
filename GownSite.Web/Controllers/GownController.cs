@@ -27,6 +27,31 @@ namespace GownSite.Web.Controllers
         public int? BatchSize { get; set; }
         public IFormFile PrimaryPicture { get; set; }
         public List<IFormFile> MorePictures { get; set; } = new();
+        // Set when finalizing a draft that autosave already created, so this submit
+        // updates that same row (and resolves any promo now) instead of making a new one.
+        public int? Id { get; set; }
+    }
+
+    // Deliberately has no required fields — called silently in the background while the
+    // owner is still filling out the posting form, so whatever they've entered so far
+    // survives a closed tab/browser crash instead of being lost.
+    public class SaveDraftGownRequest
+    {
+        public int? Id { get; set; }
+        public string Description { get; set; }
+        public string Color { get; set; }
+        public string Size { get; set; }
+        public decimal? Price { get; set; }
+        public string Location { get; set; }
+        public string ListingType { get; set; }
+        public bool DisplayOwnerName { get; set; }
+        public string Brand { get; set; }
+        public decimal? PricePaid { get; set; }
+        public string Condition { get; set; }
+        public string Length { get; set; }
+        public string StyleTags { get; set; }
+        public string Notes { get; set; }
+        public IFormFile PrimaryPicture { get; set; }
     }
 
     public class EditGownRequest
@@ -45,6 +70,8 @@ namespace GownSite.Web.Controllers
         public string Length { get; set; }
         public string StyleTags { get; set; }
         public string Notes { get; set; }
+        public IFormFile PrimaryPicture { get; set; }
+        public List<IFormFile> MorePictures { get; set; } = new();
     }
 
     public class IdRequest
@@ -110,7 +137,17 @@ namespace GownSite.Web.Controllers
         [RequestSizeLimit(100_000_000)]
         public async Task<IActionResult> Create([FromForm] CreateGownRequest request)
         {
-            if (request.PrimaryPicture == null)
+            var repo = new GownRepository(_connectionString);
+            GownPosting existingDraft = null;
+            if (request.Id.HasValue)
+            {
+                existingDraft = repo.Get(request.Id.Value);
+                if (existingDraft == null || existingDraft.OwnerId != CurrentOwnerId()) return Forbid();
+                if (existingDraft.ModerationStatus != ModerationStatus.Draft)
+                    return BadRequest(new { message = "This listing has already been submitted." });
+            }
+
+            if (request.PrimaryPicture == null && existingDraft?.PrimaryPictureUrl == null)
                 return BadRequest(new { message = "A primary picture is required." });
             if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType))
                 return BadRequest(new { message = "ListingType must be 'Rent' or 'Sale'." });
@@ -141,33 +178,60 @@ namespace GownSite.Web.Controllers
                 monthlyFeeOverride = PromoCodeCalculator.VolumeTiers.First(t => quantity >= t.MinQuantity).PricePerGown;
             }
 
-            var primaryUrl = await _storage.SaveAsync(request.PrimaryPicture, "gowns");
+            var primaryUrl = request.PrimaryPicture != null
+                ? await _storage.SaveAsync(request.PrimaryPicture, "gowns")
+                : existingDraft.PrimaryPictureUrl;
 
-            var posting = new GownPosting
+            int id;
+            if (existingDraft != null)
             {
-                OwnerId = CurrentOwnerId(),
-                Description = request.Description,
-                Color = request.Color,
-                Size = request.Size,
-                Price = request.Price,
-                Location = request.Location,
-                ListingType = listingType,
-                DisplayOwnerName = request.DisplayOwnerName,
-                Brand = request.Brand,
-                PricePaid = request.PricePaid,
-                Condition = request.Condition,
-                Length = request.Length,
-                StyleTags = request.StyleTags,
-                Notes = request.Notes,
-                PrimaryPictureUrl = primaryUrl,
-                PromoCodeId = promoCodeId,
-                MonthlyFeeOverride = monthlyFeeOverride,
-                PromoDurationMonths = promoDurationMonths,
-                BatchId = request.BatchId
-            };
-
-            var repo = new GownRepository(_connectionString);
-            var id = repo.Create(posting);
+                repo.Update(new GownPosting
+                {
+                    Id = existingDraft.Id,
+                    Description = request.Description,
+                    Color = request.Color,
+                    Size = request.Size,
+                    Price = request.Price,
+                    Location = request.Location,
+                    ListingType = listingType,
+                    DisplayOwnerName = request.DisplayOwnerName,
+                    Brand = request.Brand,
+                    PricePaid = request.PricePaid,
+                    Condition = request.Condition,
+                    Length = request.Length,
+                    StyleTags = request.StyleTags,
+                    Notes = request.Notes
+                });
+                if (request.PrimaryPicture != null) repo.SetPrimaryPicture(existingDraft.Id, primaryUrl);
+                if (promoCodeId.HasValue) repo.ApplyPromo(existingDraft.Id, promoCodeId.Value, monthlyFeeOverride, promoDurationMonths);
+                id = existingDraft.Id;
+            }
+            else
+            {
+                var posting = new GownPosting
+                {
+                    OwnerId = CurrentOwnerId(),
+                    Description = request.Description,
+                    Color = request.Color,
+                    Size = request.Size,
+                    Price = request.Price,
+                    Location = request.Location,
+                    ListingType = listingType,
+                    DisplayOwnerName = request.DisplayOwnerName,
+                    Brand = request.Brand,
+                    PricePaid = request.PricePaid,
+                    Condition = request.Condition,
+                    Length = request.Length,
+                    StyleTags = request.StyleTags,
+                    Notes = request.Notes,
+                    PrimaryPictureUrl = primaryUrl,
+                    PromoCodeId = promoCodeId,
+                    MonthlyFeeOverride = monthlyFeeOverride,
+                    PromoDurationMonths = promoDurationMonths,
+                    BatchId = request.BatchId
+                };
+                id = repo.Create(posting);
+            }
 
             if (request.MorePictures?.Count > 0)
             {
@@ -180,9 +244,76 @@ namespace GownSite.Web.Controllers
             return Ok(new { id });
         }
 
+        [HttpPost("draft")]
+        [Authorize]
+        [RequireVerifiedEmail]
+        [RequestSizeLimit(100_000_000)]
+        public async Task<IActionResult> SaveDraft([FromForm] SaveDraftGownRequest request)
+        {
+            var repo = new GownRepository(_connectionString);
+            Enum.TryParse<ListingType>(request.ListingType, out var listingType);
+
+            string primaryUrl = null;
+            if (request.PrimaryPicture != null)
+                primaryUrl = await _storage.SaveAsync(request.PrimaryPicture, "gowns");
+
+            if (request.Id.HasValue)
+            {
+                var existing = repo.Get(request.Id.Value);
+                if (existing == null || existing.OwnerId != CurrentOwnerId()) return Forbid();
+                if (existing.ModerationStatus != ModerationStatus.Draft)
+                    return BadRequest(new { message = "This listing is no longer a draft." });
+
+                repo.Update(new GownPosting
+                {
+                    Id = existing.Id,
+                    Description = request.Description,
+                    Color = request.Color,
+                    Size = request.Size,
+                    Price = request.Price ?? 0,
+                    Location = request.Location,
+                    ListingType = listingType,
+                    DisplayOwnerName = request.DisplayOwnerName,
+                    Brand = request.Brand,
+                    PricePaid = request.PricePaid,
+                    Condition = request.Condition,
+                    Length = request.Length,
+                    StyleTags = request.StyleTags,
+                    Notes = request.Notes
+                });
+                if (primaryUrl != null) repo.SetPrimaryPicture(existing.Id, primaryUrl);
+
+                return Ok(new { id = existing.Id });
+            }
+            else
+            {
+                var posting = new GownPosting
+                {
+                    OwnerId = CurrentOwnerId(),
+                    Description = request.Description,
+                    Color = request.Color,
+                    Size = request.Size,
+                    Price = request.Price ?? 0,
+                    Location = request.Location,
+                    ListingType = listingType,
+                    DisplayOwnerName = request.DisplayOwnerName,
+                    Brand = request.Brand,
+                    PricePaid = request.PricePaid,
+                    Condition = request.Condition,
+                    Length = request.Length,
+                    StyleTags = request.StyleTags,
+                    Notes = request.Notes,
+                    PrimaryPictureUrl = primaryUrl
+                };
+                var id = repo.Create(posting);
+                return Ok(new { id });
+            }
+        }
+
         [HttpPost("edit")]
         [Authorize]
-        public IActionResult Edit([FromBody] EditGownRequest request)
+        [RequestSizeLimit(100_000_000)]
+        public async Task<IActionResult> Edit([FromForm] EditGownRequest request)
         {
             var repo = new GownRepository(_connectionString);
             var existing = repo.Get(request.Id);
@@ -190,6 +321,8 @@ namespace GownSite.Web.Controllers
             if (existing.OwnerId != CurrentOwnerId()) return Forbid();
             if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType))
                 return BadRequest(new { message = "ListingType must be 'Rent' or 'Sale'." });
+            if (request.MorePictures?.Count > MaxMorePictures)
+                return BadRequest(new { message = $"You can upload up to {MaxMorePictures} additional photos." });
 
             repo.Update(new GownPosting
             {
@@ -208,6 +341,18 @@ namespace GownSite.Web.Controllers
                 StyleTags = request.StyleTags,
                 Notes = request.Notes
             });
+
+            if (request.PrimaryPicture != null)
+                repo.SetPrimaryPicture(request.Id, await _storage.SaveAsync(request.PrimaryPicture, "gowns"));
+
+            if (request.MorePictures?.Count > 0)
+            {
+                var urls = new List<string>();
+                foreach (var file in request.MorePictures)
+                    urls.Add(await _storage.SaveAsync(file, "gowns"));
+                repo.AddPictures(request.Id, urls);
+            }
+
             return Ok();
         }
 

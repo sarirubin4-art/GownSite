@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import {
     Container, Typography, TextField, Button, Stack, MenuItem, Grid,
@@ -18,10 +18,13 @@ const GownPostingForm = () => {
     const { owner, loading } = useAuth();
     const fullScreen = useFullScreenDialog();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const resumeId = searchParams.get('resume');
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [primaryPicture, setPrimaryPicture] = useState(null);
     const [primaryPreview, setPrimaryPreview] = useState(null);
+    const [hasExistingPhoto, setHasExistingPhoto] = useState(false);
     const [morePictures, setMorePictures] = useState([]);
     const [morePicturesError, setMorePicturesError] = useState('');
     const [existingLocations, setExistingLocations] = useState([]);
@@ -30,6 +33,11 @@ const GownPostingForm = () => {
     const [inquirySending, setInquirySending] = useState(false);
     const [inquirySent, setInquirySent] = useState(false);
     const [inquiryError, setInquiryError] = useState('');
+
+    const [draftId, setDraftId] = useState(resumeId ? Number(resumeId) : null);
+    const [saveState, setSaveState] = useState('idle'); // idle | saving | saved
+    const dirtyRef = useRef(false);
+    const autosaveTimer = useRef(null);
 
     const [form, setForm] = useState({
         description: '',
@@ -58,16 +66,94 @@ const GownPostingForm = () => {
         axios.get('/api/gown/locations').then(({ data }) => setExistingLocations(data)).catch(() => {});
     }, []);
 
-    const onChange = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+    // Resuming an in-progress draft (from "Complete Setup" in My Listings, or a
+    // reloaded tab) — load whatever was already saved before the user touches anything,
+    // so the autosave effect below doesn't immediately re-save an unchanged form.
+    useEffect(() => {
+        if (!resumeId) return;
+        axios.get(`/api/gown/get?id=${resumeId}`).then(({ data }) => {
+            setForm({
+                description: data.description || '',
+                colors: (data.color || '').split(',').filter(Boolean),
+                sizes: (data.size || '').split(',').filter(Boolean),
+                price: data.price || '',
+                location: data.location || '',
+                listingType: data.listingType || 'Rent',
+                displayOwnerName: data.displayOwnerName || false,
+                brand: data.brand || '',
+                pricePaid: data.pricePaid ?? '',
+                condition: data.condition || '',
+                length: data.length || '',
+                styleTags: (data.styleTags || '').split(',').filter(Boolean),
+                notes: data.notes || '',
+                promoCode: ''
+            });
+            if (data.primaryPictureUrl) {
+                setHasExistingPhoto(true);
+                setPrimaryPreview(data.primaryPictureUrl);
+            }
+        }).catch(() => {
+            setError('Could not load your saved draft. Starting fresh instead.');
+        });
+    }, [resumeId]);
+
+    const markDirty = () => { dirtyRef.current = true; };
+
+    const onChange = (field) => (e) => { markDirty(); setForm({ ...form, [field]: e.target.value }); };
 
     const toggleStyle = (value) => {
+        markDirty();
         setForm((prev) => {
             const has = prev.styleTags.includes(value);
             return { ...prev, styleTags: has ? prev.styleTags.filter(s => s !== value) : [...prev.styleTags, value] };
         });
     };
 
+    // Silently saves whatever's been filled in so far as a Draft — so closing the tab
+    // or a crash doesn't lose progress. Only runs once there's at least a description,
+    // and only after the user has actually changed something (not on the initial load
+    // when resuming an existing draft).
+    useEffect(() => {
+        if (!dirtyRef.current) return;
+        if (!form.description.trim()) return;
+
+        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+        autosaveTimer.current = setTimeout(async () => {
+            setSaveState('saving');
+            try {
+                const data = new FormData();
+                if (draftId) data.append('Id', draftId);
+                data.append('Description', form.description);
+                data.append('Color', form.colors.join(','));
+                data.append('Size', form.sizes.join(','));
+                if (form.price !== '') data.append('Price', form.price);
+                data.append('Location', form.location);
+                data.append('ListingType', form.listingType);
+                data.append('DisplayOwnerName', form.displayOwnerName);
+                data.append('Brand', form.brand);
+                if (form.pricePaid !== '') data.append('PricePaid', form.pricePaid);
+                data.append('Condition', form.condition);
+                data.append('Length', form.length);
+                data.append('StyleTags', form.styleTags.join(','));
+                data.append('Notes', form.notes);
+                if (primaryPicture) data.append('PrimaryPicture', primaryPicture);
+
+                const { data: result } = await axios.post('/api/gown/draft', data, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                if (!draftId) setDraftId(result.id);
+                setSaveState('saved');
+            } catch {
+                setSaveState('idle');
+            }
+        }, 2000);
+
+        return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [form, primaryPicture]);
+
     const onPrimaryPictureChange = (e) => {
+        markDirty();
         const file = e.target.files[0];
         setPrimaryPicture(file || null);
         setPrimaryPreview(file ? URL.createObjectURL(file) : null);
@@ -88,7 +174,7 @@ const GownPostingForm = () => {
         if (!form.description || form.colors.length === 0 || form.sizes.length === 0 || !form.price || !form.location) {
             return 'Please fill in description, color, size, price, and location.';
         }
-        if (!primaryPicture) {
+        if (!primaryPicture && !hasExistingPhoto) {
             return 'Please add a primary picture of the gown.';
         }
         return '';
@@ -104,6 +190,7 @@ const GownPostingForm = () => {
         setSubmitting(true);
         try {
             const data = new FormData();
+            if (draftId) data.append('Id', draftId);
             data.append('Description', form.description);
             data.append('Color', form.colors.join(','));
             data.append('Size', form.sizes.join(','));
@@ -118,7 +205,7 @@ const GownPostingForm = () => {
             data.append('StyleTags', form.styleTags.join(','));
             data.append('Notes', form.notes);
             data.append('PromoCode', form.promoCode);
-            data.append('PrimaryPicture', primaryPicture);
+            if (primaryPicture) data.append('PrimaryPicture', primaryPicture);
             morePictures.forEach((file) => data.append('MorePictures', file));
 
             const { data: result } = await axios.post('/api/gown/create', data, {
@@ -177,7 +264,7 @@ const GownPostingForm = () => {
                             multiple
                             options={COLOR_OPTIONS}
                             value={form.colors}
-                            onChange={(e, value) => setForm({ ...form, colors: value })}
+                            onChange={(e, value) => { markDirty(); setForm({ ...form, colors: value }); }}
                             renderInput={(params) => <TextField {...params} label="Color(s)" />}
                         />
                     </Grid>
@@ -186,7 +273,7 @@ const GownPostingForm = () => {
                             multiple
                             options={SIZE_OPTIONS}
                             value={form.sizes}
-                            onChange={(e, value) => setForm({ ...form, sizes: value })}
+                            onChange={(e, value) => { markDirty(); setForm({ ...form, sizes: value }); }}
                             renderInput={(params) => <TextField {...params} label="Size(s)" helperText="Fits a range? Select each size it fits." />}
                         />
                     </Grid>
@@ -209,7 +296,7 @@ const GownPostingForm = () => {
                             options={existingLocations}
                             filterOptions={locationFilter}
                             value={form.location}
-                            onInputChange={(e, value) => setForm({ ...form, location: value })}
+                            onInputChange={(e, value) => { markDirty(); setForm({ ...form, location: value }); }}
                             renderInput={(params) => <TextField {...params} label="Location (city/area)" />}
                         />
                     </Grid>
@@ -284,11 +371,13 @@ const GownPostingForm = () => {
             </Paper>
 
             <FormControlLabel
-                control={<Checkbox checked={form.displayOwnerName} onChange={(e) => setForm({ ...form, displayOwnerName: e.target.checked })} />}
+                control={<Checkbox checked={form.displayOwnerName} onChange={(e) => { markDirty(); setForm({ ...form, displayOwnerName: e.target.checked }); }} />}
                 label="Show my name publicly on this listing"
             />
 
-            <Stack direction="row" sx={{ mt: 2, justifyContent: 'flex-end' }}>
+            <Stack direction="row" sx={{ mt: 2, justifyContent: 'flex-end', alignItems: 'center' }} spacing={2}>
+                {saveState === 'saving' && <Typography variant="caption" color="text.secondary">Saving draft...</Typography>}
+                {saveState === 'saved' && <Typography variant="caption" color="text.secondary">Draft saved</Typography>}
                 <Button variant="contained" size="large" disabled={submitting} onClick={onSubmit}>
                     {submitting ? 'Saving...' : 'Confirm & Continue to Payment'}
                 </Button>

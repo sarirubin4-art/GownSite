@@ -20,6 +20,8 @@ const MyAds = () => {
     const [promoCodeInput, setPromoCodeInput] = useState('');
     const [promoApplying, setPromoApplying] = useState(false);
     const [promoMessage, setPromoMessage] = useState(null); // { type: 'success'|'error', text }
+    const [newImage, setNewImage] = useState(null);
+    const [newImagePreview, setNewImagePreview] = useState(null);
 
     const load = async () => {
         const { data } = await axios.get('/api/ad/myads');
@@ -47,15 +49,33 @@ const MyAds = () => {
     };
 
     const onSaveEdit = async () => {
-        await axios.post('/api/ad/edit', editTarget);
+        const data = new FormData();
+        data.append('Id', editTarget.id);
+        data.append('Title', editTarget.title);
+        data.append('Description', editTarget.description);
+        data.append('TargetUrl', editTarget.targetUrl);
+        data.append('Category', editTarget.category);
+        if (newImage) data.append('Image', newImage);
+
+        await axios.post('/api/ad/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
         setEditTarget(null);
+        setNewImage(null);
+        setNewImagePreview(null);
         load();
+    };
+
+    const onEditImageChange = (e) => {
+        const file = e.target.files[0];
+        setNewImage(file || null);
+        setNewImagePreview(file ? URL.createObjectURL(file) : null);
     };
 
     const onCloseEditDialog = () => {
         setEditTarget(null);
         setPromoCodeInput('');
         setPromoMessage(null);
+        setNewImage(null);
+        setNewImagePreview(null);
     };
 
     const onApplyPromo = async () => {
@@ -119,12 +139,12 @@ const MyAds = () => {
                                     <Button size="small" variant="outlined" onClick={() => setEditTarget({
                                         id: a.id, title: a.title, description: a.description,
                                         targetUrl: a.targetUrl || '', category: a.category,
-                                        isActive: a.isActive
+                                        isActive: a.isActive, imageUrl: a.imageUrl
                                     })}>
                                         Edit
                                     </Button>
                                     {a.moderationStatus === 'Draft' ? (
-                                        <Button size="small" color="success" variant="outlined" onClick={() => navigate(`/advertise/payment-setup/${a.id}`)}>
+                                        <Button size="small" color="success" variant="outlined" onClick={() => navigate(`/advertise/form?resume=${a.id}`)}>
                                             Complete Setup
                                         </Button>
                                     ) : a.moderationStatus === 'PendingReview' || a.moderationStatus === 'Rejected' || a.moderationStatus === 'Removed' ? null : a.isActive ? (
@@ -170,6 +190,21 @@ const MyAds = () => {
                                     </Stack>
                                 </Box>
                             )}
+                            <Stack direction="row" spacing={2} alignItems="center">
+                                <Box
+                                    component="img"
+                                    src={newImagePreview || editTarget.imageUrl}
+                                    alt="Ad"
+                                    sx={{
+                                        width: 100, height: 100, borderRadius: 2, objectFit: 'cover',
+                                        border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper'
+                                    }}
+                                />
+                                <Button variant="outlined" component="label" size="small">
+                                    Change Photo
+                                    <input type="file" accept="image/*" hidden onChange={onEditImageChange} />
+                                </Button>
+                            </Stack>
                             <TextField label="Title" value={editTarget.title}
                                 onChange={(e) => setEditTarget({ ...editTarget, title: e.target.value })} />
                             <TextField label="Description" multiline rows={2} value={editTarget.description}

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Container, Typography, TextField, Button, Stack, MenuItem, Grid, Paper, Alert, Box } from '@mui/material';
 import { AD_CATEGORY_OPTIONS } from '../constants/gownOptions';
@@ -8,10 +8,18 @@ import { useAuth } from '../context/AuthContext';
 const AdPostingForm = () => {
     const { owner, loading } = useAuth();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const resumeId = searchParams.get('resume');
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [image, setImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
+    const [hasExistingImage, setHasExistingImage] = useState(false);
+
+    const [draftId, setDraftId] = useState(resumeId ? Number(resumeId) : null);
+    const [saveState, setSaveState] = useState('idle'); // idle | saving | saved
+    const dirtyRef = useRef(false);
+    const autosaveTimer = useRef(null);
 
     const [form, setForm] = useState({
         title: '',
@@ -27,9 +35,68 @@ const AdPostingForm = () => {
         }
     }, [loading, owner]);
 
-    const onChange = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+    // Resuming an in-progress draft (from "Complete Setup" in My Ads, or a
+    // reloaded tab) — load whatever was already saved before the user touches anything,
+    // so the autosave effect below doesn't immediately re-save an unchanged form.
+    useEffect(() => {
+        if (!resumeId) return;
+        axios.get(`/api/ad/get?id=${resumeId}`).then(({ data }) => {
+            setForm({
+                title: data.title || '',
+                description: data.description || '',
+                category: data.category || '',
+                targetUrl: data.targetUrl || '',
+                promoCode: ''
+            });
+            if (data.imageUrl) {
+                setHasExistingImage(true);
+                setImagePreview(data.imageUrl);
+            }
+        }).catch(() => {
+            setError('Could not load your saved draft. Starting fresh instead.');
+        });
+    }, [resumeId]);
+
+    const markDirty = () => { dirtyRef.current = true; };
+
+    const onChange = (field) => (e) => { markDirty(); setForm({ ...form, [field]: e.target.value }); };
+
+    // Silently saves whatever's been filled in so far as a Draft — so closing the tab
+    // or a crash doesn't lose progress. Only runs once there's at least a description,
+    // and only after the user has actually changed something (not on the initial load
+    // when resuming an existing draft).
+    useEffect(() => {
+        if (!dirtyRef.current) return;
+        if (!form.description.trim()) return;
+
+        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+        autosaveTimer.current = setTimeout(async () => {
+            setSaveState('saving');
+            try {
+                const data = new FormData();
+                if (draftId) data.append('Id', draftId);
+                data.append('Title', form.title);
+                data.append('Description', form.description);
+                data.append('TargetUrl', form.targetUrl);
+                data.append('Category', form.category);
+                if (image) data.append('Image', image);
+
+                const { data: result } = await axios.post('/api/ad/draft', data, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                if (!draftId) setDraftId(result.id);
+                setSaveState('saved');
+            } catch {
+                setSaveState('idle');
+            }
+        }, 2000);
+
+        return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [form, image]);
 
     const onImageChange = (e) => {
+        markDirty();
         const file = e.target.files[0];
         setImage(file || null);
         setImagePreview(file ? URL.createObjectURL(file) : null);
@@ -39,7 +106,7 @@ const AdPostingForm = () => {
         if (!form.title || !form.description || !form.category) {
             return 'Please fill in title, description, and category.';
         }
-        if (!image) {
+        if (!image && !hasExistingImage) {
             return 'Please add an image for your ad.';
         }
         return '';
@@ -55,12 +122,13 @@ const AdPostingForm = () => {
         setSubmitting(true);
         try {
             const data = new FormData();
+            if (draftId) data.append('Id', draftId);
             data.append('Title', form.title);
             data.append('Description', form.description);
             data.append('Category', form.category);
             data.append('TargetUrl', form.targetUrl);
             data.append('PromoCode', form.promoCode);
-            data.append('Image', image);
+            if (image) data.append('Image', image);
 
             const { data: result } = await axios.post('/api/ad/create', data, {
                 headers: { 'Content-Type': 'multipart/form-data' }
@@ -109,7 +177,7 @@ const AdPostingForm = () => {
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                         <Button variant="outlined" component="label" fullWidth sx={{ py: 1.5 }}>
-                            {image ? 'Change Image' : 'Upload Ad Image'}
+                            {image || hasExistingImage ? 'Change Image' : 'Upload Ad Image'}
                             <input type="file" accept="image/*" hidden onChange={onImageChange} />
                         </Button>
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
@@ -129,7 +197,9 @@ const AdPostingForm = () => {
                 </Grid>
             </Paper>
 
-            <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
+            <Stack direction="row" sx={{ justifyContent: 'flex-end', alignItems: 'center' }} spacing={2}>
+                {saveState === 'saving' && <Typography variant="caption" color="text.secondary">Saving draft...</Typography>}
+                {saveState === 'saved' && <Typography variant="caption" color="text.secondary">Draft saved</Typography>}
                 <Button variant="contained" size="large" disabled={submitting} onClick={onSubmit}>
                     {submitting ? 'Saving...' : 'Confirm & Continue to Payment'}
                 </Button>

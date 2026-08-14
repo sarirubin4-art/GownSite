@@ -18,6 +18,18 @@ const Signup = () => {
 
     const onSignupClick = async () => {
         setError('');
+        if (!name.trim() || !number.trim() || !email.trim() || !password) {
+            setError('Name, email, phone number, and password are required.');
+            return;
+        }
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
+            setError('Please enter a valid email address.');
+            return;
+        }
+        if ((number.match(/\d/g) || []).length < 10) {
+            setError('Please enter a valid phone number.');
+            return;
+        }
         try {
             await signup(name, number, email, password);
             navigate(searchParams.get('redirect') || '/');

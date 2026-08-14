@@ -10,6 +10,7 @@ namespace GownSite.Web.Controllers
     public class BusinessInquiryRequest
     {
         public string Message { get; set; }
+        public string Topic { get; set; }
     }
 
     [Route("api/[controller]")]
@@ -49,9 +50,10 @@ namespace GownSite.Web.Controllers
             var owner = ownerRepo.Get(CurrentOwnerId());
             if (owner == null) return NotFound();
 
+            var topic = string.IsNullOrWhiteSpace(request.Topic) ? "Bulk discount inquiry" : request.Topic;
             await _emailSender.SendAsync(
                 adminEmail,
-                "Bulk discount inquiry — Regowned",
+                $"{topic} — Regowned",
                 EmailTemplates.BusinessInquiry(owner.Name, owner.Email, owner.Number, request.Message, FrontendBaseUrl())
             );
 
