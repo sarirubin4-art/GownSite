@@ -1,5 +1,6 @@
 import React from 'react';
 import { Container, Typography, Paper, List, ListItem, ListItemText } from '@mui/material';
+import usePageTitle from '../hooks/usePageTitle';
 
 const Section = ({ title, children }) => (
     <>
@@ -8,7 +9,9 @@ const Section = ({ title, children }) => (
     </>
 );
 
-const TermsOfService = () => (
+const TermsOfService = () => {
+    usePageTitle('Terms of Service', 'Regowned Terms of Service — the rules for buying, selling, renting, and advertising on Regowned.');
+    return (
     <Container maxWidth="md" sx={{ py: 6 }}>
         <Typography variant="h4" gutterBottom>Terms of Service</Typography>
         <Typography color="text.secondary" sx={{ mb: 3 }}>Last updated: August 2026</Typography>
@@ -130,6 +133,7 @@ const TermsOfService = () => (
             </Section>
         </Paper>
     </Container>
-);
+    );
+};
 
 export default TermsOfService;

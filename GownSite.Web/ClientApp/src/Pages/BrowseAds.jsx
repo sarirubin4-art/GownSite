@@ -5,8 +5,10 @@ import { Box, Typography, Tabs, Tab, Card, CardActionArea, Chip, Stack, Button }
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { AD_CATEGORY_OPTIONS, adCategoryLabel } from '../constants/gownOptions';
 import { useAdLane } from '../context/AdLaneContext';
+import usePageTitle from '../hooks/usePageTitle';
 
 const BrowseAds = () => {
+    usePageTitle('Simcha Services', 'Browse trusted simcha service providers — hair, makeup, alterations, gown rental/sales, and more.');
     const navigate = useNavigate();
     const { adVisible, laneWidth } = useAdLane();
     const [ads, setAds] = useState([]);

@@ -3,10 +3,13 @@ import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { Box, Typography, Button, Chip } from '@mui/material';
 import { adCategoryLabel } from '../constants/gownOptions';
+import usePageTitle from '../hooks/usePageTitle';
 
 const AdDetail = () => {
     const { id } = useParams();
     const [ad, setAd] = useState(null);
+
+    usePageTitle(ad ? ad.title : 'Simcha Service', ad ? ad.description : undefined);
 
     useEffect(() => {
         const load = async () => {

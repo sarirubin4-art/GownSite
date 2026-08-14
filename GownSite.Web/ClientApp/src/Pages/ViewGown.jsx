@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { styleLabel } from '../constants/gownOptions';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
+import usePageTitle from '../hooks/usePageTitle';
 import { useAdLane } from '../context/AdLaneContext';
 
 const ViewGown = () => {
@@ -18,6 +19,11 @@ const ViewGown = () => {
     const [contactInfo, setContactInfo] = useState(null);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    usePageTitle(
+        gown ? `${[gown.color, gown.size ? `Size ${gown.size}` : null].filter(Boolean).join(', ')} Gown ${gown.listingType === 'Sale' ? 'for Sale' : 'for Rent'}${gown.location ? ` in ${gown.location}` : ''}` : 'Gown Listing',
+        gown ? gown.description : undefined
+    );
 
     useEffect(() => {
         const load = async () => {

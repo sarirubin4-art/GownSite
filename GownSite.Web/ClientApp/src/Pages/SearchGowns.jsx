@@ -9,10 +9,12 @@ import {
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, styleLabel } from '../constants/gownOptions';
 import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
+import usePageTitle from '../hooks/usePageTitle';
 
 const emptyFilters = { colors: [], sizes: [], locations: [], styles: [], listingTypes: [], minPrice: '', maxPrice: '' };
 
 const SearchGowns = () => {
+    usePageTitle('Browse Gowns for Rent & Sale', 'Search gowns for rent or sale by color, size, style, and location — find the perfect dress for your simcha.');
     const navigate = useNavigate();
     const routerLocation = useLocation();
     const { adVisible, laneWidth } = useAdLane();

@@ -1,0 +1,25 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /mylistings
+Disallow: /myads
+Disallow: /admin
+Disallow: /postagown/form
+Disallow: /postagown/payment
+Disallow: /postagown/payment-setup
+Disallow: /postagown/setup-success
+Disallow: /postagown/bulk-form
+Disallow: /postagown/bulk-payment-setup
+Disallow: /postagown/bulk-setup-success
+Disallow: /advertise/form
+Disallow: /advertise/payment
+Disallow: /advertise/payment-setup
+Disallow: /advertise/setup-success
+Disallow: /paymentsuccess
+Disallow: /adpaymentsuccess
+
+Sitemap: https://regowned.com/sitemap.xml

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Container, Typography, Paper, List, ListItem, ListItemText } from '@mui/material';
+import usePageTitle from '../hooks/usePageTitle';
 
 const Section = ({ title, children }) => (
     <>
@@ -8,7 +9,9 @@ const Section = ({ title, children }) => (
     </>
 );
 
-const PrivacyPolicy = () => (
+const PrivacyPolicy = () => {
+    usePageTitle('Privacy Policy', 'How Regowned collects, uses, and protects your information.');
+    return (
     <Container maxWidth="md" sx={{ py: 6 }}>
         <Typography variant="h4" gutterBottom>Privacy Policy</Typography>
         <Typography color="text.secondary" sx={{ mb: 3 }}>Last updated: August 2026</Typography>
@@ -111,6 +114,7 @@ const PrivacyPolicy = () => (
             </Section>
         </Paper>
     </Container>
-);
+    );
+};
 
 export default PrivacyPolicy;
