@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -97,7 +98,16 @@ namespace GownSite.Web.Controllers
                 EmailVerificationToken = GenerateVerificationToken()
             };
             owner.PasswordHash = _hasher.HashPassword(owner, request.Password);
-            repo.Create(owner);
+            try
+            {
+                repo.Create(owner);
+            }
+            catch (DbUpdateException)
+            {
+                // Two signups for the same email racing past the check above — the unique
+                // index on Owner.Email is the real guard; this just keeps the response friendly.
+                return BadRequest(new { message = "An account with that email already exists." });
+            }
 
             await SendVerificationEmail(owner);
 

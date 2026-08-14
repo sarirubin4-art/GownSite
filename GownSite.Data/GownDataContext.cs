@@ -18,6 +18,10 @@ public class GownDataContext : DbContext
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Owner>()
+            .HasIndex(o => o.Email)
+            .IsUnique();
+
         modelBuilder.Entity<GownPosting>()
             .HasOne<PromoCode>().WithMany()
             .HasForeignKey(g => g.PromoCodeId).IsRequired(false);
