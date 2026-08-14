@@ -41,6 +41,9 @@ const Signup = () => {
     return (
         <Container maxWidth="xs" sx={{ py: 6 }}>
             <Typography variant="h4" gutterBottom>Create Account</Typography>
+            <Alert severity="info" sx={{ mb: 2 }}>
+                The email and phone number you enter here are what interested buyers or renters will see when they reach out about your listings — make sure they're ones you check.
+            </Alert>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             <Stack spacing={2}>
                 <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} fullWidth />

@@ -4,11 +4,19 @@ import axios from 'axios';
 import {
     Box, Typography, Tabs, Tab, Grid, Card, CardMedia, CardContent, CardActionArea, Button, Stack,
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert, MenuItem,
-    Table, TableHead, TableBody, TableRow, TableCell, Switch, Chip, Divider
+    Table, TableHead, TableBody, TableRow, TableCell, Switch, Chip, Divider,
+    Autocomplete, FormControlLabel, Checkbox, FormGroup,
+    Accordion, AccordionSummary, AccordionDetails, IconButton, LinearProgress
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 import { useAuth } from '../context/AuthContext';
 import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
+import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS } from '../constants/gownOptions';
+
+const MAX_POST_FOR_PATRON_GOWNS = 20;
 
 const DISCOUNT_TYPE_OPTIONS = [
     { value: 'PercentOff', label: 'Percent off' },
@@ -20,6 +28,15 @@ const DISCOUNT_TYPE_OPTIONS = [
 const VOLUME_TIER_DESCRIPTION = '$5/gown for 1-4, $4/gown for 5-9, $3.50/gown for 10-14, $3/gown for 15-20 — based on the total size of the batch it\'s applied to.';
 
 const emptyPromoForm = { code: '', discountType: 'PercentOff', discountValue: '', maxUses: '', expiresAt: '', durationMonths: '' };
+
+const emptyPostForPatronShared = { location: '', listingType: 'Rent', displayOwnerName: false };
+
+const makePostForPatronGown = () => ({
+    localId: crypto.randomUUID(),
+    description: '', colors: [], sizes: [], price: '',
+    brand: '', pricePaid: '', condition: '', length: '', styleTags: [], notes: '',
+    primaryPicture: null, primaryPreview: null
+});
 
 const DetailRow = ({ label, value }) => {
     if (value === null || value === undefined || value === '') return null;
@@ -211,6 +228,16 @@ const AdminDashboard = () => {
     const [deleteOwnerTarget, setDeleteOwnerTarget] = useState(null);
     const [deleteOwnerError, setDeleteOwnerError] = useState('');
     const [deleteOwnerSending, setDeleteOwnerSending] = useState(false);
+    const [postForPatronTarget, setPostForPatronTarget] = useState(null);
+    const [postForPatronShared, setPostForPatronShared] = useState(emptyPostForPatronShared);
+    const [postForPatronGowns, setPostForPatronGowns] = useState([makePostForPatronGown()]);
+    const [postForPatronExpanded, setPostForPatronExpanded] = useState(0);
+    const [postForPatronError, setPostForPatronError] = useState('');
+    const [postForPatronSending, setPostForPatronSending] = useState(false);
+    const [postForPatronProgressIndex, setPostForPatronProgressIndex] = useState(0);
+    const [postForPatronSavedCount, setPostForPatronSavedCount] = useState(0);
+    const [postForPatronFailedIndex, setPostForPatronFailedIndex] = useState(null);
+    const [postForPatronSuccess, setPostForPatronSuccess] = useState(false);
 
     const loadPending = async () => {
         const [gowns, ads] = await Promise.all([
@@ -388,6 +415,102 @@ const AdminDashboard = () => {
         }
     };
 
+    const onOpenPostForPatron = (patron) => {
+        setPostForPatronTarget(patron);
+        setPostForPatronShared(emptyPostForPatronShared);
+        setPostForPatronGowns([makePostForPatronGown()]);
+        setPostForPatronExpanded(0);
+        setPostForPatronError('');
+        setPostForPatronSavedCount(0);
+        setPostForPatronFailedIndex(null);
+        setPostForPatronSuccess(false);
+    };
+
+    const onClosePostForPatron = () => {
+        setPostForPatronTarget(null);
+    };
+
+    const updatePostForPatronGown = (localId, patch) => {
+        setPostForPatronGowns((prev) => prev.map((g) => (g.localId === localId ? { ...g, ...patch } : g)));
+    };
+
+    const togglePostForPatronStyle = (localId, value) => {
+        setPostForPatronGowns((prev) => prev.map((g) => {
+            if (g.localId !== localId) return g;
+            const has = g.styleTags.includes(value);
+            return { ...g, styleTags: has ? g.styleTags.filter(s => s !== value) : [...g.styleTags, value] };
+        }));
+    };
+
+    const onPostForPatronPictureChange = (localId) => (e) => {
+        const file = e.target.files[0];
+        updatePostForPatronGown(localId, { primaryPicture: file || null, primaryPreview: file ? URL.createObjectURL(file) : null });
+    };
+
+    const addPostForPatronGown = () => {
+        if (postForPatronGowns.length >= MAX_POST_FOR_PATRON_GOWNS) return;
+        setPostForPatronGowns((prev) => [...prev, makePostForPatronGown()]);
+        setPostForPatronExpanded(postForPatronGowns.length);
+    };
+
+    const removePostForPatronGown = (localId) => {
+        setPostForPatronGowns((prev) => prev.filter((g) => g.localId !== localId));
+    };
+
+    const postForPatronGownLabel = (g, i) => g.description ? g.description.slice(0, 40) : `Gown ${i + 1}`;
+
+    const onSubmitPostForPatron = async () => {
+        for (let i = 0; i < postForPatronGowns.length; i++) {
+            if (!postForPatronGowns[i].description.trim()) {
+                setPostForPatronError(`Gown ${i + 1}: please add at least a description.`);
+                return;
+            }
+        }
+        setPostForPatronError('');
+        setPostForPatronSending(true);
+        setPostForPatronFailedIndex(null);
+
+        const startIndex = postForPatronFailedIndex ?? postForPatronSavedCount;
+        let saved = postForPatronSavedCount;
+        for (let i = startIndex; i < postForPatronGowns.length; i++) {
+            setPostForPatronProgressIndex(i);
+            const g = postForPatronGowns[i];
+            try {
+                const data = new FormData();
+                data.append('OwnerId', postForPatronTarget.id);
+                data.append('Description', g.description);
+                data.append('Color', g.colors.join(','));
+                data.append('Size', g.sizes.join(','));
+                if (g.price !== '') data.append('Price', g.price);
+                data.append('Location', postForPatronShared.location);
+                data.append('ListingType', postForPatronShared.listingType);
+                data.append('DisplayOwnerName', postForPatronShared.displayOwnerName);
+                data.append('Brand', g.brand);
+                if (g.pricePaid !== '') data.append('PricePaid', g.pricePaid);
+                data.append('Condition', g.condition);
+                data.append('Length', g.length);
+                data.append('StyleTags', g.styleTags.join(','));
+                data.append('Notes', g.notes);
+                if (g.primaryPicture) data.append('PrimaryPicture', g.primaryPicture);
+
+                await axios.post('/api/admin/gowns/post-for-patron', data, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                saved = i + 1;
+                setPostForPatronSavedCount(saved);
+            } catch (err) {
+                setPostForPatronFailedIndex(i);
+                setPostForPatronExpanded(i);
+                setPostForPatronError(`Gown ${i + 1} (${postForPatronGownLabel(g, i)}) failed: ${err?.response?.data?.message || 'Something went wrong saving this draft.'}`);
+                setPostForPatronSending(false);
+                return;
+            }
+        }
+
+        setPostForPatronSending(false);
+        setPostForPatronSuccess(true);
+    };
+
     if (loading || !owner?.isAdmin) return null;
 
     return (
@@ -514,12 +637,20 @@ const AdminDashboard = () => {
                                                 {o.isAdmin ? <Chip size="small" label="Admin" color="primary" /> : 'Patron'}
                                             </TableCell>
                                             <TableCell align="right">
-                                                <Button
-                                                    size="small" color="error" variant="outlined"
-                                                    onClick={() => { setDeleteOwnerError(''); setDeleteOwnerTarget(o); }}
-                                                >
-                                                    Delete
-                                                </Button>
+                                                <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+                                                    <Button
+                                                        size="small" variant="outlined"
+                                                        onClick={() => onOpenPostForPatron(o)}
+                                                    >
+                                                        Post a Gown
+                                                    </Button>
+                                                    <Button
+                                                        size="small" color="error" variant="outlined"
+                                                        onClick={() => { setDeleteOwnerError(''); setDeleteOwnerTarget(o); }}
+                                                    >
+                                                        Delete
+                                                    </Button>
+                                                </Stack>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -669,6 +800,212 @@ const AdminDashboard = () => {
                     <Button variant="contained" color="error" disabled={deleteOwnerSending} onClick={onDeleteOwnerConfirm}>
                         {deleteOwnerSending ? 'Deleting...' : 'Delete'}
                     </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={!!postForPatronTarget} onClose={onClosePostForPatron} maxWidth="md" fullWidth fullScreen={fullScreen}>
+                <DialogTitle>Post {postForPatronGowns.length > 1 ? `${postForPatronGowns.length} Gowns` : 'a Gown'} for {postForPatronTarget?.name}</DialogTitle>
+                <DialogContent>
+                    {postForPatronSuccess ? (
+                        <Alert severity="success" sx={{ mt: 1 }}>
+                            Saved! {postForPatronGowns.length > 1 ? 'They\'re' : 'It\'s'} in {postForPatronTarget?.name}'s My Listings as "Setup Incomplete" — they just need to add a card and submit.
+                        </Alert>
+                    ) : (
+                        <Stack spacing={2} sx={{ mt: 1 }}>
+                            {postForPatronError && (
+                                <Alert severity="error">
+                                    {postForPatronError}
+                                    {postForPatronSavedCount > 0 && (
+                                        <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+                                            {postForPatronSavedCount} gown{postForPatronSavedCount === 1 ? '' : 's'} already saved — fix the one above and retry, or close and pick up the rest later.
+                                        </Typography>
+                                    )}
+                                </Alert>
+                            )}
+                            <Typography variant="body2" color="text.secondary">
+                                Each gown saves as a draft under their account — no card needed from you. They'll finish it themselves from My Listings.
+                            </Typography>
+
+                            {postForPatronSending && (
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                                        Saving gown {postForPatronProgressIndex + 1} of {postForPatronGowns.length}...
+                                    </Typography>
+                                    <LinearProgress variant="determinate" value={(postForPatronProgressIndex / postForPatronGowns.length) * 100} />
+                                </Box>
+                            )}
+
+                            <Grid container spacing={2}>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                        label="Location (city/area)" fullWidth value={postForPatronShared.location}
+                                        onChange={(e) => setPostForPatronShared({ ...postForPatronShared, location: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField select label="Rent or Sale" fullWidth value={postForPatronShared.listingType}
+                                        onChange={(e) => setPostForPatronShared({ ...postForPatronShared, listingType: e.target.value })}>
+                                        {LISTING_TYPE_OPTIONS.map(o2 => <MenuItem key={o2.value} value={o2.value}>{o2.label}</MenuItem>)}
+                                    </TextField>
+                                </Grid>
+                            </Grid>
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        checked={postForPatronShared.displayOwnerName}
+                                        onChange={(e) => setPostForPatronShared({ ...postForPatronShared, displayOwnerName: e.target.checked })}
+                                    />
+                                }
+                                label="Show their name publicly on these listings"
+                            />
+
+                            {postForPatronGowns.map((g, i) => (
+                                <Accordion
+                                    key={g.localId}
+                                    expanded={postForPatronExpanded === i}
+                                    onChange={() => setPostForPatronExpanded(postForPatronExpanded === i ? -1 : i)}
+                                    variant="outlined"
+                                    sx={{ border: '1px solid', borderColor: postForPatronFailedIndex === i ? 'error.main' : 'divider' }}
+                                >
+                                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexGrow: 1, pr: 1 }}>
+                                            <Typography sx={{ flexGrow: 1 }}>{postForPatronGownLabel(g, i)}</Typography>
+                                            {postForPatronSavedCount > i && <Chip size="small" color="success" label="Saved" />}
+                                            {postForPatronFailedIndex === i && <Chip size="small" color="error" label="Failed" />}
+                                            {postForPatronGowns.length > 1 && (
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={(e) => { e.stopPropagation(); removePostForPatronGown(g.localId); }}
+                                                    disabled={postForPatronSending}
+                                                >
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            )}
+                                        </Stack>
+                                    </AccordionSummary>
+                                    <AccordionDetails>
+                                        <Grid container spacing={2}>
+                                            <Grid size={12}>
+                                                <TextField
+                                                    label="Description" value={g.description}
+                                                    onChange={(e) => updatePostForPatronGown(g.localId, { description: e.target.value })}
+                                                    fullWidth multiline rows={2}
+                                                />
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 4 }}>
+                                                <Autocomplete
+                                                    multiple
+                                                    options={COLOR_OPTIONS}
+                                                    value={g.colors}
+                                                    onChange={(e, value) => updatePostForPatronGown(g.localId, { colors: value })}
+                                                    renderInput={(params) => <TextField {...params} label="Color(s)" />}
+                                                />
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 4 }}>
+                                                <Autocomplete
+                                                    multiple
+                                                    options={SIZE_OPTIONS}
+                                                    value={g.sizes}
+                                                    onChange={(e, value) => updatePostForPatronGown(g.localId, { sizes: value })}
+                                                    renderInput={(params) => <TextField {...params} label="Size(s)" />}
+                                                />
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 4 }}>
+                                                <TextField
+                                                    label="Price" type="number" fullWidth value={g.price}
+                                                    onChange={(e) => updatePostForPatronGown(g.localId, { price: e.target.value })}
+                                                    slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+                                                />
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 6 }}>
+                                                <Button variant="outlined" component="label" fullWidth sx={{ py: 1.5 }}>
+                                                    {g.primaryPicture ? 'Change Primary Picture' : 'Upload Primary Picture (optional)'}
+                                                    <input type="file" accept="image/*" hidden onChange={onPostForPatronPictureChange(g.localId)} />
+                                                </Button>
+                                            </Grid>
+                                            {g.primaryPreview && (
+                                                <Grid size={{ xs: 12, sm: 6 }}>
+                                                    <Box sx={{
+                                                        width: 100, height: 75, borderRadius: 2, overflow: 'hidden',
+                                                        bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                    }}>
+                                                        <Box component="img" src={g.primaryPreview} alt="Primary preview" sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                                                    </Box>
+                                                </Grid>
+                                            )}
+                                            <Grid size={{ xs: 12, sm: 6 }}>
+                                                <TextField label="Brand" fullWidth size="small" value={g.brand}
+                                                    onChange={(e) => updatePostForPatronGown(g.localId, { brand: e.target.value })} />
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 6 }}>
+                                                <TextField label="Original Gown Value" type="number" fullWidth size="small" value={g.pricePaid}
+                                                    onChange={(e) => updatePostForPatronGown(g.localId, { pricePaid: e.target.value })} />
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 6 }}>
+                                                <TextField label="Condition" fullWidth size="small" value={g.condition}
+                                                    placeholder="e.g. Like new, worn once"
+                                                    onChange={(e) => updatePostForPatronGown(g.localId, { condition: e.target.value })} />
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 6 }}>
+                                                <TextField label="Height/Length" fullWidth size="small" value={g.length}
+                                                    onChange={(e) => updatePostForPatronGown(g.localId, { length: e.target.value })} />
+                                            </Grid>
+                                            <Grid size={12}>
+                                                <Typography variant="subtitle2" sx={{ mb: 1 }}>Style Tags</Typography>
+                                                <FormGroup row>
+                                                    {STYLE_OPTIONS.map(s => (
+                                                        <FormControlLabel
+                                                            key={s.value}
+                                                            control={
+                                                                <Checkbox
+                                                                    size="small"
+                                                                    checked={g.styleTags.includes(s.value)}
+                                                                    onChange={() => togglePostForPatronStyle(g.localId, s.value)}
+                                                                />
+                                                            }
+                                                            label={s.label}
+                                                            sx={{ width: { xs: '100%', sm: '33%' } }}
+                                                        />
+                                                    ))}
+                                                </FormGroup>
+                                            </Grid>
+                                            <Grid size={12}>
+                                                <TextField label="Notes" fullWidth multiline rows={2} size="small" value={g.notes}
+                                                    onChange={(e) => updatePostForPatronGown(g.localId, { notes: e.target.value })} />
+                                            </Grid>
+                                        </Grid>
+                                    </AccordionDetails>
+                                </Accordion>
+                            ))}
+
+                            <Box>
+                                <Button
+                                    startIcon={<AddIcon />}
+                                    onClick={addPostForPatronGown}
+                                    disabled={postForPatronGowns.length >= MAX_POST_FOR_PATRON_GOWNS || postForPatronSending}
+                                >
+                                    Add Another Gown {postForPatronGowns.length >= MAX_POST_FOR_PATRON_GOWNS ? `(max ${MAX_POST_FOR_PATRON_GOWNS})` : ''}
+                                </Button>
+                            </Box>
+                        </Stack>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    {postForPatronSuccess ? (
+                        <Button onClick={onClosePostForPatron}>Close</Button>
+                    ) : (
+                        <>
+                            <Button onClick={onClosePostForPatron}>Cancel</Button>
+                            <Button variant="contained" disabled={postForPatronSending} onClick={onSubmitPostForPatron}>
+                                {postForPatronSending
+                                    ? 'Saving...'
+                                    : postForPatronFailedIndex !== null
+                                        ? 'Retry From Failed Gown'
+                                        : `Save ${postForPatronGowns.length} Draft${postForPatronGowns.length === 1 ? '' : 's'}`}
+                            </Button>
+                        </>
+                    )}
                 </DialogActions>
             </Dialog>
 

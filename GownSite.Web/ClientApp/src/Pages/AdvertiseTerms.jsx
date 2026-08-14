@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
-    Container, Typography, Button, Stack, Box,
+    Container, Typography, Button, Stack, Box, Paper,
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
@@ -57,7 +57,12 @@ const AdvertiseTerms = () => {
     return (
         <Container maxWidth="sm" sx={{ py: 6 }}>
             <Typography variant="h4" gutterBottom>Before You Advertise</Typography>
-            <Box component="img" src="/ad-terms.png" alt="Before you advertise: pricing and how it works" sx={{ width: '100%', borderRadius: 2, mb: 3, display: 'block' }} />
+            <Paper elevation={1} sx={{ borderRadius: 3, mb: 3, bgcolor: 'background.paper', overflow: 'hidden' }}>
+                <Box
+                    component="img" src="/ad-terms.png" alt="Before you advertise: pricing and how it works"
+                    sx={{ width: '100%', display: 'block', transform: 'scale(1.1)', transformOrigin: 'center' }}
+                />
+            </Paper>
 
             <Typography variant="body2" sx={{ mb: 3 }}>
                 <Button variant="text" size="small" onClick={onOpenGemach} sx={{ px: 0 }}>

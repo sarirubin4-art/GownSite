@@ -23,6 +23,29 @@ namespace GownSite.Web.Controllers
         public List<string> Emails { get; set; }
     }
 
+    // Lets an admin start a gown listing on a patron's behalf — e.g. someone who wants
+    // help posting but isn't comfortable filling out the form themselves. Always lands
+    // as a Draft (same as the patron's own autosave), so the patron still adds their own
+    // card and finishes submitting it via "Complete Setup" in My Listings.
+    public class AdminCreateGownDraftRequest
+    {
+        public int OwnerId { get; set; }
+        public string Description { get; set; }
+        public string Color { get; set; }
+        public string Size { get; set; }
+        public decimal? Price { get; set; }
+        public string Location { get; set; }
+        public string ListingType { get; set; }
+        public bool DisplayOwnerName { get; set; }
+        public string Brand { get; set; }
+        public decimal? PricePaid { get; set; }
+        public string Condition { get; set; }
+        public string Length { get; set; }
+        public string StyleTags { get; set; }
+        public string Notes { get; set; }
+        public IFormFile PrimaryPicture { get; set; }
+    }
+
     [Route("api/[controller]")]
     [ApiController]
     [Authorize(Roles = "Admin")]
@@ -31,12 +54,14 @@ namespace GownSite.Web.Controllers
         private readonly string _connectionString;
         private readonly IConfiguration _configuration;
         private readonly IEmailSender _emailSender;
+        private readonly IFileStorageService _storage;
 
-        public AdminController(IConfiguration configuration, IEmailSender emailSender)
+        public AdminController(IConfiguration configuration, IEmailSender emailSender, IFileStorageService storage)
         {
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("ConStr");
             _emailSender = emailSender;
+            _storage = storage;
         }
 
         private string FrontendBaseUrl()
@@ -396,6 +421,42 @@ namespace GownSite.Web.Controllers
                 // FK relationships to gowns/ads are Restrict — this patron has postings on record.
                 return BadRequest(new { message = "This patron has gowns or ads on record and can't be deleted. Remove those first." });
             }
+        }
+
+        [HttpPost("gowns/post-for-patron")]
+        [RequestSizeLimit(50_000_000)]
+        public async Task<IActionResult> PostGownForPatron([FromForm] AdminCreateGownDraftRequest request)
+        {
+            var ownerRepo = new OwnerRepository(_connectionString);
+            if (ownerRepo.Get(request.OwnerId) == null) return NotFound(new { message = "Patron not found." });
+
+            Enum.TryParse<ListingType>(request.ListingType, out var listingType);
+
+            string primaryUrl = null;
+            if (request.PrimaryPicture != null)
+                primaryUrl = await _storage.SaveAsync(request.PrimaryPicture, "gowns");
+
+            var repo = new GownRepository(_connectionString);
+            var posting = new GownPosting
+            {
+                OwnerId = request.OwnerId,
+                Description = request.Description,
+                Color = request.Color,
+                Size = request.Size,
+                Price = request.Price ?? 0,
+                Location = request.Location,
+                ListingType = listingType,
+                DisplayOwnerName = request.DisplayOwnerName,
+                Brand = request.Brand,
+                PricePaid = request.PricePaid,
+                Condition = request.Condition,
+                Length = request.Length,
+                StyleTags = request.StyleTags,
+                Notes = request.Notes,
+                PrimaryPictureUrl = primaryUrl
+            };
+            var id = repo.Create(posting);
+            return Ok(new { id });
         }
 
         [HttpPost("email/promo")]
