@@ -60,7 +60,7 @@ const AdvertiseTerms = () => {
             <Paper elevation={1} sx={{ borderRadius: 3, mb: 3, bgcolor: 'background.paper', overflow: 'hidden' }}>
                 <Box
                     component="img" src="/ad-terms.png" alt="Before you advertise: pricing and how it works"
-                    sx={{ width: '100%', display: 'block', transform: 'scale(1.1)', transformOrigin: 'center' }}
+                    sx={{ width: '100%', display: 'block' }}
                 />
             </Paper>
 

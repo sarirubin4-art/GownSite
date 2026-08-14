@@ -21,7 +21,7 @@ const PostGownTerms = () => {
             <Paper elevation={1} sx={{ borderRadius: 3, mb: 3, bgcolor: 'background.paper', overflow: 'hidden' }}>
                 <Box
                     component="img" src="/gown-terms.png" alt="Before you post: pricing and how it works"
-                    sx={{ width: '100%', display: 'block', transform: 'scale(1.08)', transformOrigin: 'center' }}
+                    sx={{ width: '100%', display: 'block' }}
                 />
             </Paper>
             <Stack direction="row" spacing={2} sx={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}>
