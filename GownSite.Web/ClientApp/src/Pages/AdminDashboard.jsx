@@ -159,7 +159,7 @@ const PendingList = ({ items, type, onApprove, onRejectClick, error, fullScreen 
     );
 };
 
-const ActiveList = ({ items, type, onTakeDownClick, error }) => (
+const ActiveList = ({ items, type, onTakeDownClick, onEditClick, error }) => (
     <Box sx={{ mt: 3 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         {items.length === 0 ? (
@@ -184,6 +184,11 @@ const ActiveList = ({ items, type, onTakeDownClick, error }) => (
                                 </Typography>
                                 {type === 'gown' && <Typography variant="h6" sx={{ mt: 0.5 }}>${item.price}</Typography>}
                                 <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+                                    {type === 'gown' && (
+                                        <Button size="small" variant="outlined" onClick={() => onEditClick(item)}>
+                                            Edit
+                                        </Button>
+                                    )}
                                     <Button size="small" variant="outlined" color="error" onClick={() => onTakeDownClick(item.id)}>
                                         Take Down
                                     </Button>
@@ -211,6 +216,10 @@ const AdminDashboard = () => {
     const [rejectReason, setRejectReason] = useState('');
     const [takeDownTarget, setTakeDownTarget] = useState(null); // { type: 'gown'|'ad', id }
     const [takeDownReason, setTakeDownReason] = useState('');
+    const [editGownTarget, setEditGownTarget] = useState(null);
+    const [editGownNewPrimaryPicture, setEditGownNewPrimaryPicture] = useState(null);
+    const [editGownNewPrimaryPreview, setEditGownNewPrimaryPreview] = useState(null);
+    const [editGownError, setEditGownError] = useState('');
     const [error, setError] = useState('');
     const [promoCodes, setPromoCodes] = useState([]);
     const [promoDialogOpen, setPromoDialogOpen] = useState(false);
@@ -401,6 +410,63 @@ const AdminDashboard = () => {
         }
     };
 
+    const onEditGownClick = (g) => setEditGownTarget({
+        id: g.id, description: g.description, colors: (g.color || '').split(',').filter(Boolean), sizes: (g.size || '').split(',').filter(Boolean),
+        price: g.price, location: g.location, listingType: g.listingType,
+        displayOwnerName: g.displayOwnerName, brand: g.brand || '', pricePaid: g.pricePaid || '',
+        condition: g.condition || '', length: g.length || '',
+        styleTags: (g.styleTags || '').split(',').filter(Boolean), notes: g.notes || '',
+        primaryPictureUrl: g.primaryPictureUrl
+    });
+
+    const onCloseEditGownDialog = () => {
+        setEditGownTarget(null);
+        setEditGownNewPrimaryPicture(null);
+        setEditGownNewPrimaryPreview(null);
+        setEditGownError('');
+    };
+
+    const onEditGownPictureChange = (e) => {
+        const file = e.target.files[0];
+        setEditGownNewPrimaryPicture(file || null);
+        setEditGownNewPrimaryPreview(file ? URL.createObjectURL(file) : null);
+    };
+
+    const toggleEditGownStyle = (value) => {
+        setEditGownTarget((prev) => {
+            const has = prev.styleTags.includes(value);
+            return { ...prev, styleTags: has ? prev.styleTags.filter(s => s !== value) : [...prev.styleTags, value] };
+        });
+    };
+
+    const onSaveEditGown = async () => {
+        setEditGownError('');
+        const data = new FormData();
+        data.append('Id', editGownTarget.id);
+        data.append('Description', editGownTarget.description);
+        data.append('Color', editGownTarget.colors.join(','));
+        data.append('Size', editGownTarget.sizes.join(','));
+        data.append('Price', Number(editGownTarget.price));
+        data.append('Location', editGownTarget.location);
+        data.append('ListingType', editGownTarget.listingType);
+        data.append('DisplayOwnerName', editGownTarget.displayOwnerName);
+        data.append('Brand', editGownTarget.brand);
+        if (editGownTarget.pricePaid !== '') data.append('PricePaid', Number(editGownTarget.pricePaid));
+        data.append('Condition', editGownTarget.condition);
+        data.append('Length', editGownTarget.length);
+        data.append('StyleTags', editGownTarget.styleTags.join(','));
+        data.append('Notes', editGownTarget.notes);
+        if (editGownNewPrimaryPicture) data.append('PrimaryPicture', editGownNewPrimaryPicture);
+
+        try {
+            await axios.post('/api/admin/gowns/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+            onCloseEditGownDialog();
+            await loadActive();
+        } catch (err) {
+            setEditGownError(err?.response?.data?.message || 'Could not save changes.');
+        }
+    };
+
     const onDeleteOwnerConfirm = async () => {
         if (!deleteOwnerTarget) return;
         setDeleteOwnerError('');
@@ -565,6 +631,7 @@ const AdminDashboard = () => {
                     type="gown"
                     error={error}
                     onTakeDownClick={(id) => setTakeDownTarget({ type: 'gown', id })}
+                    onEditClick={onEditGownClick}
                 />
             )}
             {tab === 3 && (
@@ -794,6 +861,97 @@ const AdminDashboard = () => {
                     <Button variant="contained" color="error" disabled={!takeDownReason.trim()} onClick={onTakeDownConfirm}>
                         Take Down
                     </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={!!editGownTarget} onClose={onCloseEditGownDialog} maxWidth="sm" fullWidth fullScreen={fullScreen}>
+                <DialogTitle>Edit Listing</DialogTitle>
+                {editGownTarget && (
+                    <DialogContent>
+                        <Stack spacing={2} sx={{ mt: 1 }}>
+                            {editGownError && <Alert severity="error">{editGownError}</Alert>}
+                            <Stack direction="row" spacing={2} alignItems="center">
+                                <Box
+                                    component="img"
+                                    src={editGownNewPrimaryPreview || editGownTarget.primaryPictureUrl}
+                                    alt="Primary"
+                                    sx={{
+                                        width: 100, height: 100, borderRadius: 2, objectFit: 'cover',
+                                        border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper'
+                                    }}
+                                />
+                                <Button variant="outlined" component="label" size="small">
+                                    Change Photo
+                                    <input type="file" accept="image/*" hidden onChange={onEditGownPictureChange} />
+                                </Button>
+                            </Stack>
+                            <TextField label="Description" multiline rows={2} value={editGownTarget.description}
+                                onChange={(e) => setEditGownTarget({ ...editGownTarget, description: e.target.value })} />
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                <Autocomplete
+                                    multiple
+                                    fullWidth
+                                    options={COLOR_OPTIONS}
+                                    value={editGownTarget.colors}
+                                    onChange={(e, value) => setEditGownTarget({ ...editGownTarget, colors: value })}
+                                    renderInput={(params) => <TextField {...params} label="Color(s)" />}
+                                />
+                                <Autocomplete
+                                    multiple
+                                    fullWidth
+                                    options={SIZE_OPTIONS}
+                                    value={editGownTarget.sizes}
+                                    onChange={(e, value) => setEditGownTarget({ ...editGownTarget, sizes: value })}
+                                    renderInput={(params) => <TextField {...params} label="Size(s)" />}
+                                />
+                            </Stack>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                <TextField label="Price" type="number" fullWidth value={editGownTarget.price}
+                                    onChange={(e) => setEditGownTarget({ ...editGownTarget, price: e.target.value })} />
+                                <TextField select label="Rent/Sale" fullWidth value={editGownTarget.listingType}
+                                    onChange={(e) => setEditGownTarget({ ...editGownTarget, listingType: e.target.value })}>
+                                    {LISTING_TYPE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+                                </TextField>
+                            </Stack>
+                            <LocationField
+                                label="Location"
+                                value={editGownTarget.location}
+                                onChange={(value) => setEditGownTarget({ ...editGownTarget, location: value })}
+                            />
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                <TextField label="Brand" fullWidth value={editGownTarget.brand}
+                                    onChange={(e) => setEditGownTarget({ ...editGownTarget, brand: e.target.value })} />
+                                <TextField label="Original Gown Value" type="number" fullWidth value={editGownTarget.pricePaid}
+                                    onChange={(e) => setEditGownTarget({ ...editGownTarget, pricePaid: e.target.value })} />
+                            </Stack>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                <TextField label="Condition" fullWidth value={editGownTarget.condition}
+                                    placeholder="e.g. Like new, worn once"
+                                    onChange={(e) => setEditGownTarget({ ...editGownTarget, condition: e.target.value })} />
+                                <TextField label="Height/Length" fullWidth value={editGownTarget.length}
+                                    onChange={(e) => setEditGownTarget({ ...editGownTarget, length: e.target.value })} />
+                            </Stack>
+                            <Box>
+                                <Typography variant="subtitle2" sx={{ mb: 1 }}>Style Tags (select all that apply)</Typography>
+                                <FormGroup row>
+                                    {STYLE_OPTIONS.map(s => (
+                                        <FormControlLabel
+                                            key={s.value}
+                                            control={<Checkbox checked={editGownTarget.styleTags.includes(s.value)} onChange={() => toggleEditGownStyle(s.value)} />}
+                                            label={s.label}
+                                            sx={{ width: { xs: '100%', sm: '50%' } }}
+                                        />
+                                    ))}
+                                </FormGroup>
+                            </Box>
+                            <TextField label="Notes" multiline rows={2} value={editGownTarget.notes}
+                                onChange={(e) => setEditGownTarget({ ...editGownTarget, notes: e.target.value })} />
+                        </Stack>
+                    </DialogContent>
+                )}
+                <DialogActions>
+                    <Button onClick={onCloseEditGownDialog}>Cancel</Button>
+                    <Button variant="contained" onClick={onSaveEditGown}>Save Changes</Button>
                 </DialogActions>
             </Dialog>
 

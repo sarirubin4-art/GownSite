@@ -273,6 +273,53 @@ namespace GownSite.Web.Controllers
             return Ok();
         }
 
+        // Lets an admin correct a live listing directly (a typo, a price fix, added
+        // photos) without going through the patron. Reuses the same GownRepository
+        // update path as the patron-facing edit, just without the owner-match check.
+        [HttpPost("gowns/edit")]
+        [RequestSizeLimit(100_000_000)]
+        public async Task<IActionResult> EditGown([FromForm] EditGownRequest request)
+        {
+            var repo = new GownRepository(_connectionString);
+            var existing = repo.Get(request.Id);
+            if (existing == null) return NotFound();
+            if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType))
+                return BadRequest(new { message = "ListingType must be 'Rent' or 'Sale'." });
+            if (request.MorePictures?.Count > GownController.MaxMorePictures)
+                return BadRequest(new { message = $"You can upload up to {GownController.MaxMorePictures} additional photos." });
+
+            repo.Update(new GownPosting
+            {
+                Id = request.Id,
+                Description = request.Description,
+                Color = request.Color,
+                Size = request.Size,
+                Price = request.Price,
+                Location = request.Location,
+                ListingType = listingType,
+                DisplayOwnerName = request.DisplayOwnerName,
+                Brand = request.Brand,
+                PricePaid = request.PricePaid,
+                Condition = request.Condition,
+                Length = request.Length,
+                StyleTags = request.StyleTags,
+                Notes = request.Notes
+            });
+
+            if (request.PrimaryPicture != null)
+                repo.SetPrimaryPicture(request.Id, await _storage.SaveAsync(request.PrimaryPicture, "gowns"));
+
+            if (request.MorePictures?.Count > 0)
+            {
+                var urls = new List<string>();
+                foreach (var file in request.MorePictures)
+                    urls.Add(await _storage.SaveAsync(file, "gowns"));
+                repo.AddPictures(request.Id, urls);
+            }
+
+            return Ok();
+        }
+
         [HttpGet("ads/pending")]
         public IActionResult GetPendingAds()
         {

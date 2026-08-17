@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
     Box, Grid, Typography, Chip, Button, Divider, Stack, Dialog, DialogTitle,
-    DialogContent, DialogActions, CircularProgress
+    DialogContent, DialogActions, CircularProgress, IconButton
 } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CloseIcon from '@mui/icons-material/Close';
+import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import { styleLabel } from '../constants/gownOptions';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import usePageTitle from '../hooks/usePageTitle';
@@ -12,6 +15,7 @@ import { useAdLane } from '../context/AdLaneContext';
 
 const ViewGown = () => {
     const { id } = useParams();
+    const navigate = useNavigate();
     const fullScreen = useFullScreenDialog();
     const { adVisible, laneWidth } = useAdLane();
     const [gown, setGown] = useState(null);
@@ -19,6 +23,7 @@ const ViewGown = () => {
     const [contactInfo, setContactInfo] = useState(null);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [zoomOpen, setZoomOpen] = useState(false);
 
     usePageTitle(
         gown ? `${[gown.color, gown.size ? `Size ${gown.size}` : null].filter(Boolean).join(', ')} Gown ${gown.listingType === 'Sale' ? 'for Sale' : 'for Rent'}${gown.location ? ` in ${gown.location}` : ''}` : 'Gown Listing',
@@ -52,6 +57,13 @@ const ViewGown = () => {
 
     return (
         <Box>
+            <Button
+                startIcon={<ArrowBackIcon />}
+                onClick={() => navigate(-1)}
+                sx={{ mb: 2 }}
+            >
+                Back
+            </Button>
             <Grid container spacing={4} sx={{ mr: { xs: 0, md: adVisible ? `${laneWidth}px` : 0 } }}>
                 <Grid size={{ xs: 12, md: 7 }}>
                     <Box sx={{ display: 'flex', gap: 2 }}>
@@ -70,6 +82,7 @@ const ViewGown = () => {
                             ))}
                         </Stack>
                         <Box
+                            onClick={() => setZoomOpen(true)}
                             sx={{
                                 position: 'relative',
                                 flex: 1,
@@ -82,7 +95,8 @@ const ViewGown = () => {
                                 borderColor: 'divider',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center'
+                                justifyContent: 'center',
+                                cursor: 'zoom-in'
                             }}
                         >
                             <Box
@@ -91,6 +105,16 @@ const ViewGown = () => {
                                 alt={gown.description}
                                 sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                             />
+                            <IconButton
+                                size="small"
+                                sx={{
+                                    position: 'absolute', bottom: 12, right: 12, zIndex: 1,
+                                    bgcolor: 'rgba(0,0,0,0.45)', color: '#fff',
+                                    '&:hover': { bgcolor: 'rgba(0,0,0,0.6)' }
+                                }}
+                            >
+                                <ZoomInIcon fontSize="small" />
+                            </IconButton>
                             {gown.isSold && (
                                 <Box sx={{
                                     position: 'absolute', inset: 0, zIndex: 1,
@@ -164,6 +188,44 @@ const ViewGown = () => {
                 <DialogActions>
                     <Button onClick={() => setDialogOpen(false)}>Close</Button>
                 </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={zoomOpen} onClose={() => setZoomOpen(false)} maxWidth="lg" fullScreen={fullScreen}
+                slotProps={{ paper: { sx: { bgcolor: 'rgba(0,0,0,0.92)', boxShadow: 'none' } } }}
+            >
+                <IconButton
+                    onClick={() => setZoomOpen(false)}
+                    sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1, color: '#fff', bgcolor: 'rgba(0,0,0,0.4)', '&:hover': { bgcolor: 'rgba(0,0,0,0.6)' } }}
+                >
+                    <CloseIcon />
+                </IconButton>
+                <DialogContent
+                    sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', p: { xs: 1, sm: 3 } }}
+                >
+                    <Box
+                        component="img"
+                        src={activeImage}
+                        alt={gown.description}
+                        sx={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain' }}
+                    />
+                </DialogContent>
+                {thumbnails.length > 1 && (
+                    <Stack direction="row" spacing={1} justifyContent="center" sx={{ pb: 2, flexWrap: 'wrap', px: 2 }}>
+                        {thumbnails.map((url) => (
+                            <Box
+                                key={url}
+                                component="img"
+                                src={url}
+                                onClick={() => setActiveImage(url)}
+                                sx={{
+                                    width: 56, height: 56, objectFit: 'cover', borderRadius: 1, cursor: 'pointer',
+                                    border: '2px solid', borderColor: activeImage === url ? 'primary.main' : 'transparent'
+                                }}
+                            />
+                        ))}
+                    </Stack>
+                )}
             </Dialog>
         </Box>
     );
