@@ -29,7 +29,7 @@ const VOLUME_TIER_DESCRIPTION = '$5/gown for 1-4, $4/gown for 5-9, $3.50/gown fo
 
 const emptyPromoForm = { code: '', discountType: 'PercentOff', discountValue: '', maxUses: '', expiresAt: '', durationMonths: '' };
 
-const emptyPostForPatronShared = { location: '', listingType: 'Rent', displayOwnerName: false };
+const emptyPostForPatronShared = { location: '', listingType: 'Rent', displayOwnerName: false, finalize: false };
 
 const makePostForPatronGown = () => ({
     localId: crypto.randomUUID(),
@@ -461,9 +461,20 @@ const AdminDashboard = () => {
 
     const onSubmitPostForPatron = async () => {
         for (let i = 0; i < postForPatronGowns.length; i++) {
-            if (!postForPatronGowns[i].description.trim()) {
+            const g = postForPatronGowns[i];
+            if (!g.description.trim()) {
                 setPostForPatronError(`Gown ${i + 1}: please add at least a description.`);
                 return;
+            }
+            if (postForPatronShared.finalize) {
+                if (g.colors.length === 0 || g.sizes.length === 0 || !g.price || !postForPatronShared.location.trim()) {
+                    setPostForPatronError(`Gown ${i + 1}: color, size, price, and location are required to publish immediately.`);
+                    return;
+                }
+                if (!g.primaryPicture) {
+                    setPostForPatronError(`Gown ${i + 1}: a primary picture is required to publish immediately.`);
+                    return;
+                }
             }
         }
         setPostForPatronError('');
@@ -492,6 +503,7 @@ const AdminDashboard = () => {
                 data.append('StyleTags', g.styleTags.join(','));
                 data.append('Notes', g.notes);
                 if (g.primaryPicture) data.append('PrimaryPicture', g.primaryPicture);
+                data.append('Finalize', postForPatronShared.finalize);
 
                 await axios.post('/api/admin/gowns/post-for-patron', data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
@@ -501,7 +513,7 @@ const AdminDashboard = () => {
             } catch (err) {
                 setPostForPatronFailedIndex(i);
                 setPostForPatronExpanded(i);
-                setPostForPatronError(`Gown ${i + 1} (${postForPatronGownLabel(g, i)}) failed: ${err?.response?.data?.message || 'Something went wrong saving this draft.'}`);
+                setPostForPatronError(`Gown ${i + 1} (${postForPatronGownLabel(g, i)}) failed: ${err?.response?.data?.message || `Something went wrong ${postForPatronShared.finalize ? 'publishing' : 'saving'} this gown.`}`);
                 setPostForPatronSending(false);
                 return;
             }
@@ -808,7 +820,9 @@ const AdminDashboard = () => {
                 <DialogContent>
                     {postForPatronSuccess ? (
                         <Alert severity="success" sx={{ mt: 1 }}>
-                            Saved! {postForPatronGowns.length > 1 ? 'They\'re' : 'It\'s'} in {postForPatronTarget?.name}'s My Listings as "Setup Incomplete" — they just need to add a card and submit.
+                            {postForPatronShared.finalize
+                                ? `Published! ${postForPatronGowns.length > 1 ? 'They\'re' : 'It\'s'} live on the site now, comped — no card was charged.`
+                                : `Saved! ${postForPatronGowns.length > 1 ? 'They\'re' : 'It\'s'} in ${postForPatronTarget?.name}'s My Listings as "Setup Incomplete" — they just need to add a card and submit.`}
                         </Alert>
                     ) : (
                         <Stack spacing={2} sx={{ mt: 1 }}>
@@ -823,13 +837,25 @@ const AdminDashboard = () => {
                                 </Alert>
                             )}
                             <Typography variant="body2" color="text.secondary">
-                                Each gown saves as a draft under their account — no card needed from you. They'll finish it themselves from My Listings.
+                                {postForPatronShared.finalize
+                                    ? 'Publishing goes live immediately under their account — comped, no card and no subscription at all.'
+                                    : "Each gown saves as a draft under their account — no card needed from you. They'll finish it themselves from My Listings."}
                             </Typography>
+
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        checked={postForPatronShared.finalize}
+                                        onChange={(e) => setPostForPatronShared({ ...postForPatronShared, finalize: e.target.checked })}
+                                    />
+                                }
+                                label="Finalize now — publish immediately, no card required (comped)"
+                            />
 
                             {postForPatronSending && (
                                 <Box>
                                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                                        Saving gown {postForPatronProgressIndex + 1} of {postForPatronGowns.length}...
+                                        {postForPatronShared.finalize ? 'Publishing' : 'Saving'} gown {postForPatronProgressIndex + 1} of {postForPatronGowns.length}...
                                     </Typography>
                                     <LinearProgress variant="determinate" value={(postForPatronProgressIndex / postForPatronGowns.length) * 100} />
                                 </Box>
@@ -919,7 +945,7 @@ const AdminDashboard = () => {
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 6 }}>
                                                 <Button variant="outlined" component="label" fullWidth sx={{ py: 1.5 }}>
-                                                    {g.primaryPicture ? 'Change Primary Picture' : 'Upload Primary Picture (optional)'}
+                                                    {g.primaryPicture ? 'Change Primary Picture' : `Upload Primary Picture${postForPatronShared.finalize ? '' : ' (optional)'}`}
                                                     <input type="file" accept="image/*" hidden onChange={onPostForPatronPictureChange(g.localId)} />
                                                 </Button>
                                             </Grid>
@@ -999,10 +1025,12 @@ const AdminDashboard = () => {
                             <Button onClick={onClosePostForPatron}>Cancel</Button>
                             <Button variant="contained" disabled={postForPatronSending} onClick={onSubmitPostForPatron}>
                                 {postForPatronSending
-                                    ? 'Saving...'
+                                    ? (postForPatronShared.finalize ? 'Publishing...' : 'Saving...')
                                     : postForPatronFailedIndex !== null
                                         ? 'Retry From Failed Gown'
-                                        : `Save ${postForPatronGowns.length} Draft${postForPatronGowns.length === 1 ? '' : 's'}`}
+                                        : postForPatronShared.finalize
+                                            ? `Publish ${postForPatronGowns.length} Gown${postForPatronGowns.length === 1 ? '' : 's'} Now`
+                                            : `Save ${postForPatronGowns.length} Draft${postForPatronGowns.length === 1 ? '' : 's'}`}
                             </Button>
                         </>
                     )}

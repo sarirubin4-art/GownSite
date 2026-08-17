@@ -24,9 +24,11 @@ namespace GownSite.Web.Controllers
     }
 
     // Lets an admin start a gown listing on a patron's behalf — e.g. someone who wants
-    // help posting but isn't comfortable filling out the form themselves. Always lands
+    // help posting but isn't comfortable filling out the form themselves. By default lands
     // as a Draft (same as the patron's own autosave), so the patron still adds their own
-    // card and finishes submitting it via "Complete Setup" in My Listings.
+    // card and finishes submitting it via "Complete Setup" in My Listings. If Finalize is
+    // set, the admin is comping the listing — it goes live immediately with no Stripe
+    // subscription at all, skipping the card/payment step entirely.
     public class AdminCreateGownDraftRequest
     {
         public int OwnerId { get; set; }
@@ -44,6 +46,7 @@ namespace GownSite.Web.Controllers
         public string StyleTags { get; set; }
         public string Notes { get; set; }
         public IFormFile PrimaryPicture { get; set; }
+        public bool Finalize { get; set; }
     }
 
     [Route("api/[controller]")]
@@ -430,7 +433,20 @@ namespace GownSite.Web.Controllers
             var ownerRepo = new OwnerRepository(_connectionString);
             if (ownerRepo.Get(request.OwnerId) == null) return NotFound(new { message = "Patron not found." });
 
-            Enum.TryParse<ListingType>(request.ListingType, out var listingType);
+            var listingTypeValid = Enum.TryParse<ListingType>(request.ListingType, out var listingType);
+
+            if (request.Finalize)
+            {
+                // Comping a listing live skips the card/subscription step entirely, so it
+                // needs to already look like a real listing — same required fields a patron's
+                // own form enforces before it'll let them submit. Drafts stay zero-validation.
+                if (string.IsNullOrWhiteSpace(request.Description) || string.IsNullOrWhiteSpace(request.Color) ||
+                    string.IsNullOrWhiteSpace(request.Size) || !request.Price.HasValue || request.Price.Value <= 0 ||
+                    string.IsNullOrWhiteSpace(request.Location) || !listingTypeValid)
+                    return BadRequest(new { message = "Description, color, size, price, location, and rent/sale are required to publish immediately." });
+                if (request.PrimaryPicture == null)
+                    return BadRequest(new { message = "A primary picture is required to publish immediately." });
+            }
 
             string primaryUrl = null;
             if (request.PrimaryPicture != null)
@@ -456,7 +472,9 @@ namespace GownSite.Web.Controllers
                 PrimaryPictureUrl = primaryUrl
             };
             var id = repo.Create(posting);
-            return Ok(new { id });
+            if (request.Finalize)
+                repo.ActivateListing(id, null, null);
+            return Ok(new { id, finalized = request.Finalize });
         }
 
         [HttpPost("email/promo")]
