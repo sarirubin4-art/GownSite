@@ -35,10 +35,11 @@ namespace GownSite.Web.Services
                 EmailLayout.Button("Review in Admin Dashboard", adminUrl),
                 frontendBaseUrl);
 
-        public static string BusinessInquiry(string ownerName, string ownerEmail, string ownerNumber, string message, string frontendBaseUrl) =>
+        public static string ContactReply(string topic, string originalMessage, string reply, string frontendBaseUrl) =>
             EmailLayout.Wrap(
-                $"<p><strong>{ownerName}</strong> ({ownerEmail}{(string.IsNullOrEmpty(ownerNumber) ? "" : $", {ownerNumber}")}) asked about the bulk discount:</p>" +
-                $"<p>{message}</p>",
+                EmailLayout.Heading("A Reply From Regowned") +
+                $"<p>{reply}</p>" +
+                $"<p style=\"font-size:13px;color:#8A6D72;margin-top:24px;\">In response to your message ({topic}):<br><em>{originalMessage}</em></p>",
                 frontendBaseUrl);
 
         public static string Approved(string type, string listingUrl, string frontendBaseUrl) =>

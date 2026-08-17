@@ -248,6 +248,10 @@ const AdminDashboard = () => {
     const [postForPatronSavedCount, setPostForPatronSavedCount] = useState(0);
     const [postForPatronFailedIndex, setPostForPatronFailedIndex] = useState(null);
     const [postForPatronSuccess, setPostForPatronSuccess] = useState(false);
+    const [contactMessages, setContactMessages] = useState([]);
+    const [contactReplyDrafts, setContactReplyDrafts] = useState({});
+    const [contactReplySendingId, setContactReplySendingId] = useState(null);
+    const [showResolvedMessages, setShowResolvedMessages] = useState(false);
 
     const loadPending = async () => {
         const [gowns, ads] = await Promise.all([
@@ -277,6 +281,11 @@ const AdminDashboard = () => {
         setOwners(data);
     };
 
+    const loadContactMessages = async () => {
+        const { data } = await axios.get('/api/admin/contact-messages');
+        setContactMessages(data);
+    };
+
     useEffect(() => {
         if (!loading && !owner?.isAdmin) {
             navigate('/');
@@ -287,8 +296,26 @@ const AdminDashboard = () => {
             loadActive();
             loadPromoCodes();
             loadOwners();
+            loadContactMessages();
         }
     }, [loading, owner]);
+
+    const onSendContactReply = async (id) => {
+        const reply = (contactReplyDrafts[id] || '').trim();
+        if (!reply) return;
+        setContactReplySendingId(id);
+        try {
+            await axios.post(`/api/admin/contact-messages/${id}/reply`, { reply });
+            await loadContactMessages();
+        } finally {
+            setContactReplySendingId(null);
+        }
+    };
+
+    const onResolveContactMessage = async (id) => {
+        await axios.post(`/api/admin/contact-messages/${id}/resolve`);
+        await loadContactMessages();
+    };
 
     const onSavePromo = async () => {
         setPromoError('');
@@ -592,6 +619,10 @@ const AdminDashboard = () => {
 
     if (loading || !owner?.isAdmin) return null;
 
+    const openContactCount = contactMessages.filter((m) => !m.isResolved).length;
+    const sortedContactMessages = [...contactMessages].sort((a, b) => Number(a.isResolved) - Number(b.isResolved));
+    const visibleContactMessages = showResolvedMessages ? sortedContactMessages : sortedContactMessages.filter((m) => !m.isResolved);
+
     return (
         <Box>
             <Typography variant="h4" gutterBottom>Admin</Typography>
@@ -603,6 +634,7 @@ const AdminDashboard = () => {
                 <Tab label="Promo Codes" />
                 <Tab label={`Patrons${owners.length ? ` (${owners.length})` : ''}`} />
                 <Tab label="Send Emails" />
+                <Tab label={`Inbox${openContactCount ? ` (${openContactCount})` : ''}`} />
             </Tabs>
 
             {tab === 0 && (
@@ -803,6 +835,68 @@ const AdminDashboard = () => {
                         </Stack>
                     </Box>
                 </Stack>
+            )}
+            {tab === 7 && (
+                <Box sx={{ mt: 3 }}>
+                    <Stack direction="row" sx={{ justifyContent: 'flex-end', mb: 2 }}>
+                        <FormControlLabel
+                            control={<Switch checked={showResolvedMessages} onChange={(e) => setShowResolvedMessages(e.target.checked)} />}
+                            label="Show resolved"
+                        />
+                    </Stack>
+                    {visibleContactMessages.length === 0 ? (
+                        <Typography color="text.secondary">Nothing to show.</Typography>
+                    ) : (
+                        <Stack spacing={2} sx={{ maxWidth: 720 }}>
+                            {visibleContactMessages.map((m) => (
+                                <Box key={m.id} sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider', opacity: m.isResolved ? 0.6 : 1 }}>
+                                    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                                        <Box>
+                                            <Typography variant="subtitle2">
+                                                {m.owner?.name} &middot; {m.owner?.email}{m.owner?.number ? ` · ${m.owner.number}` : ''}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                {m.topic} &middot; {new Date(m.createdDate).toLocaleString()}
+                                            </Typography>
+                                        </Box>
+                                        {m.isResolved && <Chip size="small" label="Resolved" />}
+                                    </Stack>
+                                    <Typography variant="body2" sx={{ mb: 2 }}>{m.message}</Typography>
+
+                                    {m.replyMessage ? (
+                                        <Box sx={{ p: 2, borderRadius: 1, bgcolor: 'background.default', mb: 2 }}>
+                                            <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                                                Your reply &middot; {new Date(m.repliedDate).toLocaleString()}
+                                            </Typography>
+                                            <Typography variant="body2">{m.replyMessage}</Typography>
+                                        </Box>
+                                    ) : (
+                                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 2 }}>
+                                            <TextField
+                                                size="small" fullWidth label="Reply" multiline maxRows={4}
+                                                value={contactReplyDrafts[m.id] || ''}
+                                                onChange={(e) => setContactReplyDrafts({ ...contactReplyDrafts, [m.id]: e.target.value })}
+                                            />
+                                            <Button
+                                                variant="outlined"
+                                                disabled={contactReplySendingId === m.id || !(contactReplyDrafts[m.id] || '').trim()}
+                                                onClick={() => onSendContactReply(m.id)}
+                                            >
+                                                {contactReplySendingId === m.id ? 'Sending...' : 'Send Reply'}
+                                            </Button>
+                                        </Stack>
+                                    )}
+
+                                    {!m.isResolved && (
+                                        <Button size="small" onClick={() => onResolveContactMessage(m.id)}>
+                                            Mark Resolved
+                                        </Button>
+                                    )}
+                                </Box>
+                            ))}
+                        </Stack>
+                    )}
+                </Box>
             )}
 
             <Dialog open={promoEmailConfirmOpen} onClose={() => setPromoEmailConfirmOpen(false)} maxWidth="xs" fullWidth fullScreen={fullScreen}>

@@ -18,6 +18,11 @@ namespace GownSite.Web.Controllers
         public string Message { get; set; }
     }
 
+    public class ReplyToContactMessageRequest
+    {
+        public string Reply { get; set; }
+    }
+
     public class SendSpreadTheWordRequest
     {
         public List<string> Emails { get; set; }
@@ -626,6 +631,42 @@ namespace GownSite.Web.Controllers
                 ExpiresAt = request.ExpiresAt,
                 DurationMonths = request.DurationMonths
             });
+            return Ok();
+        }
+
+        [HttpGet("contact-messages")]
+        public IActionResult GetContactMessages()
+        {
+            var repo = new ContactMessageRepository(_connectionString);
+            return Ok(repo.GetAll());
+        }
+
+        [HttpPost("contact-messages/{id}/reply")]
+        public async Task<IActionResult> ReplyToContactMessage(int id, [FromBody] ReplyToContactMessageRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Reply))
+                return BadRequest(new { message = "Please enter a reply." });
+
+            var repo = new ContactMessageRepository(_connectionString);
+            var contactMessage = repo.Get(id);
+            if (contactMessage == null) return NotFound();
+
+            repo.Reply(id, request.Reply);
+
+            await _emailSender.SendAsync(
+                contactMessage.Owner.Email,
+                "Reply from Regowned",
+                EmailTemplates.ContactReply(contactMessage.Topic, contactMessage.Message, request.Reply, FrontendBaseUrl())
+            );
+
+            return Ok();
+        }
+
+        [HttpPost("contact-messages/{id}/resolve")]
+        public IActionResult ResolveContactMessage(int id)
+        {
+            var repo = new ContactMessageRepository(_connectionString);
+            if (!repo.Resolve(id)) return NotFound();
             return Ok();
         }
 

@@ -3,19 +3,17 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import {
     Container, Typography, TextField, Button, Stack, MenuItem, Grid,
-    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box, Autocomplete,
-    Dialog, DialogTitle, DialogContent, DialogActions
+    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box, Autocomplete
 } from '@mui/material';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
-import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import LocationField from '../components/LocationField';
+import ContactAdminDialog from '../components/ContactAdminDialog';
 
 const MAX_MORE_PICTURES = 5;
 
 const GownPostingForm = () => {
     const { owner, loading } = useAuth();
-    const fullScreen = useFullScreenDialog();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const resumeId = searchParams.get('resume');
@@ -27,10 +25,6 @@ const GownPostingForm = () => {
     const [morePictures, setMorePictures] = useState([]);
     const [morePicturesError, setMorePicturesError] = useState('');
     const [inquiryOpen, setInquiryOpen] = useState(false);
-    const [inquiryMessage, setInquiryMessage] = useState('');
-    const [inquirySending, setInquirySending] = useState(false);
-    const [inquirySent, setInquirySent] = useState(false);
-    const [inquiryError, setInquiryError] = useState('');
 
     const [draftId, setDraftId] = useState(resumeId ? Number(resumeId) : null);
     const [saveState, setSaveState] = useState('idle'); // idle | saving | saved
@@ -213,30 +207,6 @@ const GownPostingForm = () => {
         }
     };
 
-    const onOpenInquiry = () => {
-        setInquiryMessage('');
-        setInquiryError('');
-        setInquirySent(false);
-        setInquiryOpen(true);
-    };
-
-    const onSendInquiry = async () => {
-        if (!inquiryMessage.trim()) {
-            setInquiryError('Please enter a message.');
-            return;
-        }
-        setInquiryError('');
-        setInquirySending(true);
-        try {
-            await axios.post('/api/contact/business-inquiry', { message: inquiryMessage });
-            setInquirySent(true);
-        } catch (err) {
-            setInquiryError(err?.response?.data?.message || 'Could not send your message.');
-        } finally {
-            setInquirySending(false);
-        }
-    };
-
     if (loading || !owner) return null;
 
     return (
@@ -372,42 +342,18 @@ const GownPostingForm = () => {
             </Stack>
 
             <Box sx={{ mt: 6, textAlign: 'center' }}>
-                <Button variant="text" onClick={onOpenInquiry}>
+                <Button variant="text" onClick={() => setInquiryOpen(true)}>
                     Are you a business? Contact me for our bulk discount!
                 </Button>
             </Box>
 
-            <Dialog open={inquiryOpen} onClose={() => setInquiryOpen(false)} maxWidth="sm" fullWidth fullScreen={fullScreen}>
-                <DialogTitle>Bulk Discount Inquiry</DialogTitle>
-                <DialogContent>
-                    {inquirySent ? (
-                        <Alert severity="success" sx={{ mt: 1 }}>Thanks! We'll be in touch soon.</Alert>
-                    ) : (
-                        <Stack spacing={2} sx={{ mt: 1 }}>
-                            <Typography variant="body2" color="text.secondary">
-                                Tell us a bit about your business and how many gowns you're looking to list — we'll follow up by email.
-                            </Typography>
-                            {inquiryError && <Alert severity="error">{inquiryError}</Alert>}
-                            <TextField
-                                label="Message" value={inquiryMessage} onChange={(e) => setInquiryMessage(e.target.value)}
-                                fullWidth multiline rows={4} autoFocus
-                            />
-                        </Stack>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    {inquirySent ? (
-                        <Button onClick={() => setInquiryOpen(false)}>Close</Button>
-                    ) : (
-                        <>
-                            <Button onClick={() => setInquiryOpen(false)}>Cancel</Button>
-                            <Button variant="contained" onClick={onSendInquiry} disabled={inquirySending}>
-                                {inquirySending ? 'Sending...' : 'Send'}
-                            </Button>
-                        </>
-                    )}
-                </DialogActions>
-            </Dialog>
+            <ContactAdminDialog
+                open={inquiryOpen}
+                onClose={() => setInquiryOpen(false)}
+                topic="Bulk discount inquiry"
+                title="Bulk Discount Inquiry"
+                promptText="Tell us a bit about your business and how many gowns you're looking to list — we'll follow up by email."
+            />
         </Container>
     );
 };

@@ -166,4 +166,22 @@ namespace GownSite.Data
         public bool IsActive { get; set; }
         public string UnsubscribeToken { get; set; }
     }
+
+    // A patron-initiated message (bulk-discount inquiry, gemach free-ad request, or the
+    // general "Contact Us" entry point) that lands in the admin's in-app inbox instead of
+    // an email, so receiving it costs nothing. Reply is one-way and single-send, so it's
+    // stored as flat fields here rather than a separate thread table.
+    public class ContactMessage
+    {
+        public int Id { get; set; }
+        public int OwnerId { get; set; }
+        public Owner Owner { get; set; }
+        public string Topic { get; set; }
+        public string Message { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public bool IsResolved { get; set; }
+        public DateTime? ResolvedDate { get; set; }
+        public string ReplyMessage { get; set; }
+        public DateTime? RepliedDate { get; set; }
+    }
 }

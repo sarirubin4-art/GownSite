@@ -33,6 +33,9 @@ public class GownDataContext : DbContext
             .HasOne<PromoCode>().WithMany()
             .HasForeignKey(a => a.PromoCodeId).IsRequired(false);
 
+        modelBuilder.Entity<ContactMessage>()
+            .HasIndex(c => c.IsResolved);
+
         foreach (var relationship in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetForeignKeys()))
         {
             relationship.DeleteBehavior = DeleteBehavior.Restrict;
@@ -45,4 +48,5 @@ public class GownDataContext : DbContext
     public DbSet<Ad> Ads { get; set; }
     public DbSet<PromoCode> PromoCodes { get; set; }
     public DbSet<SearchAlert> SearchAlerts { get; set; }
+    public DbSet<ContactMessage> ContactMessages { get; set; }
 }

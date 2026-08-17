@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import {
     AppBar, Toolbar, Typography, Button, Box, Container, Paper,
@@ -10,6 +10,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import { useAuth } from '../context/AuthContext';
 import { AdLaneProvider } from '../context/AdLaneContext';
 import FloatingAds from './FloatingAds';
+import ContactAdminDialog from './ContactAdminDialog';
 import { wallpaperBackground } from '../theme';
 
 const NAV_LINKS = [
@@ -30,10 +31,20 @@ const initialsFor = (name) => (name || '')
 const Layout = ({ children }) => {
     const { owner, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [menuAnchor, setMenuAnchor] = useState(null);
     const [adVisible, setAdVisible] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [resendState, setResendState] = useState('idle'); // idle | sending | sent
+    const [contactOpen, setContactOpen] = useState(false);
+
+    const onContactUsClick = () => {
+        if (owner) {
+            setContactOpen(true);
+        } else {
+            navigate(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`);
+        }
+    };
 
     const onResendVerification = async () => {
         setResendState('sending');
@@ -250,8 +261,19 @@ const Layout = ({ children }) => {
                     <Box component={Link} to="/terms" sx={{ color: 'inherit', mx: 1.5 }}>Terms of Service</Box>
                     &middot;
                     <Box component={Link} to="/privacy" sx={{ color: 'inherit', mx: 1.5 }}>Privacy Policy</Box>
+                    &middot;
+                    <Box component="span" onClick={onContactUsClick} sx={{ color: 'inherit', mx: 1.5, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+                        Contact Us
+                    </Box>
                 </Typography>
             </Box>
+            <ContactAdminDialog
+                open={contactOpen}
+                onClose={() => setContactOpen(false)}
+                topic="Contact Customer Service"
+                title="Contact Customer Service"
+                promptText="How can we help? Send us a message and we'll follow up by email."
+            />
             <FloatingAds onVisibilityChange={setAdVisible} />
         </Box>
     );
