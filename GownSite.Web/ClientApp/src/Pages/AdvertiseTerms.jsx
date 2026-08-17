@@ -59,7 +59,7 @@ const AdvertiseTerms = () => {
             <Typography variant="h4" gutterBottom>Before You Advertise</Typography>
             <Paper elevation={1} sx={{ borderRadius: 3, mb: 3, bgcolor: 'background.paper', overflow: 'hidden' }}>
                 <Box
-                    component="img" src="/ad-terms.png" alt="Before you advertise: pricing and how it works"
+                    component="img" src="/ad-terms.webp" alt="Before you advertise: pricing and how it works"
                     sx={{ width: '100%', display: 'block' }}
                 />
             </Paper>

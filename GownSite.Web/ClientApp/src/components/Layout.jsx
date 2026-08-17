@@ -82,7 +82,7 @@ const Layout = ({ children }) => {
                         >
                             <Box
                                 component="img"
-                                src="/logo.png"
+                                src="/logo.webp"
                                 alt="Regowned"
                                 sx={{ height: { xs: 30, md: 40 }, width: 'auto', display: 'block' }}
                             />
@@ -172,7 +172,7 @@ const Layout = ({ children }) => {
             <Drawer anchor="left" open={drawerOpen} onClose={closeDrawer}>
                 <Box sx={{ width: 260 }} role="presentation">
                     <Box sx={{ p: 2 }}>
-                        <Box component="img" src="/logo.png" alt="Regowned" sx={{ height: 32, width: 'auto', display: 'block' }} />
+                        <Box component="img" src="/logo.webp" alt="Regowned" sx={{ height: 32, width: 'auto', display: 'block' }} />
                     </Box>
                     <Divider />
                     <List>

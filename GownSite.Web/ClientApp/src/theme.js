@@ -5,7 +5,7 @@ import { createTheme } from '@mui/material/styles';
 // the true page corners and faded low so it reads as a soft accent, not decor
 // that competes with the site's own content.
 export const wallpaperBackground = {
-    backgroundImage: 'url("/floral-topleft.png"), url("/floral-bottomright.png")',
+    backgroundImage: 'url("/floral-topleft.webp"), url("/floral-bottomright.webp")',
     backgroundPosition: 'left top, right bottom',
     backgroundRepeat: 'no-repeat, no-repeat',
     backgroundSize: '320px auto, 320px auto'

@@ -13,7 +13,7 @@ const Home = () => {
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', py: 10 }}>
             <Box
                 component="img"
-                src="/logo.png"
+                src="/logo.webp"
                 alt="Regowned"
                 sx={{ width: { xs: '80%', sm: 420 }, maxWidth: 500, height: 'auto', mb: 2 }}
             />

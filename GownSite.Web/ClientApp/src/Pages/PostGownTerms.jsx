@@ -20,7 +20,7 @@ const PostGownTerms = () => {
             <Typography variant="h4" gutterBottom>Before You Post</Typography>
             <Paper elevation={1} sx={{ borderRadius: 3, mb: 3, bgcolor: 'background.paper', overflow: 'hidden' }}>
                 <Box
-                    component="img" src="/gown-terms.png" alt="Before you post: pricing and how it works"
+                    component="img" src="/gown-terms.webp" alt="Before you post: pricing and how it works"
                     sx={{ width: '100%', display: 'block' }}
                 />
             </Paper>
