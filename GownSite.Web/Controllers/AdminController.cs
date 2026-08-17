@@ -638,7 +638,18 @@ namespace GownSite.Web.Controllers
         public IActionResult GetContactMessages()
         {
             var repo = new ContactMessageRepository(_connectionString);
-            return Ok(repo.GetAll());
+            return Ok(repo.GetOpen());
+        }
+
+        [HttpGet("contact-messages/resolved")]
+        public IActionResult GetResolvedContactMessages(int page = 1, int pageSize = 20)
+        {
+            var repo = new ContactMessageRepository(_connectionString);
+            return Ok(new
+            {
+                items = repo.GetResolvedPage(page, pageSize),
+                totalCount = repo.CountResolved()
+            });
         }
 
         [HttpPost("contact-messages/{id}/reply")]

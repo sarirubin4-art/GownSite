@@ -252,6 +252,11 @@ const AdminDashboard = () => {
     const [contactReplyDrafts, setContactReplyDrafts] = useState({});
     const [contactReplySendingId, setContactReplySendingId] = useState(null);
     const [showResolvedMessages, setShowResolvedMessages] = useState(false);
+    const [resolvedMessages, setResolvedMessages] = useState([]);
+    const [resolvedTotalCount, setResolvedTotalCount] = useState(0);
+    const [resolvedPage, setResolvedPage] = useState(0);
+    const [resolvedLoading, setResolvedLoading] = useState(false);
+    const RESOLVED_PAGE_SIZE = 20;
 
     const loadPending = async () => {
         const [gowns, ads] = await Promise.all([
@@ -284,6 +289,28 @@ const AdminDashboard = () => {
     const loadContactMessages = async () => {
         const { data } = await axios.get('/api/admin/contact-messages');
         setContactMessages(data);
+    };
+
+    const loadMoreResolvedMessages = async () => {
+        setResolvedLoading(true);
+        try {
+            const nextPage = resolvedPage + 1;
+            const { data } = await axios.get('/api/admin/contact-messages/resolved', {
+                params: { page: nextPage, pageSize: RESOLVED_PAGE_SIZE }
+            });
+            setResolvedMessages((prev) => [...prev, ...data.items]);
+            setResolvedTotalCount(data.totalCount);
+            setResolvedPage(nextPage);
+        } finally {
+            setResolvedLoading(false);
+        }
+    };
+
+    const onToggleShowResolved = (checked) => {
+        setShowResolvedMessages(checked);
+        if (checked && resolvedPage === 0) {
+            loadMoreResolvedMessages();
+        }
     };
 
     useEffect(() => {
@@ -619,9 +646,8 @@ const AdminDashboard = () => {
 
     if (loading || !owner?.isAdmin) return null;
 
-    const openContactCount = contactMessages.filter((m) => !m.isResolved).length;
-    const sortedContactMessages = [...contactMessages].sort((a, b) => Number(a.isResolved) - Number(b.isResolved));
-    const visibleContactMessages = showResolvedMessages ? sortedContactMessages : sortedContactMessages.filter((m) => !m.isResolved);
+    const openContactCount = contactMessages.length;
+    const visibleContactMessages = showResolvedMessages ? [...contactMessages, ...resolvedMessages] : contactMessages;
 
     return (
         <Box>
@@ -837,19 +863,20 @@ const AdminDashboard = () => {
                 </Stack>
             )}
             {tab === 7 && (
-                <Box sx={{ mt: 3 }}>
+                <Box sx={{ mt: 3, mr: { xs: 0, md: adVisible ? `${laneWidth}px` : 0 } }}>
                     <Stack direction="row" sx={{ justifyContent: 'flex-end', mb: 2 }}>
                         <FormControlLabel
-                            control={<Switch checked={showResolvedMessages} onChange={(e) => setShowResolvedMessages(e.target.checked)} />}
+                            control={<Switch checked={showResolvedMessages} onChange={(e) => onToggleShowResolved(e.target.checked)} />}
                             label="Show resolved"
                         />
                     </Stack>
                     {visibleContactMessages.length === 0 ? (
                         <Typography color="text.secondary">Nothing to show.</Typography>
                     ) : (
-                        <Stack spacing={2} sx={{ maxWidth: 720 }}>
+                        <Grid container spacing={2}>
                             {visibleContactMessages.map((m) => (
-                                <Box key={m.id} sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider', opacity: m.isResolved ? 0.6 : 1 }}>
+                                <Grid key={m.id} size={{ xs: 12, md: 6 }}>
+                                <Box sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider', opacity: m.isResolved ? 0.6 : 1, height: '100%' }}>
                                     <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                                         <Box>
                                             <Typography variant="subtitle2">
@@ -893,7 +920,15 @@ const AdminDashboard = () => {
                                         </Button>
                                     )}
                                 </Box>
+                                </Grid>
                             ))}
+                        </Grid>
+                    )}
+                    {showResolvedMessages && resolvedMessages.length < resolvedTotalCount && (
+                        <Stack alignItems="center" sx={{ mt: 3 }}>
+                            <Button variant="outlined" disabled={resolvedLoading} onClick={loadMoreResolvedMessages}>
+                                {resolvedLoading ? 'Loading...' : `Load More (${resolvedTotalCount - resolvedMessages.length} remaining)`}
+                            </Button>
                         </Stack>
                     )}
                 </Box>
