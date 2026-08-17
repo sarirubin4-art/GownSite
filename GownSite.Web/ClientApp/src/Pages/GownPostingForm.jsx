@@ -3,16 +3,15 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import {
     Container, Typography, TextField, Button, Stack, MenuItem, Grid,
-    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box, Autocomplete, createFilterOptions,
+    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box, Autocomplete,
     Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
+import LocationField from '../components/LocationField';
 
 const MAX_MORE_PICTURES = 5;
-
-const locationFilter = createFilterOptions({ matchFrom: 'start' });
 
 const GownPostingForm = () => {
     const { owner, loading } = useAuth();
@@ -27,7 +26,6 @@ const GownPostingForm = () => {
     const [hasExistingPhoto, setHasExistingPhoto] = useState(false);
     const [morePictures, setMorePictures] = useState([]);
     const [morePicturesError, setMorePicturesError] = useState('');
-    const [existingLocations, setExistingLocations] = useState([]);
     const [inquiryOpen, setInquiryOpen] = useState(false);
     const [inquiryMessage, setInquiryMessage] = useState('');
     const [inquirySending, setInquirySending] = useState(false);
@@ -61,10 +59,6 @@ const GownPostingForm = () => {
             navigate('/login?redirect=/postagown/terms');
         }
     }, [loading, owner]);
-
-    useEffect(() => {
-        axios.get('/api/gown/locations').then(({ data }) => setExistingLocations(data)).catch(() => {});
-    }, []);
 
     // Resuming an in-progress draft (from "Complete Setup" in My Listings, or a
     // reloaded tab) — load whatever was already saved before the user touches anything,
@@ -289,15 +283,9 @@ const GownPostingForm = () => {
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                        <Autocomplete
-                            freeSolo
-                            autoComplete
-                            autoHighlight
-                            options={existingLocations}
-                            filterOptions={locationFilter}
+                        <LocationField
                             value={form.location}
-                            onInputChange={(e, value) => { markDirty(); setForm({ ...form, location: value }); }}
-                            renderInput={(params) => <TextField {...params} label="Location (city/area)" />}
+                            onChange={(value) => { markDirty(); setForm({ ...form, location: value }); }}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>

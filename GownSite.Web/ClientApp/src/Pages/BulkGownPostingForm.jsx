@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
     Container, Typography, TextField, Button, Stack, MenuItem, Grid,
-    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box, Autocomplete, createFilterOptions,
+    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box, Autocomplete,
     Accordion, AccordionSummary, AccordionDetails, IconButton, LinearProgress, Chip
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -11,11 +11,10 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
+import LocationField from '../components/LocationField';
 
 const MAX_MORE_PICTURES = 5;
 const MAX_BATCH_GOWNS = 20;
-
-const locationFilter = createFilterOptions({ matchFrom: 'start' });
 
 const makeEmptyGown = () => ({
     localId: crypto.randomUUID(),
@@ -44,7 +43,6 @@ const BulkGownPostingForm = () => {
     const [progressIndex, setProgressIndex] = useState(0);
     const [submittedIds, setSubmittedIds] = useState([]);
     const [failedIndex, setFailedIndex] = useState(null);
-    const [existingLocations, setExistingLocations] = useState([]);
     const [expanded, setExpanded] = useState(0);
 
     const [shared, setShared] = useState({
@@ -61,10 +59,6 @@ const BulkGownPostingForm = () => {
             navigate('/login?redirect=/postagown/terms');
         }
     }, [loading, owner]);
-
-    useEffect(() => {
-        axios.get('/api/gown/locations').then(({ data }) => setExistingLocations(data)).catch(() => {});
-    }, []);
 
     const updateGown = (localId, patch) => {
         setGowns((prev) => prev.map((g) => (g.localId === localId ? { ...g, ...patch } : g)));
@@ -215,15 +209,9 @@ const BulkGownPostingForm = () => {
                 </Typography>
                 <Grid container spacing={2}>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                        <Autocomplete
-                            freeSolo
-                            autoComplete
-                            autoHighlight
-                            options={existingLocations}
-                            filterOptions={locationFilter}
+                        <LocationField
                             value={shared.location}
-                            onInputChange={(e, value) => setShared({ ...shared, location: value })}
-                            renderInput={(params) => <TextField {...params} label="Location (city/area)" />}
+                            onChange={(value) => setShared({ ...shared, location: value })}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>

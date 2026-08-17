@@ -20,6 +20,13 @@ export const STYLE_OPTIONS = [
     { value: 'Maternity', label: 'Maternity' },
 ];
 
+export const LOCATION_PRESETS = [
+    'Baltimore, MD', 'Boston, MA', 'Brooklyn, NY', 'Chicago, IL', 'Cleveland, OH',
+    'Detroit, MI', 'Five Towns, NY', 'Jerusalem, IL', 'Lakewood, NJ', 'Los Angeles, CA',
+    'Miami, FL', 'Monsey, NY', 'Montreal, QC', 'Passaic/Clifton, NJ', 'Philadelphia, PA',
+    'Queens, NY', 'Silver Spring, MD', 'Staten Island, NY', 'Teaneck, NJ', 'Toronto, ON'
+];
+
 export const LISTING_TYPE_OPTIONS = [
     { value: 'Rent', label: 'For Rent' },
     { value: 'Sale', label: 'For Sale' },

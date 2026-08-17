@@ -3,14 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
     Box, Typography, Grid, Card, CardMedia, CardContent, Chip, Button, Stack,
-    Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Autocomplete, createFilterOptions,
+    Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Autocomplete,
     Checkbox, FormControlLabel, FormGroup
 } from '@mui/material';
 import { COLOR_OPTIONS, SIZE_OPTIONS, LISTING_TYPE_OPTIONS, STYLE_OPTIONS } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
-
-const locationFilter = createFilterOptions({ matchFrom: 'start' });
+import LocationField from '../components/LocationField';
 
 const MyListings = () => {
     const { owner, loading } = useAuth();
@@ -18,7 +17,6 @@ const MyListings = () => {
     const fullScreen = useFullScreenDialog();
     const [listings, setListings] = useState([]);
     const [editTarget, setEditTarget] = useState(null);
-    const [existingLocations, setExistingLocations] = useState([]);
     const [promoCodeInput, setPromoCodeInput] = useState('');
     const [promoApplying, setPromoApplying] = useState(false);
     const [promoMessage, setPromoMessage] = useState(null); // { type: 'success'|'error', text }
@@ -42,10 +40,6 @@ const MyListings = () => {
         }
         if (owner) load();
     }, [loading, owner]);
-
-    useEffect(() => {
-        axios.get('/api/gown/locations').then(({ data }) => setExistingLocations(data)).catch(() => {});
-    }, []);
 
     const onCancelClick = async (id) => {
         if (!window.confirm('This will cancel your subscription and take the listing down. Continue?')) return;
@@ -275,15 +269,10 @@ const MyListings = () => {
                                     {LISTING_TYPE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
                                 </TextField>
                             </Stack>
-                            <Autocomplete
-                                freeSolo
-                                autoComplete
-                                autoHighlight
-                                options={existingLocations}
-                                filterOptions={locationFilter}
+                            <LocationField
+                                label="Location"
                                 value={editTarget.location}
-                                onInputChange={(e, value) => setEditTarget({ ...editTarget, location: value })}
-                                renderInput={(params) => <TextField {...params} label="Location" />}
+                                onChange={(value) => setEditTarget({ ...editTarget, location: value })}
                             />
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                                 <TextField label="Brand" fullWidth value={editTarget.brand}

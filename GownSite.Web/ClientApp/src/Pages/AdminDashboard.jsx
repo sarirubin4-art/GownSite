@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS } from '../constants/gownOptions';
+import LocationField from '../components/LocationField';
 
 const MAX_POST_FOR_PATRON_GOWNS = 20;
 
@@ -863,9 +864,9 @@ const AdminDashboard = () => {
 
                             <Grid container spacing={2}>
                                 <Grid size={{ xs: 12, sm: 6 }}>
-                                    <TextField
-                                        label="Location (city/area)" fullWidth value={postForPatronShared.location}
-                                        onChange={(e) => setPostForPatronShared({ ...postForPatronShared, location: e.target.value })}
+                                    <LocationField
+                                        value={postForPatronShared.location}
+                                        onChange={(value) => setPostForPatronShared({ ...postForPatronShared, location: value })}
                                     />
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
