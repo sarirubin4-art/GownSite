@@ -24,6 +24,11 @@ const PostGownTerms = () => {
                     sx={{ width: '100%', display: 'block' }}
                 />
             </Paper>
+            <Typography variant="body2" sx={{ mb: 3 }}>
+                <Button variant="text" size="small" onClick={() => navigate('/concierge/terms')} sx={{ px: 0 }}>
+                    Too busy to fill this out yourself? Let our team do it for you
+                </Button>
+            </Typography>
             <Stack direction="row" spacing={2} sx={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <Button variant="text" onClick={() => navigate('/')}>Cancel</Button>
                 <Button variant="outlined" onClick={() => navigate('/postagown/bulk-form')}>Post Multiple Gowns</Button>

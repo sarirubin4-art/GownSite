@@ -38,7 +38,7 @@ const BUSINESS_PLAN_PRESETS = [
     { label: 'Pro — $75/150', monthlyFee: 75, gownAllowance: 150 }
 ];
 
-const emptyPostForPatronShared = { location: '', listingType: 'Rent', displayOwnerName: false, finalize: false };
+const emptyPostForPatronShared = { location: '', listingType: 'Rent', displayOwnerName: false, finalize: false, hourlyFeeUsd: '' };
 
 const makePostForPatronGown = () => ({
     localId: crypto.randomUUID(),
@@ -251,6 +251,7 @@ const AdminDashboard = () => {
     const [businessPlanError, setBusinessPlanError] = useState('');
     const [businessPlanSending, setBusinessPlanSending] = useState(false);
     const [postForPatronTarget, setPostForPatronTarget] = useState(null);
+    const [postForPatronBatchId, setPostForPatronBatchId] = useState(null);
     const [postForPatronShared, setPostForPatronShared] = useState(emptyPostForPatronShared);
     const [postForPatronGowns, setPostForPatronGowns] = useState([makePostForPatronGown()]);
     const [postForPatronExpanded, setPostForPatronExpanded] = useState(0);
@@ -269,6 +270,9 @@ const AdminDashboard = () => {
     const [resolvedPage, setResolvedPage] = useState(0);
     const [resolvedLoading, setResolvedLoading] = useState(false);
     const RESOLVED_PAGE_SIZE = 20;
+    const [conciergeQueue, setConciergeQueue] = useState([]);
+    const [conciergeFeeDrafts, setConciergeFeeDrafts] = useState({});
+    const [conciergeMarkingBatchId, setConciergeMarkingBatchId] = useState(null);
 
     const loadPending = async () => {
         const [gowns, ads] = await Promise.all([
@@ -301,6 +305,36 @@ const AdminDashboard = () => {
     const loadContactMessages = async () => {
         const { data } = await axios.get('/api/admin/contact-messages');
         setContactMessages(data);
+    };
+
+    const loadConciergeQueue = async () => {
+        const { data } = await axios.get('/api/admin/concierge/queue');
+        setConciergeQueue(data);
+    };
+
+    // $7/gown by default, $5/gown once a batch has 10+ gowns — a pre-filled starting
+    // point the admin can always override per gown, same convention as BUSINESS_PLAN_PRESETS.
+    const conciergeDefaultFee = (batchSize) => (batchSize >= 10 ? 5 : 7);
+
+    const conciergeBatches = conciergeQueue.reduce((acc, g) => {
+        const key = g.batchId || g.id;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(g);
+        return acc;
+    }, {});
+
+    const onMarkConciergeReady = async (batchId, gowns) => {
+        setConciergeMarkingBatchId(batchId);
+        try {
+            const fees = gowns.map((g) => ({
+                id: g.id,
+                oneTimeFeeUsd: Number(conciergeFeeDrafts[g.id] ?? conciergeDefaultFee(gowns.length))
+            }));
+            await axios.post(`/api/admin/concierge/${batchId}/mark-ready`, { fees });
+            await loadConciergeQueue();
+        } finally {
+            setConciergeMarkingBatchId(null);
+        }
     };
 
     const loadMoreResolvedMessages = async () => {
@@ -336,6 +370,7 @@ const AdminDashboard = () => {
             loadPromoCodes();
             loadOwners();
             loadContactMessages();
+            loadConciergeQueue();
         }
     }, [loading, owner]);
 
@@ -528,6 +563,7 @@ const AdminDashboard = () => {
             await axios.post('/api/admin/gowns/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
             onCloseEditGownDialog();
             await loadActive();
+            await loadConciergeQueue();
         } catch (err) {
             setEditGownError(err?.response?.data?.message || 'Could not save changes.');
         }
@@ -592,6 +628,10 @@ const AdminDashboard = () => {
 
     const onOpenPostForPatron = (patron) => {
         setPostForPatronTarget(patron);
+        // Always generated, even for a single gown — this is what excludes these gowns
+        // from ApproveGown's automatic solo setup fee, so an hourly visit fee never stacks
+        // with it (see AdminController.ApproveGown's isSoloDefaultPricing check).
+        setPostForPatronBatchId(crypto.randomUUID());
         setPostForPatronShared(emptyPostForPatronShared);
         setPostForPatronGowns([makePostForPatronGown()]);
         setPostForPatronExpanded(0);
@@ -679,6 +719,10 @@ const AdminDashboard = () => {
                 data.append('Notes', g.notes);
                 if (g.primaryPicture) data.append('PrimaryPicture', g.primaryPicture);
                 data.append('Finalize', postForPatronShared.finalize);
+                data.append('BatchId', postForPatronBatchId);
+                // The visit's hourly total lands on just the first gown, not every gown —
+                // it's a lump sum for the whole session, not a per-gown charge.
+                if (i === 0 && postForPatronShared.hourlyFeeUsd) data.append('OneTimeFeeUsd', postForPatronShared.hourlyFeeUsd);
 
                 await axios.post('/api/admin/gowns/post-for-patron', data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
@@ -715,6 +759,7 @@ const AdminDashboard = () => {
                 <Tab label={`Patrons${owners.length ? ` (${owners.length})` : ''}`} />
                 <Tab label="Send Emails" />
                 <Tab label={`Inbox${openContactCount ? ` (${openContactCount})` : ''}`} />
+                <Tab label={`Concierge Requests${conciergeQueue.length ? ` (${conciergeQueue.length})` : ''}`} />
             </Tabs>
 
             {tab === 0 && (
@@ -1010,6 +1055,59 @@ const AdminDashboard = () => {
                 </Box>
             )}
 
+            {tab === 8 && (
+                <Box sx={{ mt: 3, mr: { xs: 0, md: adVisible ? `${laneWidth}px` : 0 } }}>
+                    {conciergeQueue.length === 0 ? (
+                        <Typography color="text.secondary">Nothing to show.</Typography>
+                    ) : (
+                        <Stack spacing={3}>
+                            {Object.entries(conciergeBatches).map(([batchId, gowns]) => (
+                                <Box key={batchId} sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                                    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                        <Typography variant="subtitle1">
+                                            {gowns[0].owner?.name} &middot; {gowns.length} gown{gowns.length === 1 ? '' : 's'}
+                                        </Typography>
+                                        <Button
+                                            variant="contained" size="small"
+                                            disabled={conciergeMarkingBatchId === batchId}
+                                            onClick={() => onMarkConciergeReady(batchId, gowns)}
+                                        >
+                                            {conciergeMarkingBatchId === batchId ? 'Saving...' : 'Set Fees & Mark Ready'}
+                                        </Button>
+                                    </Stack>
+                                    <Grid container spacing={2}>
+                                        {gowns.map((g) => (
+                                            <Grid key={g.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                                                <Box sx={{ p: 2, borderRadius: 1, bgcolor: 'background.default', border: '1px solid', borderColor: 'divider', height: '100%' }}>
+                                                    <Stack direction="row" spacing={1.5} sx={{ mb: 1 }}>
+                                                        <Box component="img" src={g.primaryPictureUrl} alt="" sx={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }} />
+                                                        <Box>
+                                                            <Typography variant="body2">{g.size ? `Size ${g.size}` : 'No size'} &middot; ${g.price}</Typography>
+                                                            <Typography variant="caption" color="text.secondary">{g.location}</Typography>
+                                                        </Box>
+                                                    </Stack>
+                                                    {g.description && (
+                                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{g.description}</Typography>
+                                                    )}
+                                                    <Stack direction="row" spacing={1} alignItems="center">
+                                                        <TextField
+                                                            size="small" label="Fee ($)" type="number" sx={{ width: 100 }}
+                                                            value={conciergeFeeDrafts[g.id] ?? conciergeDefaultFee(gowns.length)}
+                                                            onChange={(e) => setConciergeFeeDrafts({ ...conciergeFeeDrafts, [g.id]: e.target.value })}
+                                                        />
+                                                        <Button size="small" onClick={() => onEditGownClick(g)}>Edit</Button>
+                                                    </Stack>
+                                                </Box>
+                                            </Grid>
+                                        ))}
+                                    </Grid>
+                                </Box>
+                            ))}
+                        </Stack>
+                    )}
+                </Box>
+            )}
+
             <Dialog open={promoEmailConfirmOpen} onClose={() => setPromoEmailConfirmOpen(false)} maxWidth="xs" fullWidth fullScreen={fullScreen}>
                 <DialogTitle>Send to All Patrons?</DialogTitle>
                 <DialogContent>
@@ -1281,7 +1379,20 @@ const AdminDashboard = () => {
                                         {LISTING_TYPE_OPTIONS.map(o2 => <MenuItem key={o2.value} value={o2.value}>{o2.label}</MenuItem>)}
                                     </TextField>
                                 </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                        label="Hourly Service Fee (optional, for on-site visits)" type="number" fullWidth
+                                        value={postForPatronShared.hourlyFeeUsd}
+                                        onChange={(e) => setPostForPatronShared({ ...postForPatronShared, hourlyFeeUsd: e.target.value })}
+                                        helperText="Charged once, on the first gown of this session — not per gown."
+                                    />
+                                </Grid>
                             </Grid>
+                            {postForPatronShared.hourlyFeeUsd && postForPatronShared.finalize && (
+                                <Alert severity="warning">
+                                    Publishing immediately skips Stripe entirely — the hourly fee won't be charged. Uncheck "Finalize now" if you need to collect it.
+                                </Alert>
+                            )}
                             <FormControlLabel
                                 control={
                                     <Checkbox

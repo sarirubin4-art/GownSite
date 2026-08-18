@@ -231,7 +231,9 @@ const MyListings = () => {
                                     })}>
                                         Edit
                                     </Button>
-                                    {g.moderationStatus === 'Draft' ? (
+                                    {g.moderationStatus === 'Draft' && g.needsConciergeDraft ? (
+                                        <Chip size="small" label="Our team is preparing this listing" />
+                                    ) : g.moderationStatus === 'Draft' ? (
                                         <Button size="small" color="success" variant="outlined" onClick={() => navigate(`/postagown/form?resume=${g.id}`)}>
                                             Complete Setup
                                         </Button>

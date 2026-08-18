@@ -262,6 +262,8 @@ const Layout = ({ children }) => {
                     &middot;
                     <Box component={Link} to="/privacy" sx={{ color: 'inherit', mx: 1.5 }}>Privacy Policy</Box>
                     &middot;
+                    <Box component={Link} to="/concierge/terms" sx={{ color: 'inherit', mx: 1.5 }}>Concierge Posting</Box>
+                    &middot;
                     <Box component="span" onClick={onContactUsClick} sx={{ color: 'inherit', mx: 1.5, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                         Contact Us
                     </Box>

@@ -42,6 +42,14 @@ namespace GownSite.Web.Services
                 $"<p style=\"font-size:13px;color:#8A6D72;margin-top:24px;\">In response to your message ({topic}):<br><em>{originalMessage}</em></p>",
                 frontendBaseUrl);
 
+        public static string ConciergeDraftReady(string ownerName, int gownCount, string myListingsUrl, string frontendBaseUrl) =>
+            EmailLayout.Wrap(
+                EmailLayout.Heading("Your Concierge Draft Is Ready!") +
+                $"<p>Hi {ownerName}, we've finished putting together {(gownCount > 1 ? $"your {gownCount} gowns" : "your gown")} for Regowned. " +
+                $"Head to My Listings to review the details, add a card, and submit for approval.</p>" +
+                EmailLayout.Button("Review My Listings", myListingsUrl),
+                frontendBaseUrl);
+
         public static string Approved(string type, string listingUrl, string frontendBaseUrl) =>
             EmailLayout.Wrap(
                 EmailLayout.Heading("You're Live!") +

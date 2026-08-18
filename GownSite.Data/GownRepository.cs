@@ -275,6 +275,37 @@ namespace GownSite.Data
             context.SaveChanges();
         }
 
+        public List<GownPosting> GetConciergeQueue()
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Gowns
+                .Include(g => g.Owner)
+                .Include(g => g.MorePictures)
+                .Where(g => g.NeedsConciergeDraft)
+                .OrderBy(g => g.CreatedDate)
+                .ToList();
+        }
+
+        public void MarkConciergeReady(int id, decimal oneTimeFeeUsd)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var existing = context.Gowns.FirstOrDefault(g => g.Id == id);
+            if (existing == null) return;
+
+            existing.NeedsConciergeDraft = false;
+            existing.OneTimeFeeUsd = oneTimeFeeUsd;
+            context.SaveChanges();
+        }
+
+        public List<GownPosting> GetByBatchId(Guid batchId)
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Gowns
+                .Include(g => g.Owner)
+                .Where(g => g.BatchId == batchId)
+                .ToList();
+        }
+
         public void AddPictures(int gownPostingId, List<string> urls)
         {
             using var context = new GownDataContext(_connectionString);

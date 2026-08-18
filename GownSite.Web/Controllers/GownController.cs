@@ -79,6 +79,34 @@ namespace GownSite.Web.Controllers
         public int Id { get; set; }
     }
 
+    // Concierge posting service: a customer who doesn't want to fill out the full form
+    // submits just the essentials and admin fleshes the rest out later (see
+    // AdminController's concierge/* endpoints). Only Size/Price/Location/PrimaryPicture
+    // are required — everything else is left for admin to fill in during flesh-out.
+    public class ConciergeIntakeGownRequest
+    {
+        public string Description { get; set; }
+        public string Color { get; set; }
+        public string Size { get; set; }
+        public decimal Price { get; set; }
+        public string Location { get; set; }
+        public string ListingType { get; set; }
+        public bool DisplayOwnerName { get; set; }
+        public string Brand { get; set; }
+        public decimal? PricePaid { get; set; }
+        public string Condition { get; set; }
+        public string Length { get; set; }
+        public string StyleTags { get; set; }
+        public string Notes { get; set; }
+        public Guid BatchId { get; set; }
+        public IFormFile PrimaryPicture { get; set; }
+    }
+
+    public class ConciergeNotifyRequest
+    {
+        public Guid BatchId { get; set; }
+    }
+
     [Route("api/[controller]")]
     [ApiController]
     public class GownController : ControllerBase
@@ -390,6 +418,73 @@ namespace GownSite.Web.Controllers
                 foreach (var file in request.MorePictures)
                     urls.Add(await _storage.SaveAsync(file, "gowns"));
                 repo.AddPictures(request.Id, urls);
+            }
+
+            return Ok();
+        }
+
+        [HttpPost("concierge-intake")]
+        [Authorize]
+        [RequireVerifiedEmail]
+        [RequestSizeLimit(100_000_000)]
+        public async Task<IActionResult> ConciergeIntake([FromForm] ConciergeIntakeGownRequest request)
+        {
+            if (request.PrimaryPicture == null) return BadRequest(new { message = "A photo is required." });
+            if (string.IsNullOrWhiteSpace(request.Size)) return BadRequest(new { message = "Size is required." });
+            if (request.Price <= 0) return BadRequest(new { message = "Price is required." });
+            if (string.IsNullOrWhiteSpace(request.Location)) return BadRequest(new { message = "Location is required." });
+            if (request.BatchId == Guid.Empty) return BadRequest(new { message = "Missing batch identifier." });
+
+            var listingType = Enum.TryParse<ListingType>(request.ListingType, out var lt) ? lt : ListingType.Rent;
+
+            var repo = new GownRepository(_connectionString);
+            var primaryUrl = await _storage.SaveAsync(request.PrimaryPicture, "gowns");
+
+            var posting = new GownPosting
+            {
+                OwnerId = CurrentOwnerId(),
+                Description = request.Description,
+                Color = request.Color,
+                Size = request.Size,
+                Price = request.Price,
+                Location = request.Location,
+                ListingType = listingType,
+                DisplayOwnerName = request.DisplayOwnerName,
+                Brand = request.Brand,
+                PricePaid = request.PricePaid,
+                Condition = request.Condition,
+                Length = request.Length,
+                StyleTags = request.StyleTags,
+                Notes = request.Notes,
+                PrimaryPictureUrl = primaryUrl,
+                BatchId = request.BatchId,
+                NeedsConciergeDraft = true
+            };
+            var id = repo.Create(posting);
+            return Ok(new { id });
+        }
+
+        // Called once by the frontend after the per-gown concierge-intake submission loop
+        // finishes, mirroring how PaymentController.ConfirmBatchSetupSession notifies admin
+        // once for a whole batch rather than once per gown.
+        [HttpPost("concierge-intake/notify")]
+        [Authorize]
+        [RequireVerifiedEmail]
+        public async Task<IActionResult> ConciergeIntakeNotify([FromBody] ConciergeNotifyRequest request)
+        {
+            var repo = new GownRepository(_connectionString);
+            var batch = repo.GetByBatchId(request.BatchId).Where(g => g.OwnerId == CurrentOwnerId()).ToList();
+            if (batch.Count == 0) return NotFound();
+
+            var frontendBaseUrl = _configuration["Frontend:BaseUrl"];
+            var baseUrl = string.IsNullOrEmpty(frontendBaseUrl) ? $"{Request.Scheme}://{Request.Host}" : frontendBaseUrl;
+            var adminEmail = _configuration["Email:AdminNotificationEmail"];
+            if (!string.IsNullOrEmpty(adminEmail))
+            {
+                var body = batch.Count > 1
+                    ? EmailTemplates.NewSubmissionAdminBatch(batch[0].Owner.Name, batch.Select(g => g.Description).ToList(), $"{baseUrl}/admin", baseUrl)
+                    : EmailTemplates.NewSubmissionAdmin("concierge posting request", batch[0].Owner.Name, batch[0].Description, $"{baseUrl}/admin", baseUrl);
+                await _emailSender.SendAsync(adminEmail, "New concierge posting request — Regowned", body);
             }
 
             return Ok();

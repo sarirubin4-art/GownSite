@@ -29,6 +29,9 @@ public class GownDataContext : DbContext
         modelBuilder.Entity<GownPosting>()
             .HasIndex(g => g.BatchId);
 
+        modelBuilder.Entity<GownPosting>()
+            .HasIndex(g => g.NeedsConciergeDraft);
+
         modelBuilder.Entity<Ad>()
             .HasOne<PromoCode>().WithMany()
             .HasForeignKey(a => a.PromoCodeId).IsRequired(false);

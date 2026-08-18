@@ -33,6 +33,8 @@ import TermsOfService from './Pages/TermsOfService';
 import PrivacyPolicy from './Pages/PrivacyPolicy';
 import BusinessBillingSetupPage from './Pages/BusinessBillingSetupPage';
 import BusinessBillingSetupSuccess from './Pages/BusinessBillingSetupSuccess';
+import ConciergePostingTerms from './Pages/ConciergePostingTerms';
+import ConciergePostingForm from './Pages/ConciergePostingForm';
 
 const App = () => {
     return (
@@ -72,6 +74,9 @@ const App = () => {
                     <Route path='/privacy' element={<PrivacyPolicy />} />
                     <Route path='/business/billing-setup' element={<BusinessBillingSetupPage />} />
                     <Route path='/business/billing-setup-success' element={<BusinessBillingSetupSuccess />} />
+                    <Route path='/concierge' element={<ConciergePostingTerms />} />
+                    <Route path='/concierge/terms' element={<ConciergePostingTerms />} />
+                    <Route path='/concierge/form' element={<ConciergePostingForm />} />
                 </Routes>
             </Layout>
         </AuthProvider>

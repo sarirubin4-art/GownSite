@@ -82,6 +82,14 @@ namespace GownSite.Data
         public int? PromoDurationMonths { get; set; }
         public Guid? BatchId { get; set; }
 
+        // Concierge posting service (see AdminController's concierge/* endpoints and
+        // GownController.ConciergeIntake): NeedsConciergeDraft marks a gown a customer
+        // submitted with only the bare minimum, awaiting admin to flesh it out.
+        // OneTimeFeeUsd is the concierge/on-site-visit fee charged once at approval time,
+        // alongside (not instead of) the normal recurring listing fee.
+        public bool NeedsConciergeDraft { get; set; }
+        public decimal? OneTimeFeeUsd { get; set; }
+
         public List<GownPicture> MorePictures { get; set; } = new();
 
         // optional

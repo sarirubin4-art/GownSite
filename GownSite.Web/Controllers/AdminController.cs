@@ -59,6 +59,24 @@ namespace GownSite.Web.Controllers
         public string Notes { get; set; }
         public IFormFile PrimaryPicture { get; set; }
         public bool Finalize { get; set; }
+
+        // Concierge/on-site-visit support: BatchId groups gowns drafted in one admin
+        // session (always set by the frontend now, even for a single gown, so this gown
+        // is excluded from ApproveGown's automatic solo setup fee). OneTimeFeeUsd is the
+        // on-site visit's hourly charge, applied to just the first gown of the session.
+        public Guid? BatchId { get; set; }
+        public decimal? OneTimeFeeUsd { get; set; }
+    }
+
+    public class ConciergeFeeEntry
+    {
+        public int Id { get; set; }
+        public decimal OneTimeFeeUsd { get; set; }
+    }
+
+    public class MarkConciergeReadyRequest
+    {
+        public List<ConciergeFeeEntry> Fees { get; set; } = new();
     }
 
     [Route("api/[controller]")]
@@ -196,6 +214,29 @@ namespace GownSite.Web.Controllers
                             Amount = (long)Math.Round(setupFeeUsd * 100, MidpointRounding.AwayFromZero),
                             Currency = "usd",
                             Description = "Regowned One-Time Listing Setup Fee"
+                        });
+                    }
+                    catch (StripeException ex)
+                    {
+                        return BadRequest(new { message = $"Payment could not be processed: {ex.Message}" });
+                    }
+                }
+
+                // Concierge posting / on-site business visit fee — a one-time charge riding
+                // on this gown's Stripe customer, exactly like the setup fee above just with
+                // its own amount/description. BatchId is always set on concierge/on-site
+                // gowns, so isSoloDefaultPricing above is already false for them and the
+                // standard setup fee never also fires.
+                if (posting.OneTimeFeeUsd.HasValue && posting.OneTimeFeeUsd.Value > 0)
+                {
+                    try
+                    {
+                        await new InvoiceItemService().CreateAsync(new InvoiceItemCreateOptions
+                        {
+                            Customer = posting.StripeCustomerId,
+                            Amount = (long)Math.Round(posting.OneTimeFeeUsd.Value * 100, MidpointRounding.AwayFromZero),
+                            Currency = "usd",
+                            Description = "Regowned One-Time Concierge/Visit Service Fee"
                         });
                     }
                     catch (StripeException ex)
@@ -575,12 +616,42 @@ namespace GownSite.Web.Controllers
                 Length = request.Length,
                 StyleTags = request.StyleTags,
                 Notes = request.Notes,
-                PrimaryPictureUrl = primaryUrl
+                PrimaryPictureUrl = primaryUrl,
+                BatchId = request.BatchId,
+                OneTimeFeeUsd = request.OneTimeFeeUsd
             };
             var id = repo.Create(posting);
             if (request.Finalize)
                 repo.ActivateListing(id, null, null);
             return Ok(new { id, finalized = request.Finalize });
+        }
+
+        [HttpGet("concierge/queue")]
+        public IActionResult GetConciergeQueue()
+        {
+            var repo = new GownRepository(_connectionString);
+            return Ok(repo.GetConciergeQueue());
+        }
+
+        [HttpPost("concierge/{batchId}/mark-ready")]
+        public async Task<IActionResult> MarkConciergeReady(Guid batchId, [FromBody] MarkConciergeReadyRequest request)
+        {
+            var repo = new GownRepository(_connectionString);
+            var batch = repo.GetByBatchId(batchId);
+            if (batch.Count == 0) return NotFound();
+
+            var batchIds = batch.Select(g => g.Id).ToHashSet();
+            foreach (var entry in request.Fees.Where(f => batchIds.Contains(f.Id)))
+                repo.MarkConciergeReady(entry.Id, entry.OneTimeFeeUsd);
+
+            var owner = batch[0].Owner;
+            await _emailSender.SendAsync(
+                owner.Email,
+                "Your concierge draft is ready to review — Regowned",
+                EmailTemplates.ConciergeDraftReady(owner.Name, batch.Count, $"{FrontendBaseUrl()}/mylistings", FrontendBaseUrl())
+            );
+
+            return Ok();
         }
 
         [HttpPost("email/promo")]
