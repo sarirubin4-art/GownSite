@@ -20,6 +20,9 @@ const MyListings = () => {
     const [promoCodeInput, setPromoCodeInput] = useState('');
     const [promoApplying, setPromoApplying] = useState(false);
     const [promoMessage, setPromoMessage] = useState(null); // { type: 'success'|'error', text }
+    const [businessPromoCodeInput, setBusinessPromoCodeInput] = useState('');
+    const [businessPromoApplying, setBusinessPromoApplying] = useState(false);
+    const [businessPromoMessage, setBusinessPromoMessage] = useState(null); // { type: 'success'|'error', text }
     const [newPrimaryPicture, setNewPrimaryPicture] = useState(null);
     const [newPrimaryPreview, setNewPrimaryPreview] = useState(null);
 
@@ -115,6 +118,21 @@ const MyListings = () => {
         }
     };
 
+    const onApplyBusinessPromo = async () => {
+        if (!businessPromoCodeInput.trim()) return;
+        setBusinessPromoApplying(true);
+        setBusinessPromoMessage(null);
+        try {
+            await axios.post('/api/business/apply-promo', { promoCode: businessPromoCodeInput.trim() });
+            setBusinessPromoMessage({ type: 'success', text: 'Promo applied! Your next bill will reflect the new price.' });
+            setBusinessPromoCodeInput('');
+        } catch (err) {
+            setBusinessPromoMessage({ type: 'error', text: err?.response?.data?.message || 'Could not apply promo code.' });
+        } finally {
+            setBusinessPromoApplying(false);
+        }
+    };
+
     if (loading || !owner) return null;
 
     const activeCount = listings.filter((g) => g.isActive).length;
@@ -124,9 +142,31 @@ const MyListings = () => {
             <Typography variant="h4" gutterBottom>My Listings</Typography>
             {owner.isBusinessAccount && (
                 owner.businessBillingComplete ? (
-                    <Alert severity="info" sx={{ mb: 3 }}>
-                        Business Plan: {activeCount}/{owner.businessGownAllowance} gowns live — ${owner.businessMonthlyFeeUsd}/month flat, no per-listing charges.
-                    </Alert>
+                    <Box sx={{ mb: 3 }}>
+                        <Alert severity="info" sx={{ mb: businessPromoMessage ? 1 : 1.5 }}>
+                            Business Plan: {activeCount}/{owner.businessGownAllowance} gowns live — ${owner.businessMonthlyFeeUsd}/month flat, no per-listing charges.
+                        </Alert>
+                        <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.default', border: '1px solid', borderColor: 'divider' }}>
+                            <Typography variant="subtitle2" gutterBottom>Apply a Promo Code to Your Business Plan</Typography>
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+                                Applying a new code replaces any promo already on your flat subscription. It takes effect on your next bill.
+                            </Typography>
+                            {businessPromoMessage && (
+                                <Typography variant="body2" color={businessPromoMessage.type === 'success' ? 'success.main' : 'error.main'} sx={{ mb: 1 }}>
+                                    {businessPromoMessage.text}
+                                </Typography>
+                            )}
+                            <Stack direction="row" spacing={1}>
+                                <TextField
+                                    size="small" fullWidth label="Promo Code" value={businessPromoCodeInput}
+                                    onChange={(e) => setBusinessPromoCodeInput(e.target.value)}
+                                />
+                                <Button variant="outlined" disabled={businessPromoApplying || !businessPromoCodeInput.trim()} onClick={onApplyBusinessPromo}>
+                                    {businessPromoApplying ? 'Applying...' : 'Apply'}
+                                </Button>
+                            </Stack>
+                        </Box>
+                    </Box>
                 ) : (
                     <Alert severity="warning" sx={{ mb: 3 }} action={
                         <Button color="inherit" size="small" onClick={() => navigate('/business/billing-setup')}>

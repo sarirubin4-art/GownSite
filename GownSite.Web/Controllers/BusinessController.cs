@@ -1,4 +1,5 @@
 using GownSite.Data;
+using GownSite.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Stripe;
@@ -10,6 +11,11 @@ namespace GownSite.Web.Controllers
     public class ConfirmBusinessSetupSessionRequest
     {
         public string SessionId { get; set; }
+    }
+
+    public class ApplyBusinessPromoRequest
+    {
+        public string PromoCode { get; set; }
     }
 
     // One-time card-setup + flat-rate subscription creation for an owner already
@@ -105,6 +111,67 @@ namespace GownSite.Web.Controllers
             }
 
             ownerRepo.SetBusinessStripeInfo(ownerId, session.CustomerId, setupIntent.PaymentMethodId, subscription.Id);
+
+            return Ok();
+        }
+
+        // Attaches a discount to the owner's ALREADY-RUNNING flat-rate subscription — mirrors
+        // PaymentController.ApplyPromoToSubscriptionAsync exactly (see that method's comment for
+        // why a Coupon, not a trial, is used here). Duplicated rather than shared because it's a
+        // small private helper scoped to each controller's own subscription-update call.
+        private static async Task ApplyPromoToSubscriptionAsync(string subscriptionId, decimal fullFeeUsd, decimal resolvedFee, int? durationMonths)
+        {
+            var percentOff = Math.Max(0m, (1 - (resolvedFee / fullFeeUsd)) * 100m);
+            if (percentOff <= 0)
+            {
+                await new SubscriptionService().UpdateAsync(subscriptionId, new SubscriptionUpdateOptions
+                {
+                    Discounts = new List<SubscriptionDiscountOptions>()
+                });
+                return;
+            }
+
+            var hasDuration = durationMonths.HasValue && durationMonths.Value > 0;
+            var couponOptions = new CouponCreateOptions
+            {
+                PercentOff = percentOff,
+                Duration = hasDuration ? "repeating" : "forever"
+            };
+            if (hasDuration) couponOptions.DurationInMonths = durationMonths!.Value;
+
+            var coupon = await new CouponService().CreateAsync(couponOptions);
+            await new SubscriptionService().UpdateAsync(subscriptionId, new SubscriptionUpdateOptions
+            {
+                Discounts = new List<SubscriptionDiscountOptions> { new() { Coupon = coupon.Id } }
+            });
+        }
+
+        [HttpPost("apply-promo")]
+        public async Task<IActionResult> ApplyPromo([FromBody] ApplyBusinessPromoRequest request)
+        {
+            var ownerRepo = new OwnerRepository(_connectionString);
+            var owner = ownerRepo.Get(CurrentOwnerId());
+            if (owner == null) return NotFound();
+            if (!owner.IsBusinessAccount || string.IsNullOrEmpty(owner.BusinessStripeSubscriptionId))
+                return BadRequest(new { message = "This account doesn't have an active business subscription to apply a promo to." });
+
+            var promoRepo = new PromoCodeRepository(_connectionString);
+            var promo = promoRepo.GetByCode(request.PromoCode);
+            var feeUsd = owner.BusinessMonthlyFeeUsd!.Value;
+            var resolved = PromoCodeCalculator.Resolve(promo, feeUsd, 1);
+            if (!resolved.Success)
+                return BadRequest(new { message = resolved.Error });
+
+            try
+            {
+                await ApplyPromoToSubscriptionAsync(owner.BusinessStripeSubscriptionId, feeUsd, resolved.ResolvedFee!.Value, resolved.DurationMonths);
+            }
+            catch (StripeException ex)
+            {
+                return BadRequest(new { message = $"Could not apply promo: {ex.Message}" });
+            }
+
+            promoRepo.IncrementUsage(promo.Id);
 
             return Ok();
         }
