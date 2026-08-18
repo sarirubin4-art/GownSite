@@ -312,9 +312,9 @@ const AdminDashboard = () => {
         setConciergeQueue(data);
     };
 
-    // $7/gown by default, $5/gown once a batch has 10+ gowns — a pre-filled starting
+    // $12/gown for 1-3 gowns, $9/gown once a batch has 4+ — a pre-filled starting
     // point the admin can always override per gown, same convention as BUSINESS_PLAN_PRESETS.
-    const conciergeDefaultFee = (batchSize) => (batchSize >= 10 ? 5 : 7);
+    const conciergeDefaultFee = (batchSize) => (batchSize >= 4 ? 9 : 12);
 
     const conciergeBatches = conciergeQueue.reduce((acc, g) => {
         const key = g.batchId || g.id;

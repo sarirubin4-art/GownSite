@@ -42,7 +42,10 @@ const ConciergePostingTerms = () => {
                             Send us at least one photo, the size, price, location, and rent or sale for each gown — anything else is
                             optional. We'll fill in the rest and let you know when it's ready to review.
                         </Typography>
-                        <Typography variant="h5" sx={{ mb: 2 }}>$7/gown</Typography>
+                        <Typography variant="h5">$12/gown</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                            $9/gown for batches of 4 or more
+                        </Typography>
                         <Button variant="contained" onClick={() => navigate('/concierge/form')}>
                             Start Remote Drafting
                         </Button>
