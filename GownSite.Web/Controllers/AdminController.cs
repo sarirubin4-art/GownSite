@@ -28,6 +28,13 @@ namespace GownSite.Web.Controllers
         public List<string> Emails { get; set; }
     }
 
+    public class SetBusinessPlanRequest
+    {
+        public decimal MonthlyFee { get; set; }
+        public int GownAllowance { get; set; }
+        public decimal? OverageFeePerGown { get; set; }
+    }
+
     // Lets an admin start a gown listing on a patron's behalf — e.g. someone who wants
     // help posting but isn't comfortable filling out the form themselves. By default lands
     // as a Draft (same as the patron's own autosave), so the patron still adds their own
@@ -158,52 +165,63 @@ namespace GownSite.Web.Controllers
             if (posting == null) return NotFound();
             if (posting.ModerationStatus != ModerationStatus.PendingReview)
                 return BadRequest(new { message = "This listing is no longer pending review." });
-            if (string.IsNullOrEmpty(posting.StripeCustomerId) || string.IsNullOrEmpty(posting.StripePaymentMethodId))
-                return BadRequest(new { message = "No payment method on file for this listing." });
 
-            var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m);
-
-            // A solo listing (not part of a batch) with no promo/tier applied gets a one-time
-            // setup fee added to its first invoice, so the first bill is (base + setup) and
-            // every bill after is just the base monthly fee. Batches already get their own
-            // discounted per-gown rate and skip this; promo'd listings are unaffected too.
-            var isSoloDefaultPricing = !posting.BatchId.HasValue && !posting.MonthlyFeeOverride.HasValue;
-            var setupFeeUsd = _configuration.GetValue<decimal>("Stripe:GownPostingSetupFeeUsd", 0m);
-            if (isSoloDefaultPricing && setupFeeUsd > 0)
+            // A business-plan owner's flat monthly fee already covers this gown — no
+            // per-gown Stripe subscription, setup fee, or card requirement, it just goes
+            // live for free against their plan's allowance.
+            if (posting.Owner.IsBusinessAccount)
             {
+                repo.ApproveListing(id, null);
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(posting.StripeCustomerId) || string.IsNullOrEmpty(posting.StripePaymentMethodId))
+                    return BadRequest(new { message = "No payment method on file for this listing." });
+
+                var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m);
+
+                // A solo listing (not part of a batch) with no promo/tier applied gets a one-time
+                // setup fee added to its first invoice, so the first bill is (base + setup) and
+                // every bill after is just the base monthly fee. Batches already get their own
+                // discounted per-gown rate and skip this; promo'd listings are unaffected too.
+                var isSoloDefaultPricing = !posting.BatchId.HasValue && !posting.MonthlyFeeOverride.HasValue;
+                var setupFeeUsd = _configuration.GetValue<decimal>("Stripe:GownPostingSetupFeeUsd", 0m);
+                if (isSoloDefaultPricing && setupFeeUsd > 0)
+                {
+                    try
+                    {
+                        await new InvoiceItemService().CreateAsync(new InvoiceItemCreateOptions
+                        {
+                            Customer = posting.StripeCustomerId,
+                            Amount = (long)Math.Round(setupFeeUsd * 100, MidpointRounding.AwayFromZero),
+                            Currency = "usd",
+                            Description = "Regowned One-Time Listing Setup Fee"
+                        });
+                    }
+                    catch (StripeException ex)
+                    {
+                        return BadRequest(new { message = $"Payment could not be processed: {ex.Message}" });
+                    }
+                }
+
+                Subscription subscription;
                 try
                 {
-                    await new InvoiceItemService().CreateAsync(new InvoiceItemCreateOptions
-                    {
-                        Customer = posting.StripeCustomerId,
-                        Amount = (long)Math.Round(setupFeeUsd * 100, MidpointRounding.AwayFromZero),
-                        Currency = "usd",
-                        Description = "Regowned One-Time Listing Setup Fee"
-                    });
+                    subscription = await CreatePromoAwareSubscriptionAsync(
+                        posting.StripeCustomerId, posting.StripePaymentMethodId, feeUsd,
+                        posting.MonthlyFeeOverride, posting.PromoDurationMonths, "Regowned Monthly Listing Fee");
                 }
                 catch (StripeException ex)
                 {
                     return BadRequest(new { message = $"Payment could not be processed: {ex.Message}" });
                 }
-            }
 
-            Subscription subscription;
-            try
-            {
-                subscription = await CreatePromoAwareSubscriptionAsync(
-                    posting.StripeCustomerId, posting.StripePaymentMethodId, feeUsd,
-                    posting.MonthlyFeeOverride, posting.PromoDurationMonths, "Regowned Monthly Listing Fee");
-            }
-            catch (StripeException ex)
-            {
-                return BadRequest(new { message = $"Payment could not be processed: {ex.Message}" });
-            }
+                repo.ApproveListing(id, subscription.Id);
 
-            repo.ApproveListing(id, subscription.Id);
-
-            if (posting.PromoCodeId.HasValue)
-            {
-                new PromoCodeRepository(_connectionString).IncrementUsage(posting.PromoCodeId.Value);
+                if (posting.PromoCodeId.HasValue)
+                {
+                    new PromoCodeRepository(_connectionString).IncrementUsage(posting.PromoCodeId.Value);
+                }
             }
 
             var frontendBaseUrl = FrontendBaseUrl();
@@ -457,8 +475,44 @@ namespace GownSite.Web.Controllers
         [HttpGet("owners")]
         public IActionResult GetOwners()
         {
+            var ownerRepo = new OwnerRepository(_connectionString);
+            var gownRepo = new GownRepository(_connectionString);
+            var owners = ownerRepo.GetAll().Select(o => new
+            {
+                o.Id,
+                o.Name,
+                o.Email,
+                o.Number,
+                o.IsAdmin,
+                o.EmailVerified,
+                o.IsBusinessAccount,
+                o.BusinessMonthlyFeeUsd,
+                o.BusinessGownAllowance,
+                o.BusinessOverageFeePerGownUsd,
+                BusinessBillingComplete = !string.IsNullOrEmpty(o.BusinessStripeSubscriptionId),
+                ActiveGownCount = o.IsBusinessAccount ? gownRepo.CountActiveByOwner(o.Id) : (int?)null
+            });
+            return Ok(owners);
+        }
+
+        [HttpPost("owners/{id}/business-plan")]
+        public IActionResult SetBusinessPlan(int id, [FromBody] SetBusinessPlanRequest request)
+        {
+            if (request.MonthlyFee <= 0 || request.GownAllowance <= 0)
+                return BadRequest(new { message = "Monthly fee and gown allowance must be greater than zero." });
+
             var repo = new OwnerRepository(_connectionString);
-            return Ok(repo.GetAll());
+            if (!repo.SetBusinessPlan(id, request.MonthlyFee, request.GownAllowance, request.OverageFeePerGown))
+                return NotFound();
+            return Ok();
+        }
+
+        [HttpPost("owners/{id}/business-plan/remove")]
+        public IActionResult RemoveBusinessPlan(int id)
+        {
+            var repo = new OwnerRepository(_connectionString);
+            if (!repo.RemoveBusinessPlan(id)) return NotFound();
+            return Ok();
         }
 
         [HttpPost("owners/{id}/delete")]

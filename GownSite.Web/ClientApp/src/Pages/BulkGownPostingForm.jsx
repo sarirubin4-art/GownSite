@@ -164,11 +164,32 @@ const BulkGownPostingForm = () => {
             }
         }
 
+        if (owner.isBusinessAccount) {
+            if (!owner.businessBillingComplete) {
+                setSubmitting(false);
+                navigate('/business/billing-setup');
+                return;
+            }
+            await Promise.all(ids.map((id) => axios.post('/api/gown/submit-business', { id })));
+            setSubmitting(false);
+            navigate('/mylistings');
+            return;
+        }
+
         setSubmitting(false);
         navigate(`/postagown/bulk-payment-setup?ids=${ids.join(',')}`);
     };
 
-    const onContinueWithSaved = () => {
+    const onContinueWithSaved = async () => {
+        if (owner.isBusinessAccount) {
+            if (!owner.businessBillingComplete) {
+                navigate('/business/billing-setup');
+                return;
+            }
+            await Promise.all(submittedIds.map((id) => axios.post('/api/gown/submit-business', { id })));
+            navigate('/mylistings');
+            return;
+        }
         navigate(`/postagown/bulk-payment-setup?ids=${submittedIds.join(',')}`);
     };
 

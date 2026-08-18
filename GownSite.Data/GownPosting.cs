@@ -20,6 +20,18 @@ namespace GownSite.Data
         public string PasswordResetToken { get; set; }
         [JsonIgnore]
         public DateTime? PasswordResetTokenExpiresAt { get; set; }
+
+        // Admin-assigned flat-rate plan for high-volume posters, replacing per-gown
+        // billing entirely for this owner. BusinessStripeSubscriptionId is only set once
+        // the owner has actually completed the one-time card-setup step for the plan.
+        public bool IsBusinessAccount { get; set; }
+        public decimal? BusinessMonthlyFeeUsd { get; set; }
+        public int? BusinessGownAllowance { get; set; }
+        // Reference only for the admin's own bookkeeping — not enforced anywhere in code.
+        public decimal? BusinessOverageFeePerGownUsd { get; set; }
+        public string BusinessStripeCustomerId { get; set; }
+        public string BusinessStripePaymentMethodId { get; set; }
+        public string BusinessStripeSubscriptionId { get; set; }
     }
 
     public enum ListingType

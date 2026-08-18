@@ -30,6 +30,14 @@ const VOLUME_TIER_DESCRIPTION = '$5/gown for 1-4, $4/gown for 5-9, $3.50/gown fo
 
 const emptyPromoForm = { code: '', discountType: 'PercentOff', discountValue: '', maxUses: '', expiresAt: '', durationMonths: '' };
 
+// Quick-fill starting points for the business-plan dialog — the fields stay fully
+// editable after picking one, so these are just convenient defaults, not fixed tiers.
+const BUSINESS_PLAN_PRESETS = [
+    { label: 'Starter — $50/70', monthlyFee: 50, gownAllowance: 70 },
+    { label: 'Standard — $60/100', monthlyFee: 60, gownAllowance: 100 },
+    { label: 'Pro — $75/150', monthlyFee: 75, gownAllowance: 150 }
+];
+
 const emptyPostForPatronShared = { location: '', listingType: 'Rent', displayOwnerName: false, finalize: false };
 
 const makePostForPatronGown = () => ({
@@ -238,6 +246,10 @@ const AdminDashboard = () => {
     const [deleteOwnerTarget, setDeleteOwnerTarget] = useState(null);
     const [deleteOwnerError, setDeleteOwnerError] = useState('');
     const [deleteOwnerSending, setDeleteOwnerSending] = useState(false);
+    const [businessPlanTarget, setBusinessPlanTarget] = useState(null);
+    const [businessPlanForm, setBusinessPlanForm] = useState({ monthlyFee: '', gownAllowance: '', overageFeePerGown: '' });
+    const [businessPlanError, setBusinessPlanError] = useState('');
+    const [businessPlanSending, setBusinessPlanSending] = useState(false);
     const [postForPatronTarget, setPostForPatronTarget] = useState(null);
     const [postForPatronShared, setPostForPatronShared] = useState(emptyPostForPatronShared);
     const [postForPatronGowns, setPostForPatronGowns] = useState([makePostForPatronGown()]);
@@ -536,6 +548,48 @@ const AdminDashboard = () => {
         }
     };
 
+    const onOpenBusinessPlan = (patron) => {
+        setBusinessPlanTarget(patron);
+        setBusinessPlanForm({
+            monthlyFee: patron.businessMonthlyFeeUsd ?? '',
+            gownAllowance: patron.businessGownAllowance ?? '',
+            overageFeePerGown: ''
+        });
+        setBusinessPlanError('');
+    };
+
+    const onApplyBusinessPlanPreset = (preset) => {
+        setBusinessPlanForm({ ...businessPlanForm, monthlyFee: preset.monthlyFee, gownAllowance: preset.gownAllowance });
+    };
+
+    const onSaveBusinessPlan = async () => {
+        setBusinessPlanError('');
+        if (!businessPlanForm.monthlyFee || !businessPlanForm.gownAllowance) {
+            setBusinessPlanError('Monthly fee and gown allowance are required.');
+            return;
+        }
+        setBusinessPlanSending(true);
+        try {
+            await axios.post(`/api/admin/owners/${businessPlanTarget.id}/business-plan`, {
+                monthlyFee: Number(businessPlanForm.monthlyFee),
+                gownAllowance: Number(businessPlanForm.gownAllowance),
+                overageFeePerGown: businessPlanForm.overageFeePerGown !== '' ? Number(businessPlanForm.overageFeePerGown) : null
+            });
+            setBusinessPlanTarget(null);
+            await loadOwners();
+        } catch (err) {
+            setBusinessPlanError(err?.response?.data?.message || 'Could not save the business plan.');
+        } finally {
+            setBusinessPlanSending(false);
+        }
+    };
+
+    const onRemoveBusinessPlan = async (patron) => {
+        if (!window.confirm(`Remove ${patron.name}'s business plan? Their existing live gowns keep running with no subscription — you'd need to handle those manually.`)) return;
+        await axios.post(`/api/admin/owners/${patron.id}/business-plan/remove`);
+        await loadOwners();
+    };
+
     const onOpenPostForPatron = (patron) => {
         setPostForPatronTarget(patron);
         setPostForPatronShared(emptyPostForPatronShared);
@@ -772,7 +826,15 @@ const AdminDashboard = () => {
                                             <TableCell>{o.email}</TableCell>
                                             <TableCell>{o.number || '—'}</TableCell>
                                             <TableCell>
-                                                {o.isAdmin ? <Chip size="small" label="Admin" color="primary" /> : 'Patron'}
+                                                <Stack direction="row" spacing={0.5} alignItems="center">
+                                                    {o.isAdmin ? <Chip size="small" label="Admin" color="primary" /> : 'Patron'}
+                                                    {o.isBusinessAccount && (
+                                                        <Chip
+                                                            size="small" color="secondary"
+                                                            label={`Business ${o.activeGownCount ?? 0}/${o.businessGownAllowance}`}
+                                                        />
+                                                    )}
+                                                </Stack>
                                             </TableCell>
                                             <TableCell align="right">
                                                 <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
@@ -782,6 +844,20 @@ const AdminDashboard = () => {
                                                     >
                                                         Post a Gown
                                                     </Button>
+                                                    <Button
+                                                        size="small" variant="outlined"
+                                                        onClick={() => onOpenBusinessPlan(o)}
+                                                    >
+                                                        {o.isBusinessAccount ? 'Edit Business Plan' : 'Make Business'}
+                                                    </Button>
+                                                    {o.isBusinessAccount && (
+                                                        <Button
+                                                            size="small" color="warning" variant="outlined"
+                                                            onClick={() => onRemoveBusinessPlan(o)}
+                                                        >
+                                                            Remove Plan
+                                                        </Button>
+                                                    )}
                                                     <Button
                                                         size="small" color="error" variant="outlined"
                                                         onClick={() => { setDeleteOwnerError(''); setDeleteOwnerTarget(o); }}
@@ -1099,6 +1175,49 @@ const AdminDashboard = () => {
                     <Button onClick={() => setDeleteOwnerTarget(null)}>Cancel</Button>
                     <Button variant="contained" color="error" disabled={deleteOwnerSending} onClick={onDeleteOwnerConfirm}>
                         {deleteOwnerSending ? 'Deleting...' : 'Delete'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={!!businessPlanTarget} onClose={() => setBusinessPlanTarget(null)} maxWidth="xs" fullWidth fullScreen={fullScreen}>
+                <DialogTitle>Business Plan — {businessPlanTarget?.name}</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={2} sx={{ mt: 1 }}>
+                        {businessPlanError && <Alert severity="error">{businessPlanError}</Alert>}
+                        <Typography variant="body2" color="text.secondary">
+                            A flat monthly fee covering up to a set number of live gowns, replacing per-gown billing entirely for this patron.
+                        </Typography>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                            {BUSINESS_PLAN_PRESETS.map((preset) => (
+                                <Button key={preset.label} size="small" variant="outlined" onClick={() => onApplyBusinessPlanPreset(preset)}>
+                                    {preset.label}
+                                </Button>
+                            ))}
+                        </Stack>
+                        <TextField
+                            label="Monthly Fee ($)" type="number" fullWidth value={businessPlanForm.monthlyFee}
+                            onChange={(e) => setBusinessPlanForm({ ...businessPlanForm, monthlyFee: e.target.value })}
+                        />
+                        <TextField
+                            label="Gown Allowance" type="number" fullWidth value={businessPlanForm.gownAllowance}
+                            onChange={(e) => setBusinessPlanForm({ ...businessPlanForm, gownAllowance: e.target.value })}
+                        />
+                        <TextField
+                            label="Overage Fee per Gown ($, optional)" type="number" fullWidth value={businessPlanForm.overageFeePerGown}
+                            helperText="Reference only — not automatically charged. A reminder of what you quoted them."
+                            onChange={(e) => setBusinessPlanForm({ ...businessPlanForm, overageFeePerGown: e.target.value })}
+                        />
+                        {businessPlanTarget?.isBusinessAccount && (
+                            <Alert severity="info">
+                                Saving changes clears their existing billing setup — they'll need to re-confirm a card under the new terms before posting again.
+                            </Alert>
+                        )}
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setBusinessPlanTarget(null)}>Cancel</Button>
+                    <Button variant="contained" disabled={businessPlanSending} onClick={onSaveBusinessPlan}>
+                        {businessPlanSending ? 'Saving...' : 'Save'}
                     </Button>
                 </DialogActions>
             </Dialog>

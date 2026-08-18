@@ -87,13 +87,15 @@ namespace GownSite.Web.Controllers
         private readonly IWebHostEnvironment _env;
         private readonly IFileStorageService _storage;
         private readonly IConfiguration _configuration;
+        private readonly IEmailSender _emailSender;
 
-        public GownController(IConfiguration configuration, IWebHostEnvironment env, IFileStorageService storage)
+        public GownController(IConfiguration configuration, IWebHostEnvironment env, IFileStorageService storage, IEmailSender emailSender)
         {
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("ConStr");
             _env = env;
             _storage = storage;
+            _emailSender = emailSender;
         }
 
         [HttpPost("search")]
@@ -308,6 +310,43 @@ namespace GownSite.Web.Controllers
                 var id = repo.Create(posting);
                 return Ok(new { id });
             }
+        }
+
+        // A business-plan owner's flat monthly fee already covers their gowns — this
+        // moves a Draft straight to PendingReview with no per-gown Stripe setup-session,
+        // unlike the normal PaymentController.CreateSetupSession/ConfirmSetupSession flow.
+        [HttpPost("submit-business")]
+        [Authorize]
+        [RequireVerifiedEmail]
+        public async Task<IActionResult> SubmitBusiness([FromBody] IdRequest request)
+        {
+            var repo = new GownRepository(_connectionString);
+            var posting = repo.Get(request.Id);
+            if (posting == null) return NotFound();
+            if (posting.OwnerId != CurrentOwnerId()) return Forbid();
+            if (posting.ModerationStatus != ModerationStatus.Draft)
+                return BadRequest(new { message = "This listing has already been submitted." });
+
+            var ownerRepo = new OwnerRepository(_connectionString);
+            var owner = ownerRepo.Get(CurrentOwnerId());
+            if (owner == null || !owner.IsBusinessAccount || string.IsNullOrEmpty(owner.BusinessStripeSubscriptionId))
+                return BadRequest(new { message = "Business billing hasn't been set up for this account yet." });
+
+            repo.SubmitForReview(request.Id, null, null);
+
+            var frontendBaseUrl = _configuration["Frontend:BaseUrl"];
+            var baseUrl = string.IsNullOrEmpty(frontendBaseUrl) ? $"{Request.Scheme}://{Request.Host}" : frontendBaseUrl;
+            var adminEmail = _configuration["Email:AdminNotificationEmail"];
+            if (!string.IsNullOrEmpty(adminEmail))
+            {
+                await _emailSender.SendAsync(
+                    adminEmail,
+                    "New gown submitted for review — Regowned",
+                    EmailTemplates.NewSubmissionAdmin("gown", posting.Owner.Name, posting.Description, $"{baseUrl}/admin", baseUrl)
+                );
+            }
+
+            return Ok();
         }
 
         [HttpPost("edit")]

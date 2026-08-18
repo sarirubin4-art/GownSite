@@ -4,7 +4,7 @@ import axios from 'axios';
 import {
     Box, Typography, Grid, Card, CardMedia, CardContent, Chip, Button, Stack,
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Autocomplete,
-    Checkbox, FormControlLabel, FormGroup
+    Checkbox, FormControlLabel, FormGroup, Alert
 } from '@mui/material';
 import { COLOR_OPTIONS, SIZE_OPTIONS, LISTING_TYPE_OPTIONS, STYLE_OPTIONS } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
@@ -117,9 +117,26 @@ const MyListings = () => {
 
     if (loading || !owner) return null;
 
+    const activeCount = listings.filter((g) => g.isActive).length;
+
     return (
         <Box>
             <Typography variant="h4" gutterBottom>My Listings</Typography>
+            {owner.isBusinessAccount && (
+                owner.businessBillingComplete ? (
+                    <Alert severity="info" sx={{ mb: 3 }}>
+                        Business Plan: {activeCount}/{owner.businessGownAllowance} gowns live — ${owner.businessMonthlyFeeUsd}/month flat, no per-listing charges.
+                    </Alert>
+                ) : (
+                    <Alert severity="warning" sx={{ mb: 3 }} action={
+                        <Button color="inherit" size="small" onClick={() => navigate('/business/billing-setup')}>
+                            Complete Setup
+                        </Button>
+                    }>
+                        Your business plan (${owner.businessMonthlyFeeUsd}/month, up to {owner.businessGownAllowance} gowns) is waiting on billing setup before you can post.
+                    </Alert>
+                )
+            )}
             {listings.length === 0 && (
                 <Typography color="text.secondary">You haven't posted any gowns yet.</Typography>
             )}

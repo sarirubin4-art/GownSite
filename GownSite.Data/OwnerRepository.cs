@@ -97,6 +97,49 @@ namespace GownSite.Data
             return true;
         }
 
+        // Changing terms always clears the existing Stripe subscription info, so the owner
+        // has to (re)confirm billing under the new terms before their gowns can post free.
+        public bool SetBusinessPlan(int ownerId, decimal monthlyFee, int gownAllowance, decimal? overageFeePerGown)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o => o.Id == ownerId);
+            if (owner == null) return false;
+
+            owner.IsBusinessAccount = true;
+            owner.BusinessMonthlyFeeUsd = monthlyFee;
+            owner.BusinessGownAllowance = gownAllowance;
+            owner.BusinessOverageFeePerGownUsd = overageFeePerGown;
+            owner.BusinessStripeCustomerId = null;
+            owner.BusinessStripePaymentMethodId = null;
+            owner.BusinessStripeSubscriptionId = null;
+            context.SaveChanges();
+            return true;
+        }
+
+        public bool RemoveBusinessPlan(int ownerId)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o => o.Id == ownerId);
+            if (owner == null) return false;
+
+            owner.IsBusinessAccount = false;
+            context.SaveChanges();
+            return true;
+        }
+
+        public bool SetBusinessStripeInfo(int ownerId, string customerId, string paymentMethodId, string subscriptionId)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o => o.Id == ownerId);
+            if (owner == null) return false;
+
+            owner.BusinessStripeCustomerId = customerId;
+            owner.BusinessStripePaymentMethodId = paymentMethodId;
+            owner.BusinessStripeSubscriptionId = subscriptionId;
+            context.SaveChanges();
+            return true;
+        }
+
         public bool ResetPassword(string token, string newPasswordHash)
         {
             using var context = new GownDataContext(_connectionString);

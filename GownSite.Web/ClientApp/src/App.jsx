@@ -31,6 +31,8 @@ import MyAds from './Pages/MyAds';
 import AdminDashboard from './Pages/AdminDashboard';
 import TermsOfService from './Pages/TermsOfService';
 import PrivacyPolicy from './Pages/PrivacyPolicy';
+import BusinessBillingSetupPage from './Pages/BusinessBillingSetupPage';
+import BusinessBillingSetupSuccess from './Pages/BusinessBillingSetupSuccess';
 
 const App = () => {
     return (
@@ -68,6 +70,8 @@ const App = () => {
                     <Route path='/admin' element={<AdminDashboard />} />
                     <Route path='/terms' element={<TermsOfService />} />
                     <Route path='/privacy' element={<PrivacyPolicy />} />
+                    <Route path='/business/billing-setup' element={<BusinessBillingSetupPage />} />
+                    <Route path='/business/billing-setup-success' element={<BusinessBillingSetupSuccess />} />
                 </Routes>
             </Layout>
         </AuthProvider>

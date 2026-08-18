@@ -199,6 +199,17 @@ const GownPostingForm = () => {
             const { data: result } = await axios.post('/api/gown/create', data, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
+
+            if (owner.isBusinessAccount) {
+                if (!owner.businessBillingComplete) {
+                    navigate('/business/billing-setup');
+                    return;
+                }
+                await axios.post('/api/gown/submit-business', { id: result.id });
+                navigate('/mylistings');
+                return;
+            }
+
             navigate(`/postagown/payment-setup/${result.id}`);
         } catch (err) {
             setError(err?.response?.data?.message || 'Something went wrong saving your listing.');

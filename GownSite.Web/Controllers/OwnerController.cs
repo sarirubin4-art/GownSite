@@ -46,6 +46,10 @@ namespace GownSite.Web.Controllers
         public string Email { get; set; }
         public bool IsAdmin { get; set; }
         public bool EmailVerified { get; set; }
+        public bool IsBusinessAccount { get; set; }
+        public decimal? BusinessMonthlyFeeUsd { get; set; }
+        public int? BusinessGownAllowance { get; set; }
+        public bool BusinessBillingComplete { get; set; }
     }
 
     [Route("api/[controller]")]
@@ -251,7 +255,11 @@ namespace GownSite.Web.Controllers
             Number = owner.Number,
             Email = owner.Email,
             IsAdmin = owner.IsAdmin,
-            EmailVerified = owner.EmailVerified
+            EmailVerified = owner.EmailVerified,
+            IsBusinessAccount = owner.IsBusinessAccount,
+            BusinessMonthlyFeeUsd = owner.BusinessMonthlyFeeUsd,
+            BusinessGownAllowance = owner.BusinessGownAllowance,
+            BusinessBillingComplete = !string.IsNullOrEmpty(owner.BusinessStripeSubscriptionId)
         };
     }
 }
