@@ -22,7 +22,7 @@ const makeEmptyGown = () => ({
     location: '',
     description: '',
     colors: [],
-    listingType: 'Rent',
+    listingType: '',
     brand: '',
     pricePaid: '',
     condition: '',
@@ -89,6 +89,7 @@ const ConciergePostingForm = () => {
             if (g.sizes.length === 0) return `Gown ${i + 1}: please select a size.`;
             if (!g.price) return `Gown ${i + 1}: please enter a price.`;
             if (!g.location) return `Gown ${i + 1}: please enter a location.`;
+            if (!g.listingType) return `Gown ${i + 1}: please choose rent or sale.`;
         }
         return '';
     };
@@ -161,7 +162,7 @@ const ConciergePostingForm = () => {
         <Container maxWidth="md" sx={{ py: 4 }}>
             <Typography variant="h4" gutterBottom>Let Us Post It For You</Typography>
             <Typography color="text.secondary" sx={{ mb: 3 }}>
-                Just the essentials for each gown — a photo, size, price, and location. Everything else is optional;
+                Just the essentials for each gown — a photo, size, price, location, and rent or sale. Everything else is optional;
                 we'll fill in the rest.
             </Typography>
             {error && (
@@ -243,6 +244,11 @@ const ConciergePostingForm = () => {
                                     onChange={(value) => updateGown(g.localId, { location: value })}
                                 />
                             </Grid>
+                            <Grid size={{ xs: 12, sm: 4 }}>
+                                <TextField select label="Rent or Sale" fullWidth value={g.listingType} onChange={(e) => updateGown(g.localId, { listingType: e.target.value })}>
+                                    {LISTING_TYPE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+                                </TextField>
+                            </Grid>
 
                             <Grid size={12}><Divider textAlign="left"><Typography variant="caption" color="text.secondary">Optional — anything else you'd like to add</Typography></Divider></Grid>
 
@@ -260,11 +266,6 @@ const ConciergePostingForm = () => {
                                     onChange={(e, value) => updateGown(g.localId, { colors: value })}
                                     renderInput={(params) => <TextField {...params} label="Color(s)" size="small" />}
                                 />
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField select label="Rent or Sale" fullWidth size="small" value={g.listingType} onChange={(e) => updateGown(g.localId, { listingType: e.target.value })}>
-                                    {LISTING_TYPE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
-                                </TextField>
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <TextField label="Brand" value={g.brand} onChange={(e) => updateGown(g.localId, { brand: e.target.value })} fullWidth size="small" />

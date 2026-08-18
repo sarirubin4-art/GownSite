@@ -1,20 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { Container, Typography, Button, Stack, Box, Paper, Grid } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import ContactAdminDialog from '../components/ContactAdminDialog';
+import { formatUsd } from '../constants/gownOptions';
 
 const ConciergePostingTerms = () => {
     const { owner, loading } = useAuth();
     const navigate = useNavigate();
 
     const [visitOpen, setVisitOpen] = useState(false);
+    const [gownMonthlyFee, setGownMonthlyFee] = useState(null);
 
     useEffect(() => {
         if (!loading && !owner) {
             navigate('/login?redirect=/concierge/terms');
         }
     }, [loading, owner]);
+
+    useEffect(() => {
+        axios.get('/api/payment/pricing').then(({ data }) => setGownMonthlyFee(data.gownMonthlyFee));
+    }, []);
 
     if (loading || !owner) return null;
 
@@ -23,7 +30,8 @@ const ConciergePostingTerms = () => {
             <Typography variant="h4" gutterBottom>Let Us Post It For You</Typography>
             <Typography color="text.secondary" sx={{ mb: 4 }}>
                 Too busy to fill out the posting form yourself? Send us the basics and we'll draft the listing for you.
-                Both options are add-ons on top of the normal $9.99/month per-gown listing fee once your gown is live.
+                Both options are add-ons on top of the normal{gownMonthlyFee != null ? ` ${formatUsd(gownMonthlyFee)}/month` : ''} per-gown
+                listing fee once your gown is live — the usual one-time posting fee doesn't apply on top, since these already cover that setup work.
             </Typography>
 
             <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -31,7 +39,7 @@ const ConciergePostingTerms = () => {
                     <Paper variant="outlined" sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
                         <Typography variant="h6" gutterBottom>Remote Drafting</Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2, flexGrow: 1 }}>
-                            Send us at least one photo, the size, price, and location for each gown — anything else is
+                            Send us at least one photo, the size, price, location, and rent or sale for each gown — anything else is
                             optional. We'll fill in the rest and let you know when it's ready to review.
                         </Typography>
                         <Typography variant="h5" sx={{ mb: 2 }}>$7/gown</Typography>

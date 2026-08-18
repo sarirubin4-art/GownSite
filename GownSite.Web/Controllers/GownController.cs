@@ -433,9 +433,8 @@ namespace GownSite.Web.Controllers
             if (string.IsNullOrWhiteSpace(request.Size)) return BadRequest(new { message = "Size is required." });
             if (request.Price <= 0) return BadRequest(new { message = "Price is required." });
             if (string.IsNullOrWhiteSpace(request.Location)) return BadRequest(new { message = "Location is required." });
+            if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType)) return BadRequest(new { message = "Rent or sale is required." });
             if (request.BatchId == Guid.Empty) return BadRequest(new { message = "Missing batch identifier." });
-
-            var listingType = Enum.TryParse<ListingType>(request.ListingType, out var lt) ? lt : ListingType.Rent;
 
             var repo = new GownRepository(_connectionString);
             var primaryUrl = await _storage.SaveAsync(request.PrimaryPicture, "gowns");
