@@ -13,6 +13,25 @@ import usePageTitle from '../hooks/usePageTitle';
 
 const emptyFilters = { colors: [], sizes: [], locations: [], styles: [], listingTypes: [], minPrice: '', maxPrice: '' };
 
+// Multi-select filter field: stays open after each pick (instead of closing and
+// forcing you to reopen it for the next selection), and shows "All" as a placeholder
+// once the label shrinks out of the way, so it's clear the field is optional.
+const FilterAutocomplete = ({ label, options, value, onChange, getOptionLabel, size = 'small' }) => (
+    <Autocomplete
+        multiple size={size} disableCloseOnSelect
+        options={options} value={value} onChange={onChange}
+        getOptionLabel={getOptionLabel}
+        renderInput={(params) => (
+            <TextField
+                {...params}
+                label={label}
+                placeholder={value.length === 0 ? 'All' : undefined}
+                slotProps={{ ...params.slotProps, inputLabel: { ...params.slotProps?.inputLabel, shrink: true } }}
+            />
+        )}
+    />
+);
+
 const SearchGowns = () => {
     usePageTitle('Browse Gowns for Rent & Sale', 'Search gowns for rent or sale by color, size, style, and location — find the perfect dress for your simcha.');
     const navigate = useNavigate();
@@ -106,41 +125,36 @@ const SearchGowns = () => {
             <Paper variant="outlined" sx={{ p: 2.5, mb: 4, mr: { xs: 0, md: adVisible ? `${laneWidth}px` : 0 } }}>
                 <Grid container spacing={2}>
                     <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-                        <Autocomplete
-                            multiple size="small" options={COLOR_OPTIONS} value={filters.colors}
+                        <FilterAutocomplete
+                            label="Color" options={COLOR_OPTIONS} value={filters.colors}
                             onChange={setField('colors')}
-                            renderInput={(params) => <TextField {...params} label="Color" />}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-                        <Autocomplete
-                            multiple size="small" options={SIZE_OPTIONS} value={filters.sizes}
+                        <FilterAutocomplete
+                            label="Size" options={SIZE_OPTIONS} value={filters.sizes}
                             onChange={setField('sizes')}
-                            renderInput={(params) => <TextField {...params} label="Size" />}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-                        <Autocomplete
-                            multiple size="small" options={locationOptions} value={filters.locations}
+                        <FilterAutocomplete
+                            label="Location" options={locationOptions} value={filters.locations}
                             onChange={setField('locations')}
-                            renderInput={(params) => <TextField {...params} label="Location" />}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-                        <Autocomplete
-                            multiple size="small" options={STYLE_OPTIONS.map(s => s.value)}
+                        <FilterAutocomplete
+                            label="Style" options={STYLE_OPTIONS.map(s => s.value)}
                             getOptionLabel={styleLabel} value={filters.styles}
                             onChange={setField('styles')}
-                            renderInput={(params) => <TextField {...params} label="Style" />}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-                        <Autocomplete
-                            multiple size="small" options={LISTING_TYPE_OPTIONS.map(o => o.value)}
+                        <FilterAutocomplete
+                            label="Rent / Sale" options={LISTING_TYPE_OPTIONS.map(o => o.value)}
                             getOptionLabel={(v) => LISTING_TYPE_OPTIONS.find(o => o.value === v)?.label || v}
                             value={filters.listingTypes}
                             onChange={setField('listingTypes')}
-                            renderInput={(params) => <TextField {...params} label="Rent / Sale" />}
                         />
                     </Grid>
                     <Grid size={{ xs: 6, sm: 3, md: 2 }}>
@@ -239,33 +253,28 @@ const SearchGowns = () => {
                             value={notifyEmail}
                             onChange={(e) => setNotifyEmail(e.target.value)}
                         />
-                        <Autocomplete
-                            multiple options={COLOR_OPTIONS} value={notifyFilters.colors}
+                        <FilterAutocomplete
+                            size="medium" label="Color" options={COLOR_OPTIONS} value={notifyFilters.colors}
                             onChange={setNotifyField('colors')}
-                            renderInput={(params) => <TextField {...params} label="Color" />}
                         />
-                        <Autocomplete
-                            multiple options={SIZE_OPTIONS} value={notifyFilters.sizes}
+                        <FilterAutocomplete
+                            size="medium" label="Size" options={SIZE_OPTIONS} value={notifyFilters.sizes}
                             onChange={setNotifyField('sizes')}
-                            renderInput={(params) => <TextField {...params} label="Size" />}
                         />
-                        <Autocomplete
-                            multiple options={locationOptions} value={notifyFilters.locations}
+                        <FilterAutocomplete
+                            size="medium" label="Location" options={locationOptions} value={notifyFilters.locations}
                             onChange={setNotifyField('locations')}
-                            renderInput={(params) => <TextField {...params} label="Location" />}
                         />
-                        <Autocomplete
-                            multiple options={STYLE_OPTIONS.map(s => s.value)}
+                        <FilterAutocomplete
+                            size="medium" label="Style" options={STYLE_OPTIONS.map(s => s.value)}
                             getOptionLabel={styleLabel} value={notifyFilters.styles}
                             onChange={setNotifyField('styles')}
-                            renderInput={(params) => <TextField {...params} label="Style" />}
                         />
-                        <Autocomplete
-                            multiple options={LISTING_TYPE_OPTIONS.map(o => o.value)}
+                        <FilterAutocomplete
+                            size="medium" label="Rent / Sale" options={LISTING_TYPE_OPTIONS.map(o => o.value)}
                             getOptionLabel={(v) => LISTING_TYPE_OPTIONS.find(o => o.value === v)?.label || v}
                             value={notifyFilters.listingTypes}
                             onChange={setNotifyField('listingTypes')}
-                            renderInput={(params) => <TextField {...params} label="Rent / Sale" />}
                         />
                     </Stack>
                 </DialogContent>
