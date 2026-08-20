@@ -1,6 +1,6 @@
 export const COLOR_OPTIONS = [
     'Ivory/White', 'Blush', 'Champagne', 'Beige', 'Black', 'Navy', 'Burgundy',
-    'Emerald', 'Green', 'Blue', 'Silver', 'Gold', 'Pink', 'Purple', 'Floral', 'Multi', 'Other'
+    'Emerald', 'Sage', 'Blue', 'Silver', 'Gold', 'Pink', 'Purple', 'Floral', 'Multi', 'Other'
 ];
 
 export const SIZE_OPTIONS = [
