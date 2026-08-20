@@ -18,7 +18,7 @@ const Home = () => {
                 sx={{ width: { xs: '80%', sm: 420 }, maxWidth: 500, height: 'auto', mb: 2 }}
             />
             <Typography variant="h6" color="text.secondary" sx={{ mb: 5, maxWidth: 560 }}>
-                Buy, sell, and rent gowns for every simcha. Find the perfect dress nearby,
+                Buy, sell, and rent gowns for every event. Find the perfect dress nearby,
                 or give one you love a beautiful second life.
             </Typography>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
