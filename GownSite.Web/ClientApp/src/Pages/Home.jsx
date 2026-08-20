@@ -4,7 +4,7 @@ import { Box, Typography, Button, Stack, Snackbar, Alert } from '@mui/material';
 import usePageTitle from '../hooks/usePageTitle';
 
 const Home = () => {
-    usePageTitle(null, "Buy, sell, and rent gowns for every simcha. Find the perfect dress nearby, or give one you love a beautiful second life.");
+    usePageTitle(null, "Buy, sell, and rent gowns for every event. Find the perfect dress nearby, or give one you love a beautiful second life.");
     const [searchParams] = useSearchParams();
     const verified = searchParams.get('verified');
     const [noticeOpen, setNoticeOpen] = useState(!!verified);
