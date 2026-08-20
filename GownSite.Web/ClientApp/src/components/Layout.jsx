@@ -15,7 +15,7 @@ import { wallpaperBackground } from '../theme';
 
 const NAV_LINKS = [
     { to: '/search', label: 'Browse Gowns' },
-    { to: '/ads', label: 'Simcha Services' },
+    { to: '/ads', label: 'Ad Directory' },
     { to: '/postagown', label: 'Post a Gown' },
     { to: '/advertise', label: 'Advertise' }
 ];

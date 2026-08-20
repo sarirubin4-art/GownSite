@@ -122,7 +122,8 @@ namespace GownSite.Data
         // values in the database keep their original int meaning.
         Photography,
         PartyPlanners,
-        Gemachs
+        Gemachs,
+        GirlsWomensApparel
     }
 
     public class Ad

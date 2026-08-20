@@ -38,10 +38,11 @@ export const AD_CATEGORY_OPTIONS = [
     { value: 'Hair', label: 'Hair Stylist' },
     { value: 'Alterations', label: 'Alterations' },
     { value: 'GownRental', label: 'Gown Rental/Sales' },
+    { value: 'GirlsWomensApparel', label: 'Girls/Womens Apparel' },
     { value: 'Photography', label: 'Photography' },
     { value: 'PartyPlanners', label: 'Party Planners' },
     { value: 'Gemachs', label: 'Gemachs' },
-    { value: 'Other', label: 'Simcha Services' },
+    { value: 'Other', label: 'Other' },
 ];
 
 export const formatUsd = (n) => {

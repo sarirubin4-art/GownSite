@@ -8,7 +8,7 @@ import { useAdLane } from '../context/AdLaneContext';
 import usePageTitle from '../hooks/usePageTitle';
 
 const BrowseAds = () => {
-    usePageTitle('Simcha Services', 'Browse trusted simcha service providers — hair, makeup, alterations, gown rental/sales, and more.');
+    usePageTitle('Ad Directory', 'Browse trusted simcha service providers — hair, makeup, alterations, gown rental/sales, apparel, and more.');
     const navigate = useNavigate();
     const { adVisible, laneWidth } = useAdLane();
     const [ads, setAds] = useState([]);
