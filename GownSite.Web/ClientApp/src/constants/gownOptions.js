@@ -6,6 +6,7 @@ export const COLOR_OPTIONS = [
 export const SIZE_OPTIONS = [
     '00', '0', '2', '4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24', '26',
     'Maternity XS', 'Maternity S', 'Maternity M', 'Maternity L', 'Maternity XL',
+    'Girls 12M', 'Girls 18M', 'Girls 24M',
     'Girls 2T', 'Girls 3T', 'Girls 4T', 'Girls 4', 'Girls 5', 'Girls 6', 'Girls 6X',
     'Girls 7', 'Girls 8', 'Girls 10', 'Girls 12', 'Girls 14', 'Girls 16'
 ];
