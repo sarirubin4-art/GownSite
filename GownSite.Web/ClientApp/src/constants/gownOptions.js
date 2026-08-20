@@ -1,5 +1,5 @@
 export const COLOR_OPTIONS = [
-    'Ivory/White', 'Blush', 'Champagne', 'Black', 'Navy', 'Burgundy',
+    'Ivory/White', 'Blush', 'Champagne', 'Beige', 'Black', 'Navy', 'Burgundy',
     'Emerald', 'Blue', 'Silver', 'Gold', 'Pink', 'Purple', 'Floral', 'Multi', 'Other'
 ];
 
