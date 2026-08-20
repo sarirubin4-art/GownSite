@@ -123,7 +123,8 @@ namespace GownSite.Data
         Photography,
         PartyPlanners,
         Gemachs,
-        GirlsWomensApparel
+        GirlsWomensApparel,
+        Sheitels
     }
 
     public class Ad
