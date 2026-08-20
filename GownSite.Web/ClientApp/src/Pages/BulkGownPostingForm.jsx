@@ -12,15 +12,15 @@ import AddIcon from '@mui/icons-material/Add';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import LocationField from '../components/LocationField';
+import MorePicturesInput from '../components/MorePicturesInput';
 
-const MAX_MORE_PICTURES = 5;
 const MAX_BATCH_GOWNS = 20;
 const DRAFT_KEY = 'regowned_bulk_posting_draft';
 
 // Photos (File objects) can't survive localStorage — only text fields are saved,
 // so a restored gown always needs its photo(s) re-attached before it can submit.
 const stripPhotos = (g) => {
-    const { primaryPicture, primaryPreview, morePictures, morePicturesError, ...rest } = g;
+    const { primaryPicture, primaryPreview, morePictures, ...rest } = g;
     return rest;
 };
 
@@ -41,8 +41,7 @@ const makeEmptyGown = () => ({
     notes: '',
     primaryPicture: null,
     primaryPreview: null,
-    morePictures: [],
-    morePicturesError: ''
+    morePictures: []
 });
 
 const BulkGownPostingForm = () => {
@@ -80,7 +79,7 @@ const BulkGownPostingForm = () => {
         try {
             const parsed = JSON.parse(saved);
             if (!hasDraftContent(parsed.gowns, parsed.shared)) return;
-            setGowns(parsed.gowns.map((g) => ({ ...g, primaryPicture: null, primaryPreview: null, morePictures: [], morePicturesError: '' })));
+            setGowns(parsed.gowns.map((g) => ({ ...g, primaryPicture: null, primaryPreview: null, morePictures: [] })));
             setShared(parsed.shared);
             setRestoredDraft(true);
         } catch {
@@ -125,16 +124,8 @@ const BulkGownPostingForm = () => {
         updateGown(localId, { primaryPicture: file || null, primaryPreview: file ? URL.createObjectURL(file) : null });
     };
 
-    const onMorePicturesChange = (localId) => (e) => {
-        const files = Array.from(e.target.files);
-        if (files.length > MAX_MORE_PICTURES) {
-            updateGown(localId, {
-                morePictures: files.slice(0, MAX_MORE_PICTURES),
-                morePicturesError: `You can upload up to ${MAX_MORE_PICTURES} additional photos — only the first ${MAX_MORE_PICTURES} were kept.`
-            });
-        } else {
-            updateGown(localId, { morePictures: files, morePicturesError: '' });
-        }
+    const onMorePicturesChange = (localId) => (files) => {
+        updateGown(localId, { morePictures: files });
     };
 
     const addGown = () => {
@@ -386,11 +377,7 @@ const BulkGownPostingForm = () => {
                                 </Grid>
                             )}
                             <Grid size={12}>
-                                <Button variant="outlined" component="label" size="small">
-                                    {g.morePictures.length > 0 ? `${g.morePictures.length} additional photo(s) selected` : `Add More Pictures (up to ${MAX_MORE_PICTURES}, optional)`}
-                                    <input type="file" accept="image/*" multiple hidden onChange={onMorePicturesChange(g.localId)} />
-                                </Button>
-                                {g.morePicturesError && <Typography variant="caption" color="error" display="block" sx={{ mt: 0.5 }}>{g.morePicturesError}</Typography>}
+                                <MorePicturesInput files={g.morePictures} onFilesChange={onMorePicturesChange(g.localId)} />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <TextField label="Brand" value={g.brand} onChange={(e) => updateGown(g.localId, { brand: e.target.value })} fullWidth size="small" />

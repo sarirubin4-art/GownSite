@@ -9,8 +9,7 @@ import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS } from
 import { useAuth } from '../context/AuthContext';
 import LocationField from '../components/LocationField';
 import ContactAdminDialog from '../components/ContactAdminDialog';
-
-const MAX_MORE_PICTURES = 5;
+import MorePicturesInput from '../components/MorePicturesInput';
 
 const GownPostingForm = () => {
     const { owner, loading } = useAuth();
@@ -23,7 +22,6 @@ const GownPostingForm = () => {
     const [primaryPreview, setPrimaryPreview] = useState(null);
     const [hasExistingPhoto, setHasExistingPhoto] = useState(false);
     const [morePictures, setMorePictures] = useState([]);
-    const [morePicturesError, setMorePicturesError] = useState('');
     const [inquiryOpen, setInquiryOpen] = useState(false);
 
     const [draftId, setDraftId] = useState(resumeId ? Number(resumeId) : null);
@@ -145,17 +143,6 @@ const GownPostingForm = () => {
         const file = e.target.files[0];
         setPrimaryPicture(file || null);
         setPrimaryPreview(file ? URL.createObjectURL(file) : null);
-    };
-
-    const onMorePicturesChange = (e) => {
-        const files = Array.from(e.target.files);
-        if (files.length > MAX_MORE_PICTURES) {
-            setMorePicturesError(`You can upload up to ${MAX_MORE_PICTURES} additional photos — only the first ${MAX_MORE_PICTURES} were kept.`);
-            setMorePictures(files.slice(0, MAX_MORE_PICTURES));
-        } else {
-            setMorePicturesError('');
-            setMorePictures(files);
-        }
     };
 
     const validate = () => {
@@ -287,11 +274,7 @@ const GownPostingForm = () => {
                         </Grid>
                     )}
                     <Grid size={12}>
-                        <Button variant="outlined" component="label">
-                            {morePictures.length > 0 ? `${morePictures.length} additional photo(s) selected` : `Add More Pictures (up to ${MAX_MORE_PICTURES}, optional)`}
-                            <input type="file" accept="image/*" multiple hidden onChange={onMorePicturesChange} />
-                        </Button>
-                        {morePicturesError && <Typography variant="caption" color="error" display="block" sx={{ mt: 0.5 }}>{morePicturesError}</Typography>}
+                        <MorePicturesInput files={morePictures} onFilesChange={setMorePictures} />
                     </Grid>
                 </Grid>
             </Paper>

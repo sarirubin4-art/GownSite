@@ -10,6 +10,7 @@ import { COLOR_OPTIONS, SIZE_OPTIONS, LISTING_TYPE_OPTIONS, STYLE_OPTIONS } from
 import { useAuth } from '../context/AuthContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import LocationField from '../components/LocationField';
+import MorePicturesInput from '../components/MorePicturesInput';
 
 const MyListings = () => {
     const { owner, loading } = useAuth();
@@ -25,6 +26,9 @@ const MyListings = () => {
     const [businessPromoMessage, setBusinessPromoMessage] = useState(null); // { type: 'success'|'error', text }
     const [newPrimaryPicture, setNewPrimaryPicture] = useState(null);
     const [newPrimaryPreview, setNewPrimaryPreview] = useState(null);
+    const [removePictureIds, setRemovePictureIds] = useState([]);
+    const [newMorePictures, setNewMorePictures] = useState([]);
+    const [resubmitting, setResubmitting] = useState(false);
 
     const load = async () => {
         const { data } = await axios.get('/api/gown/mylistings');
@@ -56,6 +60,16 @@ const MyListings = () => {
         load();
     };
 
+    const onResubmitClick = async (id) => {
+        setResubmitting(true);
+        try {
+            await axios.post('/api/gown/resubmit', { id });
+            load();
+        } finally {
+            setResubmitting(false);
+        }
+    };
+
     const onSaveEdit = async () => {
         const data = new FormData();
         data.append('Id', editTarget.id);
@@ -73,11 +87,15 @@ const MyListings = () => {
         data.append('StyleTags', editTarget.styleTags.join(','));
         data.append('Notes', editTarget.notes);
         if (newPrimaryPicture) data.append('PrimaryPicture', newPrimaryPicture);
+        removePictureIds.forEach((id) => data.append('RemovePictureIds', id));
+        newMorePictures.forEach((file) => data.append('MorePictures', file));
 
         await axios.post('/api/gown/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
         setEditTarget(null);
         setNewPrimaryPicture(null);
         setNewPrimaryPreview(null);
+        setRemovePictureIds([]);
+        setNewMorePictures([]);
         load();
     };
 
@@ -85,6 +103,10 @@ const MyListings = () => {
         const file = e.target.files[0];
         setNewPrimaryPicture(file || null);
         setNewPrimaryPreview(file ? URL.createObjectURL(file) : null);
+    };
+
+    const onRemoveExistingPicture = (id) => {
+        setRemovePictureIds((prev) => [...prev, id]);
     };
 
     const toggleEditStyle = (value) => {
@@ -100,6 +122,8 @@ const MyListings = () => {
         setPromoMessage(null);
         setNewPrimaryPicture(null);
         setNewPrimaryPreview(null);
+        setRemovePictureIds([]);
+        setNewMorePictures([]);
     };
 
     const onApplyPromo = async () => {
@@ -227,7 +251,8 @@ const MyListings = () => {
                                         displayOwnerName: g.displayOwnerName, brand: g.brand || '', pricePaid: g.pricePaid || '',
                                         condition: g.condition || '', length: g.length || '',
                                         styleTags: (g.styleTags || '').split(',').filter(Boolean), notes: g.notes || '',
-                                        isActive: g.isActive, primaryPictureUrl: g.primaryPictureUrl
+                                        isActive: g.isActive, primaryPictureUrl: g.primaryPictureUrl,
+                                        morePictures: [...(g.morePictures || [])].sort((a, b) => a.sortOrder - b.sortOrder)
                                     })}>
                                         Edit
                                     </Button>
@@ -237,7 +262,11 @@ const MyListings = () => {
                                         <Button size="small" color="success" variant="outlined" onClick={() => navigate(`/postagown/form?resume=${g.id}`)}>
                                             Complete Setup
                                         </Button>
-                                    ) : g.moderationStatus === 'PendingReview' || g.moderationStatus === 'Rejected' || g.moderationStatus === 'Removed' ? null : g.isSold ? null : g.isActive ? (
+                                    ) : g.moderationStatus === 'Rejected' ? (
+                                        <Button size="small" color="success" variant="outlined" disabled={resubmitting} onClick={() => onResubmitClick(g.id)}>
+                                            Resubmit for Review
+                                        </Button>
+                                    ) : g.moderationStatus === 'PendingReview' || g.moderationStatus === 'Removed' ? null : g.isSold ? null : g.isActive ? (
                                         <>
                                             <Button size="small" color="secondary" variant="outlined" onClick={() => onMarkSoldClick(g.id)}>
                                                 Mark as Sold
@@ -300,6 +329,12 @@ const MyListings = () => {
                                     <input type="file" accept="image/*" hidden onChange={onEditPictureChange} />
                                 </Button>
                             </Stack>
+                            <MorePicturesInput
+                                files={newMorePictures}
+                                onFilesChange={setNewMorePictures}
+                                existing={editTarget.morePictures.filter(p => !removePictureIds.includes(p.id))}
+                                onRemoveExisting={onRemoveExistingPicture}
+                            />
                             <TextField label="Description" multiline rows={2} value={editTarget.description}
                                 onChange={(e) => setEditTarget({ ...editTarget, description: e.target.value })} />
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>

@@ -58,6 +58,7 @@ namespace GownSite.Web.Controllers
         public string StyleTags { get; set; }
         public string Notes { get; set; }
         public IFormFile PrimaryPicture { get; set; }
+        public List<IFormFile> MorePictures { get; set; } = new();
         public bool Finalize { get; set; }
 
         // Concierge/on-site-visit support: BatchId groups gowns drafted in one admin
@@ -349,8 +350,10 @@ namespace GownSite.Web.Controllers
             if (existing == null) return NotFound();
             if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType))
                 return BadRequest(new { message = "ListingType must be 'Rent' or 'Sale'." });
-            if (request.MorePictures?.Count > GownController.MaxMorePictures)
-                return BadRequest(new { message = $"You can upload up to {GownController.MaxMorePictures} additional photos." });
+            var removeIds = existing.MorePictures.Select(p => p.Id).Intersect(request.RemovePictureIds ?? new List<int>()).ToList();
+            var remainingCount = existing.MorePictures.Count - removeIds.Count + (request.MorePictures?.Count ?? 0);
+            if (remainingCount > GownController.MaxMorePictures)
+                return BadRequest(new { message = $"You can have up to {GownController.MaxMorePictures} additional photos total." });
 
             repo.Update(new GownPosting
             {
@@ -372,6 +375,9 @@ namespace GownSite.Web.Controllers
 
             if (request.PrimaryPicture != null)
                 repo.SetPrimaryPicture(request.Id, await _storage.SaveAsync(request.PrimaryPicture, "gowns"));
+
+            if (removeIds.Count > 0)
+                repo.RemovePictures(request.Id, removeIds);
 
             if (request.MorePictures?.Count > 0)
             {
@@ -582,6 +588,9 @@ namespace GownSite.Web.Controllers
 
             var listingTypeValid = Enum.TryParse<ListingType>(request.ListingType, out var listingType);
 
+            if (request.MorePictures?.Count > GownController.MaxMorePictures)
+                return BadRequest(new { message = $"You can upload up to {GownController.MaxMorePictures} additional photos." });
+
             if (request.Finalize)
             {
                 // Comping a listing live skips the card/subscription step entirely, so it
@@ -621,6 +630,15 @@ namespace GownSite.Web.Controllers
                 OneTimeFeeUsd = request.OneTimeFeeUsd
             };
             var id = repo.Create(posting);
+
+            if (request.MorePictures?.Count > 0)
+            {
+                var moreUrls = new List<string>();
+                foreach (var file in request.MorePictures)
+                    moreUrls.Add(await _storage.SaveAsync(file, "gowns"));
+                repo.AddPictures(id, moreUrls);
+            }
+
             if (request.Finalize)
                 repo.ActivateListing(id, null, null);
             return Ok(new { id, finalized = request.Finalize });

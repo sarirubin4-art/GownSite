@@ -72,6 +72,7 @@ namespace GownSite.Web.Controllers
         public string Notes { get; set; }
         public IFormFile PrimaryPicture { get; set; }
         public List<IFormFile> MorePictures { get; set; } = new();
+        public List<int> RemovePictureIds { get; set; } = new();
     }
 
     public class IdRequest
@@ -388,8 +389,10 @@ namespace GownSite.Web.Controllers
             if (existing.OwnerId != CurrentOwnerId()) return Forbid();
             if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType))
                 return BadRequest(new { message = "ListingType must be 'Rent' or 'Sale'." });
-            if (request.MorePictures?.Count > MaxMorePictures)
-                return BadRequest(new { message = $"You can upload up to {MaxMorePictures} additional photos." });
+            var removeIds = existing.MorePictures.Select(p => p.Id).Intersect(request.RemovePictureIds ?? new List<int>()).ToList();
+            var remainingCount = existing.MorePictures.Count - removeIds.Count + (request.MorePictures?.Count ?? 0);
+            if (remainingCount > MaxMorePictures)
+                return BadRequest(new { message = $"You can have up to {MaxMorePictures} additional photos total." });
 
             repo.Update(new GownPosting
             {
@@ -411,6 +414,9 @@ namespace GownSite.Web.Controllers
 
             if (request.PrimaryPicture != null)
                 repo.SetPrimaryPicture(request.Id, await _storage.SaveAsync(request.PrimaryPicture, "gowns"));
+
+            if (removeIds.Count > 0)
+                repo.RemovePictures(request.Id, removeIds);
 
             if (request.MorePictures?.Count > 0)
             {
@@ -555,6 +561,37 @@ namespace GownSite.Web.Controllers
             }
 
             repo.MarkSold(request.Id);
+            return Ok();
+        }
+
+        // Sends a Rejected listing back into the review queue after the owner fixes
+        // whatever the admin flagged, instead of forcing them to delete it and redraft
+        // from scratch. Reuses the Stripe customer/payment method already on file.
+        [HttpPost("resubmit")]
+        [Authorize]
+        public async Task<IActionResult> Resubmit([FromBody] IdRequest request)
+        {
+            var repo = new GownRepository(_connectionString);
+            var existing = repo.Get(request.Id);
+            if (existing == null) return NotFound();
+            if (existing.OwnerId != CurrentOwnerId()) return Forbid();
+            if (existing.ModerationStatus != ModerationStatus.Rejected)
+                return BadRequest(new { message = "This listing isn't rejected." });
+
+            repo.ResubmitListing(request.Id);
+
+            var frontendBaseUrl = _configuration["Frontend:BaseUrl"];
+            var baseUrl = string.IsNullOrEmpty(frontendBaseUrl) ? $"{Request.Scheme}://{Request.Host}" : frontendBaseUrl;
+            var adminEmail = _configuration["Email:AdminNotificationEmail"];
+            if (!string.IsNullOrEmpty(adminEmail))
+            {
+                await _emailSender.SendAsync(
+                    adminEmail,
+                    "Gown resubmitted for review — Regowned",
+                    EmailTemplates.NewSubmissionAdmin("gown (resubmitted)", existing.Owner.Name, existing.Description, $"{baseUrl}/admin", baseUrl)
+                );
+            }
+
             return Ok();
         }
 

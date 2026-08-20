@@ -245,6 +245,21 @@ namespace GownSite.Data
             context.SaveChanges();
         }
 
+        // Lets an owner send a Rejected listing back into the review queue after fixing
+        // whatever the admin flagged, instead of deleting it and drafting a new one from
+        // scratch. Reuses the Stripe customer/payment method already on file from the
+        // listing's original card-setup step, so no new payment info is needed.
+        public void ResubmitListing(int id)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var existing = context.Gowns.FirstOrDefault(g => g.Id == id);
+            if (existing == null) return;
+
+            existing.ModerationStatus = ModerationStatus.PendingReview;
+            existing.RejectionReason = null;
+            context.SaveChanges();
+        }
+
         public void CancelListing(int id)
         {
             using var context = new GownDataContext(_connectionString);
@@ -319,6 +334,17 @@ namespace GownSite.Data
                     SortOrder = order++
                 });
             }
+            context.SaveChanges();
+        }
+
+        public void RemovePictures(int gownPostingId, List<int> pictureIds)
+        {
+            if (pictureIds == null || pictureIds.Count == 0) return;
+            using var context = new GownDataContext(_connectionString);
+            var toRemove = context.GownPictures
+                .Where(p => p.GownPostingId == gownPostingId && pictureIds.Contains(p.Id))
+                .ToList();
+            context.GownPictures.RemoveRange(toRemove);
             context.SaveChanges();
         }
     }

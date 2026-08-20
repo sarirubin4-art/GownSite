@@ -16,6 +16,7 @@ import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS } from '../constants/gownOptions';
 import LocationField from '../components/LocationField';
+import MorePicturesInput from '../components/MorePicturesInput';
 
 const MAX_POST_FOR_PATRON_GOWNS = 20;
 
@@ -44,7 +45,8 @@ const makePostForPatronGown = () => ({
     localId: crypto.randomUUID(),
     description: '', colors: [], sizes: [], price: '',
     brand: '', pricePaid: '', condition: '', length: '', styleTags: [], notes: '',
-    primaryPicture: null, primaryPreview: null
+    primaryPicture: null, primaryPreview: null,
+    morePictures: []
 });
 
 const DetailRow = ({ label, value }) => {
@@ -228,6 +230,8 @@ const AdminDashboard = () => {
     const [editGownNewPrimaryPicture, setEditGownNewPrimaryPicture] = useState(null);
     const [editGownNewPrimaryPreview, setEditGownNewPrimaryPreview] = useState(null);
     const [editGownError, setEditGownError] = useState('');
+    const [editGownRemovePictureIds, setEditGownRemovePictureIds] = useState([]);
+    const [editGownNewMorePictures, setEditGownNewMorePictures] = useState([]);
     const [error, setError] = useState('');
     const [promoCodes, setPromoCodes] = useState([]);
     const [promoDialogOpen, setPromoDialogOpen] = useState(false);
@@ -517,7 +521,8 @@ const AdminDashboard = () => {
         displayOwnerName: g.displayOwnerName, brand: g.brand || '', pricePaid: g.pricePaid || '',
         condition: g.condition || '', length: g.length || '',
         styleTags: (g.styleTags || '').split(',').filter(Boolean), notes: g.notes || '',
-        primaryPictureUrl: g.primaryPictureUrl
+        primaryPictureUrl: g.primaryPictureUrl,
+        morePictures: [...(g.morePictures || [])].sort((a, b) => a.sortOrder - b.sortOrder)
     });
 
     const onCloseEditGownDialog = () => {
@@ -525,12 +530,18 @@ const AdminDashboard = () => {
         setEditGownNewPrimaryPicture(null);
         setEditGownNewPrimaryPreview(null);
         setEditGownError('');
+        setEditGownRemovePictureIds([]);
+        setEditGownNewMorePictures([]);
     };
 
     const onEditGownPictureChange = (e) => {
         const file = e.target.files[0];
         setEditGownNewPrimaryPicture(file || null);
         setEditGownNewPrimaryPreview(file ? URL.createObjectURL(file) : null);
+    };
+
+    const onRemoveEditGownExistingPicture = (id) => {
+        setEditGownRemovePictureIds((prev) => [...prev, id]);
     };
 
     const toggleEditGownStyle = (value) => {
@@ -558,6 +569,8 @@ const AdminDashboard = () => {
         data.append('StyleTags', editGownTarget.styleTags.join(','));
         data.append('Notes', editGownTarget.notes);
         if (editGownNewPrimaryPicture) data.append('PrimaryPicture', editGownNewPrimaryPicture);
+        editGownRemovePictureIds.forEach((id) => data.append('RemovePictureIds', id));
+        editGownNewMorePictures.forEach((file) => data.append('MorePictures', file));
 
         try {
             await axios.post('/api/admin/gowns/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
@@ -662,6 +675,10 @@ const AdminDashboard = () => {
         updatePostForPatronGown(localId, { primaryPicture: file || null, primaryPreview: file ? URL.createObjectURL(file) : null });
     };
 
+    const onPostForPatronMorePicturesChange = (localId) => (files) => {
+        updatePostForPatronGown(localId, { morePictures: files });
+    };
+
     const addPostForPatronGown = () => {
         if (postForPatronGowns.length >= MAX_POST_FOR_PATRON_GOWNS) return;
         setPostForPatronGowns((prev) => [...prev, makePostForPatronGown()]);
@@ -718,6 +735,7 @@ const AdminDashboard = () => {
                 data.append('StyleTags', g.styleTags.join(','));
                 data.append('Notes', g.notes);
                 if (g.primaryPicture) data.append('PrimaryPicture', g.primaryPicture);
+                g.morePictures.forEach((file) => data.append('MorePictures', file));
                 data.append('Finalize', postForPatronShared.finalize);
                 data.append('BatchId', postForPatronBatchId);
                 // The visit's hourly total lands on just the first gown, not every gown —
@@ -1188,6 +1206,12 @@ const AdminDashboard = () => {
                                     <input type="file" accept="image/*" hidden onChange={onEditGownPictureChange} />
                                 </Button>
                             </Stack>
+                            <MorePicturesInput
+                                files={editGownNewMorePictures}
+                                onFilesChange={setEditGownNewMorePictures}
+                                existing={editGownTarget.morePictures.filter(p => !editGownRemovePictureIds.includes(p.id))}
+                                onRemoveExisting={onRemoveEditGownExistingPicture}
+                            />
                             <TextField label="Description" multiline rows={2} value={editGownTarget.description}
                                 onChange={(e) => setEditGownTarget({ ...editGownTarget, description: e.target.value })} />
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -1478,6 +1502,9 @@ const AdminDashboard = () => {
                                                     </Box>
                                                 </Grid>
                                             )}
+                                            <Grid size={12}>
+                                                <MorePicturesInput files={g.morePictures} onFilesChange={onPostForPatronMorePicturesChange(g.localId)} />
+                                            </Grid>
                                             <Grid size={{ xs: 12, sm: 6 }}>
                                                 <TextField label="Brand" fullWidth size="small" value={g.brand}
                                                     onChange={(e) => updatePostForPatronGown(g.localId, { brand: e.target.value })} />
