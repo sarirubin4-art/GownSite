@@ -50,5 +50,47 @@ namespace GownSite.Web.Services
 
             return new PromoResolveResult { Success = true, ResolvedFee = fee, DurationMonths = promo.DurationMonths };
         }
+
+        public class PricingResolveResult
+        {
+            public bool Success { get; set; }
+            public string Error { get; set; }
+            public int? PromoCodeId { get; set; }
+            public decimal? MonthlyFeeOverride { get; set; }
+            public int? PromoDurationMonths { get; set; }
+        }
+
+        // Shared by every gown-creation entry point (owner's own posting form, bulk
+        // posting, concierge intake, and admin's Post for Patron) so a promo code or a
+        // batch's volume-tiered rate resolves identically no matter how the gown was
+        // posted. A promo code takes priority; with no code, a gown that's part of a
+        // batch (BatchId set) falls back to the volume-tiered per-gown rate.
+        public static PricingResolveResult ResolvePricing(string connectionString, string promoCode, decimal baseFee, bool hasBatchId, int batchSize)
+        {
+            if (!string.IsNullOrWhiteSpace(promoCode))
+            {
+                var promoRepo = new PromoCodeRepository(connectionString);
+                var promo = promoRepo.GetByCode(promoCode);
+                var resolved = Resolve(promo, baseFee, batchSize);
+                if (!resolved.Success)
+                    return new PricingResolveResult { Success = false, Error = resolved.Error };
+
+                return new PricingResolveResult
+                {
+                    Success = true,
+                    PromoCodeId = promo.Id,
+                    MonthlyFeeOverride = resolved.ResolvedFee,
+                    PromoDurationMonths = resolved.DurationMonths
+                };
+            }
+
+            if (hasBatchId)
+            {
+                var tierFee = VolumeTiers.First(t => batchSize >= t.MinQuantity).PricePerGown;
+                return new PricingResolveResult { Success = true, MonthlyFeeOverride = tierFee };
+            }
+
+            return new PricingResolveResult { Success = true };
+        }
     }
 }

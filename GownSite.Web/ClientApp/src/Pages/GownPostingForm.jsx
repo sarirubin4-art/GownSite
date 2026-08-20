@@ -317,6 +317,7 @@ const GownPostingForm = () => {
                         <TextField
                             label="Promo Code" value={form.promoCode} onChange={onChange('promoCode')}
                             fullWidth placeholder="Have a code? Enter it here"
+                            helperText="Add it here before checking out — it can't easily be applied after."
                         />
                     </Grid>
                 </Grid>

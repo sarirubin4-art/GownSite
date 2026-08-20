@@ -173,7 +173,10 @@ const AdPostingForm = () => {
                         <TextField label="Website/Contact Link (optional)" value={form.targetUrl} onChange={onChange('targetUrl')} fullWidth />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                        <TextField label="Promo Code (optional)" value={form.promoCode} onChange={onChange('promoCode')} fullWidth />
+                        <TextField
+                            label="Promo Code (optional)" value={form.promoCode} onChange={onChange('promoCode')} fullWidth
+                            helperText="Add it here before checking out — it can't easily be applied after."
+                        />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                         <Button variant="outlined" component="label" fullWidth sx={{ py: 1.5 }}>

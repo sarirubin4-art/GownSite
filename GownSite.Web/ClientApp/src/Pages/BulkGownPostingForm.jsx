@@ -292,6 +292,7 @@ const BulkGownPostingForm = () => {
                         <TextField
                             label="Promo Code" value={shared.promoCode} onChange={(e) => setShared({ ...shared, promoCode: e.target.value })}
                             fullWidth placeholder="Have a code? Enter it here"
+                            helperText="Add it here before checking out — it can't easily be applied after."
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }} sx={{ display: 'flex', alignItems: 'center' }}>

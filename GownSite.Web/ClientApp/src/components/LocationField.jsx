@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import { TextField, MenuItem, Stack } from '@mui/material';
 import { LOCATION_PRESETS } from '../constants/gownOptions';
 
@@ -6,9 +7,19 @@ const OTHER_VALUE = '__other__';
 
 // A closed dropdown of common Jewish-community locations plus "Other," which reveals a
 // blank text field for anything else — replaces free typing so listings don't end up
-// with inconsistent variants of the same place (e.g. "Brooklyn" vs "Brooklyn, NY").
+// with inconsistent variants of the same place (e.g. "Brooklyn" vs "Brooklyn, NY"). Also
+// pulls in every location anyone has already typed into "Other" on a real listing, so a
+// custom location only ever needs to be typed once — everyone after that just picks it.
 const LocationField = ({ value, onChange, label = 'Location (city/area)', size }) => {
-    const isPreset = LOCATION_PRESETS.includes(value);
+    const [options, setOptions] = useState(LOCATION_PRESETS);
+
+    useEffect(() => {
+        axios.get('/api/gown/locations').then(({ data }) => {
+            setOptions((prev) => Array.from(new Set([...LOCATION_PRESETS, ...data])).sort());
+        }).catch(() => {});
+    }, []);
+
+    const isPreset = options.includes(value);
     const [otherActive, setOtherActive] = useState(!isPreset && !!value);
 
     // Reflects a value set from outside (loading an existing listing, resuming a draft,
@@ -37,7 +48,7 @@ const LocationField = ({ value, onChange, label = 'Location (city/area)', size }
                     }
                 }}
             >
-                {LOCATION_PRESETS.map((loc) => <MenuItem key={loc} value={loc}>{loc}</MenuItem>)}
+                {options.map((loc) => <MenuItem key={loc} value={loc}>{loc}</MenuItem>)}
                 <MenuItem value={OTHER_VALUE}>Other</MenuItem>
             </TextField>
             {otherActive && (

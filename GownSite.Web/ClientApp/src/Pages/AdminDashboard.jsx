@@ -39,7 +39,7 @@ const BUSINESS_PLAN_PRESETS = [
     { label: 'Pro — $75/150', monthlyFee: 75, gownAllowance: 150 }
 ];
 
-const emptyPostForPatronShared = { location: '', listingType: 'Rent', displayOwnerName: false, finalize: false, hourlyFeeUsd: '' };
+const emptyPostForPatronShared = { location: '', listingType: 'Rent', displayOwnerName: false, finalize: false, hourlyFeeUsd: '', promoCode: '' };
 
 const makePostForPatronGown = () => ({
     localId: crypto.randomUUID(),
@@ -738,6 +738,8 @@ const AdminDashboard = () => {
                 g.morePictures.forEach((file) => data.append('MorePictures', file));
                 data.append('Finalize', postForPatronShared.finalize);
                 data.append('BatchId', postForPatronBatchId);
+                data.append('BatchSize', postForPatronGowns.length);
+                if (postForPatronShared.promoCode.trim()) data.append('PromoCode', postForPatronShared.promoCode.trim());
                 // The visit's hourly total lands on just the first gown, not every gown —
                 // it's a lump sum for the whole session, not a per-gown charge.
                 if (i === 0 && postForPatronShared.hourlyFeeUsd) data.append('OneTimeFeeUsd', postForPatronShared.hourlyFeeUsd);
@@ -1411,10 +1413,18 @@ const AdminDashboard = () => {
                                         helperText="Charged once, on the first gown of this session — not per gown."
                                     />
                                 </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                        label="Promo Code (optional)" fullWidth
+                                        value={postForPatronShared.promoCode}
+                                        onChange={(e) => setPostForPatronShared({ ...postForPatronShared, promoCode: e.target.value })}
+                                        helperText="Add it here before saving — it can't easily be applied after checkout."
+                                    />
+                                </Grid>
                             </Grid>
-                            {postForPatronShared.hourlyFeeUsd && postForPatronShared.finalize && (
+                            {(postForPatronShared.hourlyFeeUsd || postForPatronShared.promoCode) && postForPatronShared.finalize && (
                                 <Alert severity="warning">
-                                    Publishing immediately skips Stripe entirely — the hourly fee won't be charged. Uncheck "Finalize now" if you need to collect it.
+                                    Publishing immediately skips Stripe entirely — the hourly fee and promo code won't be applied. Uncheck "Finalize now" if you need either to take effect.
                                 </Alert>
                             )}
                             <FormControlLabel

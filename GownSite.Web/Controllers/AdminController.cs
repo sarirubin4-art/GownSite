@@ -66,7 +66,12 @@ namespace GownSite.Web.Controllers
         // is excluded from ApproveGown's automatic solo setup fee). OneTimeFeeUsd is the
         // on-site visit's hourly charge, applied to just the first gown of the session.
         public Guid? BatchId { get; set; }
+        public int? BatchSize { get; set; }
         public decimal? OneTimeFeeUsd { get; set; }
+
+        // Only meaningful when Finalize is false — a comped listing has no Stripe
+        // subscription for a promo to discount.
+        public string PromoCode { get; set; }
     }
 
     public class ConciergeFeeEntry
@@ -604,6 +609,16 @@ namespace GownSite.Web.Controllers
                     return BadRequest(new { message = "A primary picture is required to publish immediately." });
             }
 
+            // Finalize comps the listing live with no Stripe subscription at all, so a
+            // promo/volume rate would have nothing to apply to — only resolve one otherwise.
+            var pricing = request.Finalize
+                ? new PromoCodeCalculator.PricingResolveResult { Success = true }
+                : PromoCodeCalculator.ResolvePricing(
+                    _connectionString, request.PromoCode, _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m),
+                    request.BatchId.HasValue, request.BatchSize ?? 1);
+            if (!pricing.Success)
+                return BadRequest(new { message = pricing.Error });
+
             string primaryUrl = null;
             if (request.PrimaryPicture != null)
                 primaryUrl = await _storage.SaveAsync(request.PrimaryPicture, "gowns");
@@ -627,7 +642,10 @@ namespace GownSite.Web.Controllers
                 Notes = request.Notes,
                 PrimaryPictureUrl = primaryUrl,
                 BatchId = request.BatchId,
-                OneTimeFeeUsd = request.OneTimeFeeUsd
+                OneTimeFeeUsd = request.OneTimeFeeUsd,
+                PromoCodeId = pricing.PromoCodeId,
+                MonthlyFeeOverride = pricing.MonthlyFeeOverride,
+                PromoDurationMonths = pricing.PromoDurationMonths
             };
             var id = repo.Create(posting);
 

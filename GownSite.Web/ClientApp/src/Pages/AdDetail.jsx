@@ -30,7 +30,7 @@ const AdDetail = () => {
                     <Box component="img" src={ad.imageUrl} alt={ad.title} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 </Box>
             )}
-            <Typography variant="body1" sx={{ mb: 4 }}>{ad.description}</Typography>
+            <Typography variant="body1" sx={{ mb: 4, whiteSpace: 'pre-line' }}>{ad.description}</Typography>
             {ad.targetUrl && (
                 <Button variant="contained" size="large" href={ad.targetUrl} target="_blank" rel="noopener noreferrer">
                     Learn More

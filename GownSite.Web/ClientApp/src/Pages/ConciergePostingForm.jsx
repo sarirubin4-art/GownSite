@@ -58,6 +58,7 @@ const ConciergePostingForm = () => {
 
     const [gowns, setGowns] = useState([makeEmptyGown()]);
     const [restoredDraft, setRestoredDraft] = useState(false);
+    const [promoCode, setPromoCode] = useState('');
 
     useEffect(() => {
         if (!loading && !owner) {
@@ -169,6 +170,8 @@ const ConciergePostingForm = () => {
                 data.append('StyleTags', g.styleTags.join(','));
                 data.append('Notes', g.notes);
                 data.append('BatchId', batchId);
+                data.append('BatchSize', gowns.length);
+                if (promoCode.trim()) data.append('PromoCode', promoCode.trim());
                 data.append('PrimaryPicture', g.primaryPicture);
 
                 const { data: result } = await axios.post('/api/gown/concierge-intake', data, {
@@ -364,6 +367,12 @@ const ConciergePostingForm = () => {
             >
                 Add Another Gown {gowns.length >= MAX_BATCH_GOWNS ? `(max ${MAX_BATCH_GOWNS})` : ''}
             </Button>
+
+            <TextField
+                label="Promo Code (optional)" value={promoCode} onChange={(e) => setPromoCode(e.target.value)}
+                fullWidth sx={{ mb: 1 }}
+                helperText="Add any promo code here before submitting — it can't easily be applied after checkout."
+            />
 
             <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
                 <Button

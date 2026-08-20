@@ -100,6 +100,8 @@ namespace GownSite.Web.Controllers
         public string StyleTags { get; set; }
         public string Notes { get; set; }
         public Guid BatchId { get; set; }
+        public int? BatchSize { get; set; }
+        public string PromoCode { get; set; }
         public IFormFile PrimaryPicture { get; set; }
     }
 
@@ -185,29 +187,15 @@ namespace GownSite.Web.Controllers
             if (request.MorePictures?.Count > MaxMorePictures)
                 return BadRequest(new { message = $"You can upload up to {MaxMorePictures} additional photos." });
 
-            int? promoCodeId = null;
-            decimal? monthlyFeeOverride = null;
-            int? promoDurationMonths = null;
-            if (!string.IsNullOrWhiteSpace(request.PromoCode))
-            {
-                var promoRepo = new PromoCodeRepository(_connectionString);
-                var promo = promoRepo.GetByCode(request.PromoCode);
-                var baseFee = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m);
-                var resolved = PromoCodeCalculator.Resolve(promo, baseFee, request.BatchSize ?? 1);
-                if (!resolved.Success)
-                    return BadRequest(new { message = resolved.Error });
+            var pricing = PromoCodeCalculator.ResolvePricing(
+                _connectionString, request.PromoCode, _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m),
+                request.BatchId.HasValue, request.BatchSize ?? 1);
+            if (!pricing.Success)
+                return BadRequest(new { message = pricing.Error });
 
-                promoCodeId = promo.Id;
-                monthlyFeeOverride = resolved.ResolvedFee;
-                promoDurationMonths = resolved.DurationMonths;
-            }
-            else if (request.BatchId.HasValue)
-            {
-                // Bulk posts (2+ gowns in one batch) get the volume-tiered per-gown rate
-                // automatically — no promo code needed, matching every other gown in the batch.
-                var quantity = request.BatchSize ?? 1;
-                monthlyFeeOverride = PromoCodeCalculator.VolumeTiers.First(t => quantity >= t.MinQuantity).PricePerGown;
-            }
+            var promoCodeId = pricing.PromoCodeId;
+            var monthlyFeeOverride = pricing.MonthlyFeeOverride;
+            var promoDurationMonths = pricing.PromoDurationMonths;
 
             var primaryUrl = request.PrimaryPicture != null
                 ? await _storage.SaveAsync(request.PrimaryPicture, "gowns")
@@ -442,6 +430,12 @@ namespace GownSite.Web.Controllers
             if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType)) return BadRequest(new { message = "Rent or sale is required." });
             if (request.BatchId == Guid.Empty) return BadRequest(new { message = "Missing batch identifier." });
 
+            var pricing = PromoCodeCalculator.ResolvePricing(
+                _connectionString, request.PromoCode, _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m),
+                true, request.BatchSize ?? 1);
+            if (!pricing.Success)
+                return BadRequest(new { message = pricing.Error });
+
             var repo = new GownRepository(_connectionString);
             var primaryUrl = await _storage.SaveAsync(request.PrimaryPicture, "gowns");
 
@@ -463,7 +457,10 @@ namespace GownSite.Web.Controllers
                 Notes = request.Notes,
                 PrimaryPictureUrl = primaryUrl,
                 BatchId = request.BatchId,
-                NeedsConciergeDraft = true
+                NeedsConciergeDraft = true,
+                PromoCodeId = pricing.PromoCodeId,
+                MonthlyFeeOverride = pricing.MonthlyFeeOverride,
+                PromoDurationMonths = pricing.PromoDurationMonths
             };
             var id = repo.Create(posting);
             return Ok(new { id });

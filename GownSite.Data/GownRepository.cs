@@ -75,6 +75,7 @@ namespace GownSite.Data
         {
             using var context = new GownDataContext(_connectionString);
             return context.Gowns
+                .Where(g => g.ModerationStatus != ModerationStatus.Rejected && g.ModerationStatus != ModerationStatus.Removed)
                 .Select(g => g.Location)
                 .Where(l => !string.IsNullOrEmpty(l))
                 .Distinct()

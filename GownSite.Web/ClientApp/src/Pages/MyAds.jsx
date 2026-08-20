@@ -129,7 +129,7 @@ const MyAds = () => {
                                     <Typography variant="body2" color="text.secondary">{adCategoryLabel(a.category)}</Typography>
                                 </Stack>
                                 <Typography variant="h6">{a.title}</Typography>
-                                <Typography variant="body2" color="text.secondary">{a.description}</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>{a.description}</Typography>
                                 {(a.moderationStatus === 'Rejected' || a.moderationStatus === 'Removed') && a.rejectionReason && (
                                     <Typography variant="body2" color="error.main" sx={{ mt: 1 }}>
                                         Reason: {a.rejectionReason}
