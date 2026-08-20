@@ -240,7 +240,7 @@ const GownPostingForm = () => {
                             options={COLOR_OPTIONS}
                             value={form.colors}
                             onChange={(e, value) => { markDirty(); setForm({ ...form, colors: value }); }}
-                            renderInput={(params) => <TextField {...params} label="Color(s)" />}
+                            renderInput={(params) => <TextField {...params} label="Color(s)" helperText="Choose all that apply." />}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 4 }}>

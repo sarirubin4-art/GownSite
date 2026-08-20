@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import {
     Typography, Paper, Grid, Autocomplete, TextField, Card, CardActionArea,
     CardMedia, CardContent, Box, Chip, Snackbar, Alert, Button, Stack,
-    Dialog, DialogTitle, DialogContent, DialogActions
+    Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress
 } from '@mui/material';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, styleLabel } from '../constants/gownOptions';
 import { useAdLane } from '../context/AdLaneContext';
@@ -40,6 +40,7 @@ const SearchGowns = () => {
     const fullScreen = useFullScreenDialog();
     const [filters, setFilters] = useState(emptyFilters);
     const [results, setResults] = useState([]);
+    const [searching, setSearching] = useState(true);
     const [locationOptions, setLocationOptions] = useState([]);
     const [showPostedNotice, setShowPostedNotice] = useState(!!routerLocation.state?.posted);
     const [notifyOpen, setNotifyOpen] = useState(false);
@@ -49,7 +50,11 @@ const SearchGowns = () => {
     const [notifySubmitting, setNotifySubmitting] = useState(false);
     const [showNotifySuccess, setShowNotifySuccess] = useState(false);
 
+    const searchSeq = useRef(0);
+
     const runSearch = async (f) => {
+        const seq = ++searchSeq.current;
+        setSearching(true);
         const body = {
             colors: f.colors,
             sizes: f.sizes,
@@ -59,9 +64,14 @@ const SearchGowns = () => {
             minPrice: f.minPrice === '' ? null : Number(f.minPrice),
             maxPrice: f.maxPrice === '' ? null : Number(f.maxPrice)
         };
-        const { data } = await axios.post('/api/gown/search', body);
-        setResults(data);
-        setLocationOptions((prev) => Array.from(new Set([...prev, ...data.map(g => g.location)])).sort());
+        try {
+            const { data } = await axios.post('/api/gown/search', body);
+            if (seq !== searchSeq.current) return; // a newer search already started; ignore this stale response
+            setResults(data);
+            setLocationOptions((prev) => Array.from(new Set([...prev, ...data.map(g => g.location)])).sort());
+        } finally {
+            if (seq === searchSeq.current) setSearching(false);
+        }
     };
 
     useEffect(() => {
@@ -174,10 +184,14 @@ const SearchGowns = () => {
                 </Grid>
             </Paper>
 
-            {results.length === 0 ? (
+            {searching && results.length === 0 ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                    <CircularProgress />
+                </Box>
+            ) : results.length === 0 ? (
                 <Typography color="text.secondary">No gowns match your search yet. Try adjusting the filters.</Typography>
             ) : (
-                <Grid container spacing={3}>
+                <Grid container spacing={3} sx={{ opacity: searching ? 0.6 : 1, transition: 'opacity 0.2s' }}>
                     {results.map((gown) => (
                         <Grid key={gown.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
                             <Card sx={{ position: 'relative' }}>

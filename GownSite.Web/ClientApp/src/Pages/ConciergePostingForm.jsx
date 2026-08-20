@@ -14,6 +14,17 @@ import { useAuth } from '../context/AuthContext';
 import LocationField from '../components/LocationField';
 
 const MAX_BATCH_GOWNS = 20;
+const DRAFT_KEY = 'regowned_concierge_posting_draft';
+
+// Photos (File objects) can't survive localStorage — only text fields are saved,
+// so a restored gown always needs its photo re-attached before it can submit.
+const stripPhotos = (g) => {
+    const { primaryPicture, primaryPreview, ...rest } = g;
+    return rest;
+};
+
+const hasDraftContent = (gowns) =>
+    gowns.some((g) => g.description || g.colors.length || g.sizes.length || g.price || g.location || g.listingType);
 
 const makeEmptyGown = () => ({
     localId: crypto.randomUUID(),
@@ -46,12 +57,47 @@ const ConciergePostingForm = () => {
     const [done, setDone] = useState(false);
 
     const [gowns, setGowns] = useState([makeEmptyGown()]);
+    const [restoredDraft, setRestoredDraft] = useState(false);
 
     useEffect(() => {
         if (!loading && !owner) {
             navigate('/login?redirect=/concierge/terms');
         }
     }, [loading, owner]);
+
+    // Restore an in-progress draft (text fields only — photos can't be persisted)
+    // left over from a crash or accidental navigation away.
+    useEffect(() => {
+        const saved = localStorage.getItem(DRAFT_KEY);
+        if (!saved) return;
+        try {
+            const parsed = JSON.parse(saved);
+            if (!hasDraftContent(parsed)) return;
+            setGowns(parsed.map((g) => ({ ...g, primaryPicture: null, primaryPreview: null })));
+            setRestoredDraft(true);
+        } catch {
+            localStorage.removeItem(DRAFT_KEY);
+        }
+    }, []);
+
+    // Debounce-save the text fields of every gown so a crash or accidental tab close
+    // doesn't lose a half-filled batch. Photos are intentionally excluded (see stripPhotos).
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (hasDraftContent(gowns)) {
+                localStorage.setItem(DRAFT_KEY, JSON.stringify(gowns.map(stripPhotos)));
+            } else {
+                localStorage.removeItem(DRAFT_KEY);
+            }
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [gowns]);
+
+    const discardDraft = () => {
+        localStorage.removeItem(DRAFT_KEY);
+        setGowns([makeEmptyGown()]);
+        setRestoredDraft(false);
+    };
 
     const updateGown = (localId, patch) => {
         setGowns((prev) => prev.map((g) => (g.localId === localId ? { ...g, ...patch } : g)));
@@ -140,6 +186,7 @@ const ConciergePostingForm = () => {
         }
 
         await axios.post('/api/gown/concierge-intake/notify', { batchId });
+        localStorage.removeItem(DRAFT_KEY);
         setSubmitting(false);
         setDone(true);
     };
@@ -165,6 +212,12 @@ const ConciergePostingForm = () => {
                 Just the essentials for each gown — a photo, size, price, location, and rent or sale. Everything else is optional;
                 we'll fill in the rest.
             </Typography>
+            {restoredDraft && (
+                <Alert severity="info" sx={{ mb: 2 }} onClose={() => setRestoredDraft(false)}>
+                    We restored your unsaved draft from earlier. Photos couldn't be saved, so please re-attach one for each gown.
+                    {' '}<Button size="small" onClick={discardDraft}>Discard draft &amp; start fresh</Button>
+                </Alert>
+            )}
             {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
                     {error}
@@ -264,7 +317,7 @@ const ConciergePostingForm = () => {
                                     options={COLOR_OPTIONS}
                                     value={g.colors}
                                     onChange={(e, value) => updateGown(g.localId, { colors: value })}
-                                    renderInput={(params) => <TextField {...params} label="Color(s)" size="small" />}
+                                    renderInput={(params) => <TextField {...params} label="Color(s)" size="small" helperText="Choose all that apply." />}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>

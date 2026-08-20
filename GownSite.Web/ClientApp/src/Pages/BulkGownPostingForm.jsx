@@ -15,6 +15,17 @@ import LocationField from '../components/LocationField';
 
 const MAX_MORE_PICTURES = 5;
 const MAX_BATCH_GOWNS = 20;
+const DRAFT_KEY = 'regowned_bulk_posting_draft';
+
+// Photos (File objects) can't survive localStorage — only text fields are saved,
+// so a restored gown always needs its photo(s) re-attached before it can submit.
+const stripPhotos = (g) => {
+    const { primaryPicture, primaryPreview, morePictures, morePicturesError, ...rest } = g;
+    return rest;
+};
+
+const hasDraftContent = (gowns, shared) =>
+    !!shared.location || gowns.some((g) => g.description || g.colors.length || g.sizes.length || g.price);
 
 const makeEmptyGown = () => ({
     localId: crypto.randomUUID(),
@@ -53,12 +64,49 @@ const BulkGownPostingForm = () => {
     });
 
     const [gowns, setGowns] = useState([makeEmptyGown()]);
+    const [restoredDraft, setRestoredDraft] = useState(false);
 
     useEffect(() => {
         if (!loading && !owner) {
             navigate('/login?redirect=/postagown/terms');
         }
     }, [loading, owner]);
+
+    // Restore an in-progress draft (text fields only — photos can't be persisted)
+    // left over from a crash or accidental navigation away.
+    useEffect(() => {
+        const saved = localStorage.getItem(DRAFT_KEY);
+        if (!saved) return;
+        try {
+            const parsed = JSON.parse(saved);
+            if (!hasDraftContent(parsed.gowns, parsed.shared)) return;
+            setGowns(parsed.gowns.map((g) => ({ ...g, primaryPicture: null, primaryPreview: null, morePictures: [], morePicturesError: '' })));
+            setShared(parsed.shared);
+            setRestoredDraft(true);
+        } catch {
+            localStorage.removeItem(DRAFT_KEY);
+        }
+    }, []);
+
+    // Debounce-save the text fields of every gown so a crash or accidental tab close
+    // doesn't lose a half-filled batch. Photos are intentionally excluded (see stripPhotos).
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (hasDraftContent(gowns, shared)) {
+                localStorage.setItem(DRAFT_KEY, JSON.stringify({ gowns: gowns.map(stripPhotos), shared }));
+            } else {
+                localStorage.removeItem(DRAFT_KEY);
+            }
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [gowns, shared]);
+
+    const discardDraft = () => {
+        localStorage.removeItem(DRAFT_KEY);
+        setGowns([makeEmptyGown()]);
+        setShared({ location: '', listingType: 'Rent', displayOwnerName: false, promoCode: '' });
+        setRestoredDraft(false);
+    };
 
     const updateGown = (localId, patch) => {
         setGowns((prev) => prev.map((g) => (g.localId === localId ? { ...g, ...patch } : g)));
@@ -164,6 +212,8 @@ const BulkGownPostingForm = () => {
             }
         }
 
+        localStorage.removeItem(DRAFT_KEY);
+
         if (owner.isBusinessAccount) {
             if (!owner.businessBillingComplete) {
                 setSubmitting(false);
@@ -181,6 +231,7 @@ const BulkGownPostingForm = () => {
     };
 
     const onContinueWithSaved = async () => {
+        localStorage.removeItem(DRAFT_KEY);
         if (owner.isBusinessAccount) {
             if (!owner.businessBillingComplete) {
                 navigate('/business/billing-setup');
@@ -201,6 +252,12 @@ const BulkGownPostingForm = () => {
             <Typography color="text.secondary" sx={{ mb: 3 }}>
                 Fill in each gown below, then go through one card setup for the whole batch — no need to check out separately for every listing.
             </Typography>
+            {restoredDraft && (
+                <Alert severity="info" sx={{ mb: 2 }} onClose={() => setRestoredDraft(false)}>
+                    We restored your unsaved draft from earlier. Photos couldn't be saved, so please re-attach one for each gown.
+                    {' '}<Button size="small" onClick={discardDraft}>Discard draft &amp; start fresh</Button>
+                </Alert>
+            )}
             {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
                     {error}
@@ -293,7 +350,7 @@ const BulkGownPostingForm = () => {
                                     options={COLOR_OPTIONS}
                                     value={g.colors}
                                     onChange={(e, value) => updateGown(g.localId, { colors: value })}
-                                    renderInput={(params) => <TextField {...params} label="Color(s)" />}
+                                    renderInput={(params) => <TextField {...params} label="Color(s)" helperText="Choose all that apply." />}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 4 }}>

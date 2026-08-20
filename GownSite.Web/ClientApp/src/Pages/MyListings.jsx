@@ -309,7 +309,7 @@ const MyListings = () => {
                                     options={COLOR_OPTIONS}
                                     value={editTarget.colors}
                                     onChange={(e, value) => setEditTarget({ ...editTarget, colors: value })}
-                                    renderInput={(params) => <TextField {...params} label="Color(s)" />}
+                                    renderInput={(params) => <TextField {...params} label="Color(s)" helperText="Choose all that apply." />}
                                 />
                                 <Autocomplete
                                     multiple
