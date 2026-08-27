@@ -8,7 +8,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CloseIcon from '@mui/icons-material/Close';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
-import { styleLabel } from '../constants/gownOptions';
+import { styleLabel, formatPriceRange } from '../constants/gownOptions';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import usePageTitle from '../hooks/usePageTitle';
 import { useAdLane } from '../context/AdLaneContext';
@@ -141,7 +141,7 @@ const ViewGown = () => {
                         <Chip label={gown.listingType === 'Rent' ? 'For Rent' : 'For Sale'} color="primary" />
                         {gown.isSold && <Chip label="SOLD" color="secondary" sx={{ fontWeight: 700, letterSpacing: 1 }} />}
                     </Stack>
-                    <Typography variant="h4" gutterBottom>${gown.price}</Typography>
+                    <Typography variant="h4" gutterBottom>{formatPriceRange(gown.price, gown.priceMax)}</Typography>
                     <Typography variant="body1" sx={{ mb: 2 }}>{gown.description}</Typography>
 
                     <Stack spacing={0.75} sx={{ mb: 2 }}>

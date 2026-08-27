@@ -14,8 +14,9 @@ import AddIcon from '@mui/icons-material/Add';
 import { useAuth } from '../context/AuthContext';
 import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
-import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS } from '../constants/gownOptions';
+import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, formatPriceRange } from '../constants/gownOptions';
 import LocationField from '../components/LocationField';
+import PriceField from '../components/PriceField';
 import MorePicturesInput from '../components/MorePicturesInput';
 
 const MAX_POST_FOR_PATRON_GOWNS = 20;
@@ -43,7 +44,7 @@ const emptyPostForPatronShared = { location: '', listingType: 'Rent', displayOwn
 
 const makePostForPatronGown = () => ({
     localId: crypto.randomUUID(),
-    description: '', colors: [], sizes: [], price: '',
+    description: '', colors: [], sizes: [], price: '', priceMax: '',
     brand: '', pricePaid: '', condition: '', length: '', styleTags: [], notes: '',
     primaryPicture: null, primaryPreview: null,
     morePictures: []
@@ -82,7 +83,7 @@ const ItemDetailDialog = ({ item, type, onClose, fullScreen }) => (
                 {type === 'gown' ? (
                     <>
                         <DetailRow label="Description" value={item.description} />
-                        <DetailRow label="Price" value={`$${item.price}`} />
+                        <DetailRow label="Price" value={formatPriceRange(item.price, item.priceMax)} />
                         <DetailRow label="Rent/Sale" value={item.listingType} />
                         <DetailRow label="Color(s)" value={(item.color || '').split(',').join(', ')} />
                         <DetailRow label="Size(s)" value={(item.size || '').split(',').join(', ')} />
@@ -517,7 +518,7 @@ const AdminDashboard = () => {
 
     const onEditGownClick = (g) => setEditGownTarget({
         id: g.id, description: g.description, colors: (g.color || '').split(',').filter(Boolean), sizes: (g.size || '').split(',').filter(Boolean),
-        price: g.price, location: g.location, listingType: g.listingType,
+        price: g.price, priceMax: g.priceMax || '', location: g.location, listingType: g.listingType,
         displayOwnerName: g.displayOwnerName, brand: g.brand || '', pricePaid: g.pricePaid || '',
         condition: g.condition || '', length: g.length || '',
         styleTags: (g.styleTags || '').split(',').filter(Boolean), notes: g.notes || '',
@@ -553,12 +554,17 @@ const AdminDashboard = () => {
 
     const onSaveEditGown = async () => {
         setEditGownError('');
+        if (editGownTarget.priceMax !== '' && Number(editGownTarget.priceMax) <= Number(editGownTarget.price)) {
+            setEditGownError('The high end of the price range must be more than the low end.');
+            return;
+        }
         const data = new FormData();
         data.append('Id', editGownTarget.id);
         data.append('Description', editGownTarget.description);
         data.append('Color', editGownTarget.colors.join(','));
         data.append('Size', editGownTarget.sizes.join(','));
         data.append('Price', Number(editGownTarget.price));
+        if (editGownTarget.priceMax !== '') data.append('PriceMax', Number(editGownTarget.priceMax));
         data.append('Location', editGownTarget.location);
         data.append('ListingType', editGownTarget.listingType);
         data.append('DisplayOwnerName', editGownTarget.displayOwnerName);
@@ -698,6 +704,10 @@ const AdminDashboard = () => {
                 setPostForPatronError(`Gown ${i + 1}: please add at least a description.`);
                 return;
             }
+            if (g.priceMax !== '' && Number(g.priceMax) <= Number(g.price)) {
+                setPostForPatronError(`Gown ${i + 1}: the high end of the price range must be more than the low end.`);
+                return;
+            }
             if (postForPatronShared.finalize) {
                 if (g.colors.length === 0 || g.sizes.length === 0 || !g.price || !postForPatronShared.location.trim()) {
                     setPostForPatronError(`Gown ${i + 1}: color, size, price, and location are required to publish immediately.`);
@@ -725,6 +735,7 @@ const AdminDashboard = () => {
                 data.append('Color', g.colors.join(','));
                 data.append('Size', g.sizes.join(','));
                 if (g.price !== '') data.append('Price', g.price);
+                if (g.priceMax !== '') data.append('PriceMax', g.priceMax);
                 data.append('Location', postForPatronShared.location);
                 data.append('ListingType', postForPatronShared.listingType);
                 data.append('DisplayOwnerName', postForPatronShared.displayOwnerName);
@@ -1102,7 +1113,7 @@ const AdminDashboard = () => {
                                                     <Stack direction="row" spacing={1.5} sx={{ mb: 1 }}>
                                                         <Box component="img" src={g.primaryPictureUrl} alt="" sx={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }} />
                                                         <Box>
-                                                            <Typography variant="body2">{g.size ? `Size ${g.size}` : 'No size'} &middot; ${g.price}</Typography>
+                                                            <Typography variant="body2">{g.size ? `Size ${g.size}` : 'No size'} &middot; {formatPriceRange(g.price, g.priceMax)}</Typography>
                                                             <Typography variant="caption" color="text.secondary">{g.location}</Typography>
                                                         </Box>
                                                     </Stack>
@@ -1234,9 +1245,12 @@ const AdminDashboard = () => {
                                     renderInput={(params) => <TextField {...params} label="Size(s)" />}
                                 />
                             </Stack>
-                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                                <TextField label="Price" type="number" fullWidth value={editGownTarget.price}
-                                    onChange={(e) => setEditGownTarget({ ...editGownTarget, price: e.target.value })} />
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="flex-start">
+                                <PriceField
+                                    price={editGownTarget.price} priceMax={editGownTarget.priceMax}
+                                    onPriceChange={(v) => setEditGownTarget({ ...editGownTarget, price: v })}
+                                    onPriceMaxChange={(v) => setEditGownTarget({ ...editGownTarget, priceMax: v })}
+                                />
                                 <TextField select label="Rent/Sale" fullWidth value={editGownTarget.listingType}
                                     onChange={(e) => setEditGownTarget({ ...editGownTarget, listingType: e.target.value })}>
                                     {LISTING_TYPE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
@@ -1489,10 +1503,10 @@ const AdminDashboard = () => {
                                                 />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
-                                                <TextField
-                                                    label="Price" type="number" fullWidth value={g.price}
-                                                    onChange={(e) => updatePostForPatronGown(g.localId, { price: e.target.value })}
-                                                    slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+                                                <PriceField
+                                                    size="small" price={g.price} priceMax={g.priceMax}
+                                                    onPriceChange={(v) => updatePostForPatronGown(g.localId, { price: v })}
+                                                    onPriceMaxChange={(v) => updatePostForPatronGown(g.localId, { priceMax: v })}
                                                 />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 6 }}>

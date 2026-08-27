@@ -37,8 +37,10 @@ namespace GownSite.Data
                 query = query.Where(g => filters.Locations.Contains(g.Location));
             if (filters.ListingTypes.Count > 0)
                 query = query.Where(g => filters.ListingTypes.Contains(g.ListingType));
+            // A range-priced gown (PriceMax set) matches a price filter if the two ranges
+            // overlap at all, not just if its low end falls inside the filter window.
             if (filters.MinPrice.HasValue)
-                query = query.Where(g => g.Price >= filters.MinPrice.Value);
+                query = query.Where(g => (g.PriceMax ?? g.Price) >= filters.MinPrice.Value);
             if (filters.MaxPrice.HasValue)
                 query = query.Where(g => g.Price <= filters.MaxPrice.Value);
 
@@ -130,6 +132,7 @@ namespace GownSite.Data
             existing.Color = posting.Color;
             existing.Size = posting.Size;
             existing.Price = posting.Price;
+            existing.PriceMax = posting.PriceMax;
             existing.Location = posting.Location;
             existing.ListingType = posting.ListingType;
             existing.DisplayOwnerName = posting.DisplayOwnerName;

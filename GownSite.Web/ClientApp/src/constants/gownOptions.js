@@ -51,5 +51,8 @@ export const formatUsd = (n) => {
     return `$${num % 1 === 0 ? num : num.toFixed(2)}`;
 };
 
+export const formatPriceRange = (price, priceMax) =>
+    priceMax ? `${formatUsd(price)} - ${formatUsd(priceMax)}` : formatUsd(price);
+
 export const styleLabel = (value) => STYLE_OPTIONS.find(s => s.value === value)?.label || value;
 export const adCategoryLabel = (value) => AD_CATEGORY_OPTIONS.find(c => c.value === value)?.label || value;

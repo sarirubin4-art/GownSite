@@ -62,6 +62,9 @@ namespace GownSite.Data
         public string Color { get; set; }
         public string Size { get; set; }
         public decimal Price { get; set; }
+        // Set only when the owner hasn't settled on an exact price yet — Price is then
+        // the low end of the range and PriceMax the high end, e.g. "$100 - $150".
+        public decimal? PriceMax { get; set; }
         public string Location { get; set; }
         public string PrimaryPictureUrl { get; set; }
         public ListingType ListingType { get; set; }

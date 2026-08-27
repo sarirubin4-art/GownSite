@@ -12,6 +12,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import LocationField from '../components/LocationField';
+import PriceField from '../components/PriceField';
 import MorePicturesInput from '../components/MorePicturesInput';
 
 const MAX_BATCH_GOWNS = 20;
@@ -33,6 +34,7 @@ const makeEmptyGown = () => ({
     colors: [],
     sizes: [],
     price: '',
+    priceMax: '',
     brand: '',
     pricePaid: '',
     condition: '',
@@ -147,6 +149,9 @@ const BulkGownPostingForm = () => {
             if (!g.description || g.colors.length === 0 || g.sizes.length === 0 || !g.price) {
                 return `Gown ${i + 1}: please fill in description, color, size, and price.`;
             }
+            if (g.priceMax !== '' && Number(g.priceMax) <= Number(g.price)) {
+                return `Gown ${i + 1}: the high end of the price range must be more than the low end.`;
+            }
             if (!g.primaryPicture) {
                 return `Gown ${i + 1}: please add a primary picture.`;
             }
@@ -174,6 +179,7 @@ const BulkGownPostingForm = () => {
                 data.append('Color', g.colors.join(','));
                 data.append('Size', g.sizes.join(','));
                 data.append('Price', g.price);
+                if (g.priceMax !== '') data.append('PriceMax', g.priceMax);
                 data.append('Location', shared.location);
                 data.append('ListingType', shared.listingType);
                 data.append('DisplayOwnerName', shared.displayOwnerName);
@@ -355,9 +361,10 @@ const BulkGownPostingForm = () => {
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 4 }}>
-                                <TextField
-                                    label="Price" type="number" value={g.price} onChange={(e) => updateGown(g.localId, { price: e.target.value })}
-                                    fullWidth slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+                                <PriceField
+                                    size="small" price={g.price} priceMax={g.priceMax}
+                                    onPriceChange={(v) => updateGown(g.localId, { price: v })}
+                                    onPriceMaxChange={(v) => updateGown(g.localId, { priceMax: v })}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>

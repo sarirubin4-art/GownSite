@@ -6,7 +6,7 @@ import {
     CardMedia, CardContent, Box, Chip, Snackbar, Alert, Button, Stack,
     Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress
 } from '@mui/material';
-import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, styleLabel } from '../constants/gownOptions';
+import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, styleLabel, formatPriceRange } from '../constants/gownOptions';
 import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import usePageTitle from '../hooks/usePageTitle';
@@ -230,10 +230,15 @@ const SearchGowns = () => {
                                     />
                                     <CardContent>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-                                            <Typography variant="h6">${gown.price}</Typography>
+                                            <Typography variant="h6">{formatPriceRange(gown.price, gown.priceMax)}</Typography>
                                             <Chip size="small" label={gown.listingType === 'Rent' ? 'For Rent' : 'For Sale'} color="primary" variant="outlined" />
                                         </Box>
-                                        <Typography variant="body2" color="text.secondary">{(gown.color || '').split(',').join(', ')} &middot; Size {(gown.size || '').split(',').join(', ')}</Typography>
+                                        <Typography
+                                            variant="body2" color="text.secondary"
+                                            sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                        >
+                                            {gown.description && `${gown.description} · `}Size {(gown.size || '').split(',').join(', ')}
+                                        </Typography>
                                         <Typography variant="body2" color="text.secondary">{gown.location}</Typography>
                                     </CardContent>
                                 </CardActionArea>

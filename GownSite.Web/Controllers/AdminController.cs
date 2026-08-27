@@ -48,6 +48,7 @@ namespace GownSite.Web.Controllers
         public string Color { get; set; }
         public string Size { get; set; }
         public decimal? Price { get; set; }
+        public decimal? PriceMax { get; set; }
         public string Location { get; set; }
         public string ListingType { get; set; }
         public bool DisplayOwnerName { get; set; }
@@ -359,6 +360,8 @@ namespace GownSite.Web.Controllers
             var remainingCount = existing.MorePictures.Count - removeIds.Count + (request.MorePictures?.Count ?? 0);
             if (remainingCount > GownController.MaxMorePictures)
                 return BadRequest(new { message = $"You can have up to {GownController.MaxMorePictures} additional photos total." });
+            if (request.PriceMax.HasValue && request.PriceMax.Value <= request.Price)
+                return BadRequest(new { message = "The high end of the price range must be more than the low end." });
 
             repo.Update(new GownPosting
             {
@@ -367,6 +370,7 @@ namespace GownSite.Web.Controllers
                 Color = request.Color,
                 Size = request.Size,
                 Price = request.Price,
+                PriceMax = request.PriceMax,
                 Location = request.Location,
                 ListingType = listingType,
                 DisplayOwnerName = request.DisplayOwnerName,
@@ -595,6 +599,8 @@ namespace GownSite.Web.Controllers
 
             if (request.MorePictures?.Count > GownController.MaxMorePictures)
                 return BadRequest(new { message = $"You can upload up to {GownController.MaxMorePictures} additional photos." });
+            if (request.PriceMax.HasValue && request.Price.HasValue && request.PriceMax.Value <= request.Price.Value)
+                return BadRequest(new { message = "The high end of the price range must be more than the low end." });
 
             if (request.Finalize)
             {
@@ -631,6 +637,7 @@ namespace GownSite.Web.Controllers
                 Color = request.Color,
                 Size = request.Size,
                 Price = request.Price ?? 0,
+                PriceMax = request.PriceMax,
                 Location = request.Location,
                 ListingType = listingType,
                 DisplayOwnerName = request.DisplayOwnerName,

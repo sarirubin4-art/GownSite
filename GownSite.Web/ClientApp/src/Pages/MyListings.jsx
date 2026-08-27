@@ -6,10 +6,11 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Autocomplete,
     Checkbox, FormControlLabel, FormGroup, Alert
 } from '@mui/material';
-import { COLOR_OPTIONS, SIZE_OPTIONS, LISTING_TYPE_OPTIONS, STYLE_OPTIONS } from '../constants/gownOptions';
+import { COLOR_OPTIONS, SIZE_OPTIONS, LISTING_TYPE_OPTIONS, STYLE_OPTIONS, formatPriceRange } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import LocationField from '../components/LocationField';
+import PriceField from '../components/PriceField';
 import MorePicturesInput from '../components/MorePicturesInput';
 
 const MyListings = () => {
@@ -77,6 +78,7 @@ const MyListings = () => {
         data.append('Color', editTarget.colors.join(','));
         data.append('Size', editTarget.sizes.join(','));
         data.append('Price', Number(editTarget.price));
+        if (editTarget.priceMax !== '') data.append('PriceMax', Number(editTarget.priceMax));
         data.append('Location', editTarget.location);
         data.append('ListingType', editTarget.listingType);
         data.append('DisplayOwnerName', editTarget.displayOwnerName);
@@ -232,7 +234,7 @@ const MyListings = () => {
                                         {g.inquiryCount} {g.inquiryCount === 1 ? 'inquiry' : 'inquiries'}
                                     </Typography>
                                 </Stack>
-                                <Typography variant="h6">${g.price}</Typography>
+                                <Typography variant="h6">{formatPriceRange(g.price, g.priceMax)}</Typography>
                                 <Typography variant="body2" color="text.secondary">{(g.color || '').split(',').join(', ')} &middot; Size {(g.size || '').split(',').join(', ')}</Typography>
                                 {g.batchId && batchCounts[g.batchId] > 1 && (
                                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
@@ -247,7 +249,7 @@ const MyListings = () => {
                                 <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
                                     <Button size="small" variant="outlined" onClick={() => setEditTarget({
                                         id: g.id, description: g.description, colors: (g.color || '').split(',').filter(Boolean), sizes: (g.size || '').split(',').filter(Boolean),
-                                        price: g.price, location: g.location, listingType: g.listingType,
+                                        price: g.price, priceMax: g.priceMax || '', location: g.location, listingType: g.listingType,
                                         displayOwnerName: g.displayOwnerName, brand: g.brand || '', pricePaid: g.pricePaid || '',
                                         condition: g.condition || '', length: g.length || '',
                                         styleTags: (g.styleTags || '').split(',').filter(Boolean), notes: g.notes || '',
@@ -355,9 +357,12 @@ const MyListings = () => {
                                     renderInput={(params) => <TextField {...params} label="Size(s)" />}
                                 />
                             </Stack>
-                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                                <TextField label="Price" type="number" fullWidth value={editTarget.price}
-                                    onChange={(e) => setEditTarget({ ...editTarget, price: e.target.value })} />
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="flex-start">
+                                <PriceField
+                                    price={editTarget.price} priceMax={editTarget.priceMax}
+                                    onPriceChange={(v) => setEditTarget({ ...editTarget, price: v })}
+                                    onPriceMaxChange={(v) => setEditTarget({ ...editTarget, priceMax: v })}
+                                />
                                 <TextField select label="Rent/Sale" fullWidth value={editTarget.listingType}
                                     onChange={(e) => setEditTarget({ ...editTarget, listingType: e.target.value })}>
                                     {LISTING_TYPE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
@@ -401,7 +406,12 @@ const MyListings = () => {
                 )}
                 <DialogActions>
                     <Button onClick={onCloseEditDialog}>Cancel</Button>
-                    <Button variant="contained" onClick={onSaveEdit}>Save Changes</Button>
+                    <Button
+                        variant="contained" onClick={onSaveEdit}
+                        disabled={editTarget && editTarget.priceMax !== '' && Number(editTarget.priceMax) <= Number(editTarget.price)}
+                    >
+                        Save Changes
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>

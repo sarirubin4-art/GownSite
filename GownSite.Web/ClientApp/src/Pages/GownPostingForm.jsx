@@ -8,6 +8,7 @@ import {
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import LocationField from '../components/LocationField';
+import PriceField from '../components/PriceField';
 import ContactAdminDialog from '../components/ContactAdminDialog';
 import MorePicturesInput from '../components/MorePicturesInput';
 
@@ -34,6 +35,7 @@ const GownPostingForm = () => {
         colors: [],
         sizes: [],
         price: '',
+        priceMax: '',
         location: '',
         listingType: 'Rent',
         displayOwnerName: false,
@@ -63,6 +65,7 @@ const GownPostingForm = () => {
                 colors: (data.color || '').split(',').filter(Boolean),
                 sizes: (data.size || '').split(',').filter(Boolean),
                 price: data.price || '',
+                priceMax: data.priceMax || '',
                 location: data.location || '',
                 listingType: data.listingType || 'Rent',
                 displayOwnerName: data.displayOwnerName || false,
@@ -113,6 +116,7 @@ const GownPostingForm = () => {
                 data.append('Color', form.colors.join(','));
                 data.append('Size', form.sizes.join(','));
                 if (form.price !== '') data.append('Price', form.price);
+                if (form.priceMax !== '') data.append('PriceMax', form.priceMax);
                 data.append('Location', form.location);
                 data.append('ListingType', form.listingType);
                 data.append('DisplayOwnerName', form.displayOwnerName);
@@ -149,6 +153,9 @@ const GownPostingForm = () => {
         if (!form.description || form.colors.length === 0 || form.sizes.length === 0 || !form.price || !form.location) {
             return 'Please fill in description, color, size, price, and location.';
         }
+        if (form.priceMax !== '' && Number(form.priceMax) <= Number(form.price)) {
+            return 'The high end of your price range must be more than the low end.';
+        }
         if (!primaryPicture && !hasExistingPhoto) {
             return 'Please add a primary picture of the gown.';
         }
@@ -170,6 +177,7 @@ const GownPostingForm = () => {
             data.append('Color', form.colors.join(','));
             data.append('Size', form.sizes.join(','));
             data.append('Price', form.price);
+            if (form.priceMax !== '') data.append('PriceMax', form.priceMax);
             data.append('Location', form.location);
             data.append('ListingType', form.listingType);
             data.append('DisplayOwnerName', form.displayOwnerName);
@@ -245,9 +253,10 @@ const GownPostingForm = () => {
                         </TextField>
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                        <TextField
-                            label="Price" type="number" value={form.price} onChange={onChange('price')}
-                            fullWidth slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+                        <PriceField
+                            price={form.price} priceMax={form.priceMax}
+                            onPriceChange={(v) => { markDirty(); setForm({ ...form, price: v }); }}
+                            onPriceMaxChange={(v) => { markDirty(); setForm({ ...form, priceMax: v }); }}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
