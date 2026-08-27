@@ -11,6 +11,22 @@ export const SIZE_OPTIONS = [
     'Girls 7', 'Girls 8', 'Girls 10', 'Girls 12', 'Girls 14', 'Girls 16'
 ];
 
+// Sorts a comma-separated (or array) list of sizes into the canonical SIZE_OPTIONS order,
+// regardless of the order they were originally selected/stored in — so "10, 2, 6" always
+// displays as "2, 6, 10". Anything not found in SIZE_OPTIONS sorts to the end, unchanged
+// relative to each other, rather than disappearing.
+export const sortSizes = (sizes) => {
+    const list = Array.isArray(sizes) ? sizes : (sizes || '').split(',').filter(Boolean);
+    return [...list].sort((a, b) => {
+        const ai = SIZE_OPTIONS.indexOf(a);
+        const bi = SIZE_OPTIONS.indexOf(b);
+        if (ai === -1 && bi === -1) return 0;
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+    });
+};
+
 export const STYLE_OPTIONS = [
     { value: 'MotherOfBrideOrGroom', label: 'Mother of the Bride/Groom' },
     { value: 'SisterOfBrideOrGroom', label: 'Sister of the Bride/Groom' },

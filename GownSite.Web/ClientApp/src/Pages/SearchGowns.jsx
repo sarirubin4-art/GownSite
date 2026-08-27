@@ -6,7 +6,7 @@ import {
     CardMedia, CardContent, Box, Chip, Snackbar, Alert, Button, Stack,
     Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress
 } from '@mui/material';
-import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, styleLabel, formatPriceRange } from '../constants/gownOptions';
+import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, styleLabel, formatPriceRange, sortSizes } from '../constants/gownOptions';
 import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import usePageTitle from '../hooks/usePageTitle';
@@ -237,7 +237,7 @@ const SearchGowns = () => {
                                             variant="body2" color="text.secondary"
                                             sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                                         >
-                                            {gown.description && `${gown.description} · `}Size {(gown.size || '').split(',').join(', ')}
+                                            {gown.description && `${gown.description} · `}Size {sortSizes(gown.size).join(', ')}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary">{gown.location}</Typography>
                                     </CardContent>

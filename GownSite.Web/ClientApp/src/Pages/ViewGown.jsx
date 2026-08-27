@@ -8,7 +8,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CloseIcon from '@mui/icons-material/Close';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
-import { styleLabel, formatPriceRange } from '../constants/gownOptions';
+import { styleLabel, formatPriceRange, sortSizes } from '../constants/gownOptions';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import usePageTitle from '../hooks/usePageTitle';
 import { useAdLane } from '../context/AdLaneContext';
@@ -26,7 +26,7 @@ const ViewGown = () => {
     const [zoomOpen, setZoomOpen] = useState(false);
 
     usePageTitle(
-        gown ? `${[gown.color, gown.size ? `Size ${gown.size}` : null].filter(Boolean).join(', ')} Gown ${gown.listingType === 'Sale' ? 'for Sale' : 'for Rent'}${gown.location ? ` in ${gown.location}` : ''}` : 'Gown Listing',
+        gown ? `${[gown.color, gown.size ? `Size ${sortSizes(gown.size).join(', ')}` : null].filter(Boolean).join(', ')} Gown ${gown.listingType === 'Sale' ? 'for Sale' : 'for Rent'}${gown.location ? ` in ${gown.location}` : ''}` : 'Gown Listing',
         gown ? gown.description : undefined
     );
 
@@ -146,7 +146,7 @@ const ViewGown = () => {
 
                     <Stack spacing={0.75} sx={{ mb: 2 }}>
                         <Typography><strong>Color{(gown.color || '').includes(',') ? 's' : ''}:</strong> {(gown.color || '').split(',').join(', ')}</Typography>
-                        <Typography><strong>Size{(gown.size || '').includes(',') ? 's' : ''}:</strong> {(gown.size || '').split(',').join('-')}</Typography>
+                        <Typography><strong>Size{(gown.size || '').includes(',') ? 's' : ''}:</strong> {sortSizes(gown.size).join('-')}</Typography>
                         <Typography><strong>Location:</strong> {gown.location}</Typography>
                         {gown.brand && <Typography><strong>Brand:</strong> {gown.brand}</Typography>}
                         {gown.condition && <Typography><strong>Condition:</strong> {gown.condition}</Typography>}

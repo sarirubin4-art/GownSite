@@ -5,7 +5,7 @@ import {
     Container, Typography, TextField, Button, Stack, MenuItem, Grid,
     FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box, Autocomplete
 } from '@mui/material';
-import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS } from '../constants/gownOptions';
+import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, sortSizes } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import LocationField from '../components/LocationField';
 import PriceField from '../components/PriceField';
@@ -63,7 +63,7 @@ const GownPostingForm = () => {
             setForm({
                 description: data.description || '',
                 colors: (data.color || '').split(',').filter(Boolean),
-                sizes: (data.size || '').split(',').filter(Boolean),
+                sizes: sortSizes(data.size),
                 price: data.price || '',
                 priceMax: data.priceMax || '',
                 location: data.location || '',

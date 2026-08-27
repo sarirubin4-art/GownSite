@@ -14,7 +14,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { useAuth } from '../context/AuthContext';
 import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
-import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, formatPriceRange } from '../constants/gownOptions';
+import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, formatPriceRange, sortSizes } from '../constants/gownOptions';
 import LocationField from '../components/LocationField';
 import PriceField from '../components/PriceField';
 import MorePicturesInput from '../components/MorePicturesInput';
@@ -86,7 +86,7 @@ const ItemDetailDialog = ({ item, type, onClose, fullScreen }) => (
                         <DetailRow label="Price" value={formatPriceRange(item.price, item.priceMax)} />
                         <DetailRow label="Rent/Sale" value={item.listingType} />
                         <DetailRow label="Color(s)" value={(item.color || '').split(',').join(', ')} />
-                        <DetailRow label="Size(s)" value={(item.size || '').split(',').join(', ')} />
+                        <DetailRow label="Size(s)" value={sortSizes(item.size).join(', ')} />
                         <DetailRow label="Location" value={item.location} />
                         <DetailRow label="Brand" value={item.brand} />
                         <DetailRow label="Original Gown Value" value={item.pricePaid != null ? `$${item.pricePaid}` : null} />
@@ -517,7 +517,7 @@ const AdminDashboard = () => {
     };
 
     const onEditGownClick = (g) => setEditGownTarget({
-        id: g.id, description: g.description, colors: (g.color || '').split(',').filter(Boolean), sizes: (g.size || '').split(',').filter(Boolean),
+        id: g.id, description: g.description, colors: (g.color || '').split(',').filter(Boolean), sizes: sortSizes(g.size),
         price: g.price, priceMax: g.priceMax || '', location: g.location, listingType: g.listingType,
         displayOwnerName: g.displayOwnerName, brand: g.brand || '', pricePaid: g.pricePaid || '',
         condition: g.condition || '', length: g.length || '',
@@ -1113,7 +1113,7 @@ const AdminDashboard = () => {
                                                     <Stack direction="row" spacing={1.5} sx={{ mb: 1 }}>
                                                         <Box component="img" src={g.primaryPictureUrl} alt="" sx={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }} />
                                                         <Box>
-                                                            <Typography variant="body2">{g.size ? `Size ${g.size}` : 'No size'} &middot; {formatPriceRange(g.price, g.priceMax)}</Typography>
+                                                            <Typography variant="body2">{g.size ? `Size ${sortSizes(g.size).join(', ')}` : 'No size'} &middot; {formatPriceRange(g.price, g.priceMax)}</Typography>
                                                             <Typography variant="caption" color="text.secondary">{g.location}</Typography>
                                                         </Box>
                                                     </Stack>

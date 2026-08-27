@@ -6,7 +6,7 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Autocomplete,
     Checkbox, FormControlLabel, FormGroup, Alert
 } from '@mui/material';
-import { COLOR_OPTIONS, SIZE_OPTIONS, LISTING_TYPE_OPTIONS, STYLE_OPTIONS, formatPriceRange } from '../constants/gownOptions';
+import { COLOR_OPTIONS, SIZE_OPTIONS, LISTING_TYPE_OPTIONS, STYLE_OPTIONS, formatPriceRange, sortSizes } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import LocationField from '../components/LocationField';
@@ -235,7 +235,7 @@ const MyListings = () => {
                                     </Typography>
                                 </Stack>
                                 <Typography variant="h6">{formatPriceRange(g.price, g.priceMax)}</Typography>
-                                <Typography variant="body2" color="text.secondary">{(g.color || '').split(',').join(', ')} &middot; Size {(g.size || '').split(',').join(', ')}</Typography>
+                                <Typography variant="body2" color="text.secondary">{(g.color || '').split(',').join(', ')} &middot; Size {sortSizes(g.size).join(', ')}</Typography>
                                 {g.batchId && batchCounts[g.batchId] > 1 && (
                                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
                                         Part of a {batchCounts[g.batchId]}-gown batch
@@ -248,7 +248,7 @@ const MyListings = () => {
                                 )}
                                 <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
                                     <Button size="small" variant="outlined" onClick={() => setEditTarget({
-                                        id: g.id, description: g.description, colors: (g.color || '').split(',').filter(Boolean), sizes: (g.size || '').split(',').filter(Boolean),
+                                        id: g.id, description: g.description, colors: (g.color || '').split(',').filter(Boolean), sizes: sortSizes(g.size),
                                         price: g.price, priceMax: g.priceMax || '', location: g.location, listingType: g.listingType,
                                         displayOwnerName: g.displayOwnerName, brand: g.brand || '', pricePaid: g.pricePaid || '',
                                         condition: g.condition || '', length: g.length || '',
