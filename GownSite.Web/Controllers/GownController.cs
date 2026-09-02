@@ -610,6 +610,7 @@ namespace GownSite.Web.Controllers
             var repo = new GownRepository(_connectionString);
             var posting = repo.Get(request.Id);
             if (posting == null || !posting.IsActive) return NotFound();
+            if (posting.IsSold) return BadRequest(new { message = "This gown has already been sold." });
 
             repo.IncrementInquiry(request.Id);
             posting.InquiryCount++;

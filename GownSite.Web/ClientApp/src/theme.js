@@ -4,11 +4,17 @@ import { createTheme } from '@mui/material/styles';
 // background and text removed, leaving just the two corner blooms. Anchored to
 // the true page corners and faded low so it reads as a soft accent, not decor
 // that competes with the site's own content.
+// The bottom-right bloom is pinned to the viewport (not the page) on desktop, so
+// it's visible the whole time you're scrolling instead of only appearing once you
+// reach the very bottom of a long results list. Mobile keeps it page-anchored —
+// `background-attachment: fixed` is a known jank/performance risk on mobile Safari,
+// and the ad lane it's compensating for doesn't exist on mobile anyway.
 export const wallpaperBackground = {
     backgroundImage: 'url("/floral-topleft.webp"), url("/floral-bottomright.webp")',
     backgroundPosition: 'left top, right bottom',
     backgroundRepeat: 'no-repeat, no-repeat',
-    backgroundSize: '320px auto, 320px auto'
+    backgroundSize: '320px auto, 320px auto',
+    backgroundAttachment: { xs: 'scroll, scroll', md: 'scroll, fixed' }
 };
 
 const theme = createTheme({

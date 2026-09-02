@@ -168,12 +168,18 @@ const ViewGown = () => {
                         </>
                     )}
 
-                    <Button
-                        variant="contained" size="large" fullWidth sx={{ mt: 3 }}
-                        onClick={onInterestedClick} disabled={loading}
-                    >
-                        {loading ? <CircularProgress size={22} color="inherit" /> : "I'm Interested"}
-                    </Button>
+                    {gown.isSold ? (
+                        <Button variant="outlined" size="large" fullWidth sx={{ mt: 3 }} disabled>
+                            This Gown Has Been Sold
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="contained" size="large" fullWidth sx={{ mt: 3 }}
+                            onClick={onInterestedClick} disabled={loading}
+                        >
+                            {loading ? <CircularProgress size={22} color="inherit" /> : "I'm Interested"}
+                        </Button>
+                    )}
                 </Grid>
             </Grid>
 
