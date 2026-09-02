@@ -11,6 +11,8 @@ Live gown rental/sale marketplace at regowned.com. ASP.NET Core 9 Web API (`Gown
    - Delete `appsettings.local.json` immediately after.
 2. `git push origin master` — only after explicit user confirmation.
 
+For a **high-risk change** (payment/pricing logic, auth/permissions, a data migration, or a large multi-file change) — before pushing, ask the user whether they'd like a fresh-Opus-subagent code review first (`/code-review`), rather than always running one automatically. Routine changes don't need to be offered this.
+
 Local dev DB is SQL Express (`.\sqlexpress`, `GownSite` catalog, integrated security) — connection string lives in `GownSite.Web/appsettings.json`.
 
 ## Local dev server
