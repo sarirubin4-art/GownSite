@@ -8,6 +8,7 @@ import {
 } from '@mui/material';
 import { COLOR_OPTIONS, SIZE_OPTIONS, LISTING_TYPE_OPTIONS, STYLE_OPTIONS, formatPriceRange, sortSizes } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
+import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import LocationField from '../components/LocationField';
 import PriceField from '../components/PriceField';
@@ -16,6 +17,7 @@ import MorePicturesInput from '../components/MorePicturesInput';
 const MyListings = () => {
     const { owner, loading } = useAuth();
     const navigate = useNavigate();
+    const { laneSx } = useAdLane();
     const fullScreen = useFullScreenDialog();
     const [listings, setListings] = useState([]);
     const [editTarget, setEditTarget] = useState(null);
@@ -214,7 +216,7 @@ const MyListings = () => {
             {listings.length === 0 && (
                 <Typography color="text.secondary">You haven't posted any gowns yet.</Typography>
             )}
-            <Grid container spacing={3}>
+            <Grid container spacing={3} sx={{ mr: laneSx }}>
                 {listings.map((g) => (
                     <Grid key={g.id} size={{ xs: 12, sm: 6, md: 4 }}>
                         <Card>

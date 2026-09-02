@@ -70,7 +70,6 @@ const SearchGowns = () => {
     const [showNotifySuccess, setShowNotifySuccess] = useState(false);
 
     const searchSeq = useRef(0);
-    const resultsTopRef = useRef(null);
     const scrollRestoreRef = useRef(null);
 
     // Captured once on mount (not on every filter/page change, which re-renders this same
@@ -167,7 +166,7 @@ const SearchGowns = () => {
             if (value > 1) next.set('page', String(value));
             else next.delete('page');
         }, { resetPage: false });
-        resultsTopRef.current?.scrollIntoView({ block: 'start' });
+        window.scrollTo(0, 0);
     };
 
     const setNotifyField = (field) => (event, value) => setNotifyFilters((prev) => ({ ...prev, [field]: value }));
@@ -287,7 +286,6 @@ const SearchGowns = () => {
                 </Grid>
             </Paper>
 
-            <Box ref={resultsTopRef} />
             {searching && results.length === 0 ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
                     <CircularProgress />
@@ -295,7 +293,7 @@ const SearchGowns = () => {
             ) : results.length === 0 ? (
                 <Typography color="text.secondary">No gowns match your search yet. Try adjusting the filters.</Typography>
             ) : (
-                <Grid container spacing={3} sx={{ opacity: searching ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+                <Grid container spacing={3} sx={{ opacity: searching ? 0.6 : 1, transition: 'opacity 0.2s', mr: laneSx }}>
                     {results.map((gown) => (
                         <Grid key={gown.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
                             <Card sx={{ position: 'relative' }}>

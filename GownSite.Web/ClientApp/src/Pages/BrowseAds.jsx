@@ -67,7 +67,7 @@ const BrowseAds = () => {
             {visibleAds.length === 0 ? (
                 <Typography color="text.secondary">No advertisers in this category yet.</Typography>
             ) : (
-                <Stack spacing={2.5}>
+                <Stack spacing={2.5} sx={{ mr: laneSx }}>
                     {visibleAds.map((ad) => (
                         <Card key={ad.id}>
                             <CardActionArea
