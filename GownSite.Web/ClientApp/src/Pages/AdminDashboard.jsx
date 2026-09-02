@@ -14,7 +14,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { useAuth } from '../context/AuthContext';
 import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
-import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, formatPriceRange, sortSizes } from '../constants/gownOptions';
+import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, AD_CATEGORY_OPTIONS, formatPriceRange, sortSizes } from '../constants/gownOptions';
 import LocationField from '../components/LocationField';
 import PriceField from '../components/PriceField';
 import MorePicturesInput from '../components/MorePicturesInput';
@@ -196,11 +196,9 @@ const ActiveList = ({ items, type, onTakeDownClick, onEditClick, error }) => (
                                 </Typography>
                                 {type === 'gown' && <Typography variant="h6" sx={{ mt: 0.5 }}>${item.price}</Typography>}
                                 <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-                                    {type === 'gown' && (
-                                        <Button size="small" variant="outlined" onClick={() => onEditClick(item)}>
-                                            Edit
-                                        </Button>
-                                    )}
+                                    <Button size="small" variant="outlined" onClick={() => onEditClick(item)}>
+                                        Edit
+                                    </Button>
                                     <Button size="small" variant="outlined" color="error" onClick={() => onTakeDownClick(item.id)}>
                                         Take Down
                                     </Button>
@@ -234,6 +232,10 @@ const AdminDashboard = () => {
     const [editGownError, setEditGownError] = useState('');
     const [editGownRemovePictureIds, setEditGownRemovePictureIds] = useState([]);
     const [editGownNewMorePictures, setEditGownNewMorePictures] = useState([]);
+    const [editAdTarget, setEditAdTarget] = useState(null);
+    const [editAdNewImage, setEditAdNewImage] = useState(null);
+    const [editAdNewImagePreview, setEditAdNewImagePreview] = useState(null);
+    const [editAdError, setEditAdError] = useState('');
     const [error, setError] = useState('');
     const [promoCodes, setPromoCodes] = useState([]);
     const [promoDialogOpen, setPromoDialogOpen] = useState(false);
@@ -589,6 +591,46 @@ const AdminDashboard = () => {
         }
     };
 
+    const onEditAdClick = (a) => setEditAdTarget({
+        id: a.id, title: a.title, description: a.description, targetUrl: a.targetUrl || '',
+        category: a.category, location: a.location || '', servesAllLocations: !!a.servesAllLocations,
+        imageUrl: a.imageUrl
+    });
+
+    const onCloseEditAdDialog = () => {
+        setEditAdTarget(null);
+        setEditAdNewImage(null);
+        setEditAdNewImagePreview(null);
+        setEditAdError('');
+    };
+
+    const onEditAdImageChange = (e) => {
+        const file = e.target.files[0];
+        setEditAdNewImage(file || null);
+        setEditAdNewImagePreview(file ? URL.createObjectURL(file) : null);
+    };
+
+    const onSaveEditAd = async () => {
+        setEditAdError('');
+        const data = new FormData();
+        data.append('Id', editAdTarget.id);
+        data.append('Title', editAdTarget.title);
+        data.append('Description', editAdTarget.description);
+        data.append('TargetUrl', editAdTarget.targetUrl);
+        data.append('Category', editAdTarget.category);
+        data.append('Location', editAdTarget.location);
+        data.append('ServesAllLocations', editAdTarget.servesAllLocations);
+        if (editAdNewImage) data.append('Image', editAdNewImage);
+
+        try {
+            await axios.post('/api/admin/ads/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+            onCloseEditAdDialog();
+            await loadActive();
+        } catch (err) {
+            setEditAdError(err?.response?.data?.message || 'Could not save changes.');
+        }
+    };
+
     const onDeleteOwnerConfirm = async () => {
         if (!deleteOwnerTarget) return;
         setDeleteOwnerError('');
@@ -829,6 +871,7 @@ const AdminDashboard = () => {
                     type="ad"
                     error={error}
                     onTakeDownClick={(id) => setTakeDownTarget({ type: 'ad', id })}
+                    onEditClick={onEditAdClick}
                 />
             )}
             {tab === 4 && (
@@ -1296,6 +1339,59 @@ const AdminDashboard = () => {
                 <DialogActions>
                     <Button onClick={onCloseEditGownDialog}>Cancel</Button>
                     <Button variant="contained" onClick={onSaveEditGown}>Save Changes</Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={!!editAdTarget} onClose={onCloseEditAdDialog} maxWidth="sm" fullWidth fullScreen={fullScreen}>
+                <DialogTitle>Edit Ad</DialogTitle>
+                {editAdTarget && (
+                    <DialogContent>
+                        <Stack spacing={2} sx={{ mt: 1 }}>
+                            {editAdError && <Alert severity="error">{editAdError}</Alert>}
+                            <Stack direction="row" spacing={2} alignItems="center">
+                                <Box
+                                    component="img"
+                                    src={editAdNewImagePreview || editAdTarget.imageUrl}
+                                    alt="Ad"
+                                    sx={{
+                                        width: 100, height: 100, borderRadius: 2, objectFit: 'cover',
+                                        border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper'
+                                    }}
+                                />
+                                <Button variant="outlined" component="label" size="small">
+                                    Change Photo
+                                    <input type="file" accept="image/*" hidden onChange={onEditAdImageChange} />
+                                </Button>
+                            </Stack>
+                            <TextField label="Title" value={editAdTarget.title}
+                                onChange={(e) => setEditAdTarget({ ...editAdTarget, title: e.target.value })} />
+                            <TextField label="Description" multiline rows={2} value={editAdTarget.description}
+                                onChange={(e) => setEditAdTarget({ ...editAdTarget, description: e.target.value })} />
+                            <TextField select label="Category" fullWidth value={editAdTarget.category}
+                                onChange={(e) => setEditAdTarget({ ...editAdTarget, category: e.target.value })}>
+                                {AD_CATEGORY_OPTIONS.map(c => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
+                            </TextField>
+                            <TextField label="Website/Contact Link" value={editAdTarget.targetUrl}
+                                onChange={(e) => setEditAdTarget({ ...editAdTarget, targetUrl: e.target.value })} />
+                            {!editAdTarget.servesAllLocations && (
+                                <LocationField value={editAdTarget.location}
+                                    onChange={(value) => setEditAdTarget({ ...editAdTarget, location: value })} />
+                            )}
+                            <FormControlLabel
+                                control={
+                                    <Checkbox checked={editAdTarget.servesAllLocations} onChange={(e) => setEditAdTarget({
+                                        ...editAdTarget, servesAllLocations: e.target.checked,
+                                        location: e.target.checked ? '' : editAdTarget.location
+                                    })} />
+                                }
+                                label="This business isn't tied to one location (e.g. online-only)"
+                            />
+                        </Stack>
+                    </DialogContent>
+                )}
+                <DialogActions>
+                    <Button onClick={onCloseEditAdDialog}>Cancel</Button>
+                    <Button variant="contained" onClick={onSaveEditAd}>Save Changes</Button>
                 </DialogActions>
             </Dialog>
 

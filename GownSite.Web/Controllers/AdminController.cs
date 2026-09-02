@@ -408,6 +408,37 @@ namespace GownSite.Web.Controllers
             return Ok(repo.GetPendingReview());
         }
 
+        // Lets an admin correct a live ad directly (e.g. setting a location for a business
+        // that isn't the logged-in owner). Reuses the same AdRepository update path and
+        // request shape as the owner-facing edit, just without the owner-match check.
+        [HttpPost("ads/edit")]
+        [RequestSizeLimit(50_000_000)]
+        public async Task<IActionResult> EditAd([FromForm] EditAdRequest request)
+        {
+            var repo = new AdRepository(_connectionString);
+            var existing = repo.Get(request.Id);
+            if (existing == null) return NotFound();
+            if (!Enum.TryParse<AdCategory>(request.Category, out var category))
+                return BadRequest(new { message = "Please choose a valid category." });
+            if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
+                return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
+
+            repo.Update(new Ad
+            {
+                Id = request.Id,
+                Title = request.Title,
+                Description = request.Description,
+                TargetUrl = request.TargetUrl,
+                Category = category,
+                Location = request.ServesAllLocations ? null : request.Location,
+                ServesAllLocations = request.ServesAllLocations
+            });
+            if (request.Image != null)
+                repo.SetImage(request.Id, await _storage.SaveAsync(request.Image, "ads"));
+
+            return Ok();
+        }
+
         [HttpPost("ads/{id}/approve")]
         public async Task<IActionResult> ApproveAd(int id)
         {
