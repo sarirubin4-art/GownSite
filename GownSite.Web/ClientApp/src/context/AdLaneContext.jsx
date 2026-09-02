@@ -8,7 +8,7 @@ import React, { createContext, useContext } from 'react';
 // so the reserved lane grows to match — each value here is that width plus the ad's
 // 20px offset from the viewport's right edge, otherwise a wider ad on a big monitor
 // overlaps a lane still sized for its smaller, laptop-width self.
-const LANE_SX = { xs: 0, md: '220px', lg: '280px', xl: '340px' };
+const LANE_SX = { xs: 0, md: '220px', lg: '260px', xl: '300px' };
 
 const AdLaneContext = createContext({ adVisible: false, laneSx: 0 });
 

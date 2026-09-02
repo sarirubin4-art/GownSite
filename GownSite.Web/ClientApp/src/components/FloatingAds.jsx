@@ -51,7 +51,7 @@ const FloatingAds = ({ onVisibilityChange }) => {
                     position: 'fixed',
                     top: 84,
                     right: 20,
-                    width: { md: 200, lg: 260, xl: 320 },
+                    width: { md: 200, lg: 240, xl: 280 },
                     overflow: 'hidden',
                     cursor: 'pointer',
                     zIndex: 1300,
