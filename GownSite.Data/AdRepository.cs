@@ -92,7 +92,21 @@ namespace GownSite.Data
             existing.Description = ad.Description;
             existing.TargetUrl = ad.TargetUrl;
             existing.Category = ad.Category;
+            existing.Location = ad.Location;
+            existing.ServesAllLocations = ad.ServesAllLocations;
             context.SaveChanges();
+        }
+
+        public List<string> GetDistinctLocations()
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Ads
+                .Where(a => a.IsActive)
+                .Select(a => a.Location)
+                .Where(l => !string.IsNullOrEmpty(l))
+                .Distinct()
+                .OrderBy(l => l)
+                .ToList();
         }
 
         public void SetImage(int id, string url)

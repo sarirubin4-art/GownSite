@@ -139,6 +139,12 @@ namespace GownSite.Data
         public string ImageUrl { get; set; }
         public string TargetUrl { get; set; }
         public string Description { get; set; }
+        public string Location { get; set; }
+        // Marks a business that isn't tied to any one place (e.g. an online-only shop) so
+        // it should surface under every location filter instead of needing a real Location
+        // value — kept as its own flag rather than a sentinel Location string so filtering
+        // logic can just OR it in without special-casing a magic value.
+        public bool ServesAllLocations { get; set; }
         public AdCategory Category { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedDate { get; set; }

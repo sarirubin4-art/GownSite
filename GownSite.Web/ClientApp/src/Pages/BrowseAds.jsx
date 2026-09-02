@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import { Box, Typography, Tabs, Tab, Card, CardActionArea, Chip, Stack, Button } from '@mui/material';
+import { Box, Typography, Tabs, Tab, Card, CardActionArea, Chip, Stack, Button, TextField, MenuItem } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import PlaceIcon from '@mui/icons-material/Place';
+import PublicIcon from '@mui/icons-material/Public';
 import { AD_CATEGORY_OPTIONS, adCategoryLabel } from '../constants/gownOptions';
 import { useAdLane } from '../context/AdLaneContext';
 import usePageTitle from '../hooks/usePageTitle';
+
+const ALL_LOCATIONS = 'All';
 
 const BrowseAds = () => {
     usePageTitle('Ad Directory', 'Browse trusted simcha service providers — hair, makeup, alterations, gown rental/sales, apparel, and more.');
@@ -13,6 +17,8 @@ const BrowseAds = () => {
     const { laneSx } = useAdLane();
     const [ads, setAds] = useState([]);
     const [category, setCategory] = useState('All');
+    const [location, setLocation] = useState(ALL_LOCATIONS);
+    const [locationOptions, setLocationOptions] = useState([]);
 
     useEffect(() => {
         const load = async () => {
@@ -20,9 +26,14 @@ const BrowseAds = () => {
             setAds(data);
         };
         load();
+        axios.get('/api/ad/locations').then(({ data }) => setLocationOptions(data));
     }, []);
 
-    const visibleAds = category === 'All' ? ads : ads.filter(a => a.category === category);
+    const visibleAds = ads
+        .filter(a => category === 'All' || a.category === category)
+        // An ad marked "serves all locations" is relevant no matter which location is
+        // selected, so it isn't filtered out the way a location mismatch normally would.
+        .filter(a => location === ALL_LOCATIONS || a.servesAllLocations || a.location === location);
 
     return (
         <Box>
@@ -36,13 +47,22 @@ const BrowseAds = () => {
                 onChange={(e, value) => setCategory(value)}
                 variant="scrollable"
                 scrollButtons="auto"
-                sx={{ mb: 4, mr: laneSx, borderBottom: 1, borderColor: 'divider' }}
+                sx={{ mr: laneSx, borderBottom: 1, borderColor: 'divider' }}
             >
                 <Tab label="All" value="All" />
                 {AD_CATEGORY_OPTIONS.map(c => (
                     <Tab key={c.value} label={c.label} value={c.value} />
                 ))}
             </Tabs>
+
+            <TextField
+                select size="small" label="Location" value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                sx={{ width: 220, mt: 2, mb: 4, mr: laneSx }}
+            >
+                <MenuItem value={ALL_LOCATIONS}>All Locations</MenuItem>
+                {locationOptions.map((loc) => <MenuItem key={loc} value={loc}>{loc}</MenuItem>)}
+            </TextField>
 
             {visibleAds.length === 0 ? (
                 <Typography color="text.secondary">No advertisers in this category yet.</Typography>
@@ -68,7 +88,14 @@ const BrowseAds = () => {
                                     />
                                 )}
                                 <Box sx={{ p: 2.5, flex: 1, minWidth: 0 }}>
-                                    <Chip size="small" label={adCategoryLabel(ad.category)} color="primary" variant="outlined" sx={{ mb: 1 }} />
+                                    <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                                        <Chip size="small" label={adCategoryLabel(ad.category)} color="primary" variant="outlined" />
+                                        {ad.servesAllLocations ? (
+                                            <Chip size="small" icon={<PublicIcon />} label="All Locations" variant="outlined" />
+                                        ) : ad.location ? (
+                                            <Chip size="small" icon={<PlaceIcon />} label={ad.location} variant="outlined" />
+                                        ) : null}
+                                    </Stack>
                                     <Typography variant="h6" gutterBottom>{ad.title}</Typography>
                                     <Typography
                                         variant="body2"

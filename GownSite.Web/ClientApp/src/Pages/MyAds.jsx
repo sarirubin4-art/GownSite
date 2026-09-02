@@ -3,11 +3,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import {
     Box, Typography, Grid, Card, CardMedia, CardContent, Chip, Button, Stack,
-    Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Snackbar, Alert
+    Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Snackbar, Alert,
+    FormControlLabel, Checkbox
 } from '@mui/material';
 import { AD_CATEGORY_OPTIONS, adCategoryLabel } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
+import LocationField from '../components/LocationField';
 
 const MyAds = () => {
     const { owner, loading } = useAuth();
@@ -55,6 +57,8 @@ const MyAds = () => {
         data.append('Description', editTarget.description);
         data.append('TargetUrl', editTarget.targetUrl);
         data.append('Category', editTarget.category);
+        data.append('Location', editTarget.location);
+        data.append('ServesAllLocations', editTarget.servesAllLocations);
         if (newImage) data.append('Image', newImage);
 
         await axios.post('/api/ad/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
@@ -139,6 +143,7 @@ const MyAds = () => {
                                     <Button size="small" variant="outlined" onClick={() => setEditTarget({
                                         id: a.id, title: a.title, description: a.description,
                                         targetUrl: a.targetUrl || '', category: a.category,
+                                        location: a.location || '', servesAllLocations: !!a.servesAllLocations,
                                         isActive: a.isActive, imageUrl: a.imageUrl
                                     })}>
                                         Edit
@@ -215,6 +220,19 @@ const MyAds = () => {
                             </TextField>
                             <TextField label="Website/Contact Link" value={editTarget.targetUrl}
                                 onChange={(e) => setEditTarget({ ...editTarget, targetUrl: e.target.value })} />
+                            {!editTarget.servesAllLocations && (
+                                <LocationField value={editTarget.location}
+                                    onChange={(value) => setEditTarget({ ...editTarget, location: value })} />
+                            )}
+                            <FormControlLabel
+                                control={
+                                    <Checkbox checked={editTarget.servesAllLocations} onChange={(e) => setEditTarget({
+                                        ...editTarget, servesAllLocations: e.target.checked,
+                                        location: e.target.checked ? '' : editTarget.location
+                                    })} />
+                                }
+                                label="This business isn't tied to one location (e.g. online-only)"
+                            />
                         </Stack>
                     </DialogContent>
                 )}

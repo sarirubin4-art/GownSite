@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { Container, Typography, TextField, Button, Stack, MenuItem, Grid, Paper, Alert, Box } from '@mui/material';
+import { Container, Typography, TextField, Button, Stack, MenuItem, Grid, Paper, Alert, Box, FormControlLabel, Checkbox } from '@mui/material';
 import { AD_CATEGORY_OPTIONS } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
+import LocationField from '../components/LocationField';
 
 const AdPostingForm = () => {
     const { owner, loading } = useAuth();
@@ -26,6 +27,8 @@ const AdPostingForm = () => {
         description: '',
         category: '',
         targetUrl: '',
+        location: '',
+        servesAllLocations: false,
         promoCode: ''
     });
 
@@ -46,6 +49,8 @@ const AdPostingForm = () => {
                 description: data.description || '',
                 category: data.category || '',
                 targetUrl: data.targetUrl || '',
+                location: data.location || '',
+                servesAllLocations: !!data.servesAllLocations,
                 promoCode: ''
             });
             if (data.imageUrl) {
@@ -60,6 +65,11 @@ const AdPostingForm = () => {
     const markDirty = () => { dirtyRef.current = true; };
 
     const onChange = (field) => (e) => { markDirty(); setForm({ ...form, [field]: e.target.value }); };
+    const onLocationChange = (value) => { markDirty(); setForm({ ...form, location: value }); };
+    const onServesAllLocationsChange = (e) => {
+        markDirty();
+        setForm({ ...form, servesAllLocations: e.target.checked, location: e.target.checked ? '' : form.location });
+    };
 
     // Silently saves whatever's been filled in so far as a Draft — so closing the tab
     // or a crash doesn't lose progress. Only runs once there's at least a description,
@@ -79,6 +89,8 @@ const AdPostingForm = () => {
                 data.append('Description', form.description);
                 data.append('TargetUrl', form.targetUrl);
                 data.append('Category', form.category);
+                data.append('Location', form.location);
+                data.append('ServesAllLocations', form.servesAllLocations);
                 if (image) data.append('Image', image);
 
                 const { data: result } = await axios.post('/api/ad/draft', data, {
@@ -106,6 +118,9 @@ const AdPostingForm = () => {
         if (!form.title || !form.description || !form.category) {
             return 'Please fill in title, description, and category.';
         }
+        if (!form.servesAllLocations && !form.location) {
+            return 'Please choose a location, or mark this ad as not tied to one location.';
+        }
         if (!image && !hasExistingImage) {
             return 'Please add an image for your ad.';
         }
@@ -127,6 +142,8 @@ const AdPostingForm = () => {
             data.append('Description', form.description);
             data.append('Category', form.category);
             data.append('TargetUrl', form.targetUrl);
+            data.append('Location', form.location);
+            data.append('ServesAllLocations', form.servesAllLocations);
             data.append('PromoCode', form.promoCode);
             if (image) data.append('Image', image);
 
@@ -147,10 +164,6 @@ const AdPostingForm = () => {
         <Container maxWidth="sm" sx={{ py: 4 }}>
             <Typography variant="h4" gutterBottom>Advertise With Us</Typography>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-            <Alert severity="info" sx={{ mb: 2 }}>
-                Please include your location (city/area) in your description — our audience spans many locations,
-                and it helps the right people find you.
-            </Alert>
 
             <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
                 <Grid container spacing={2}>
@@ -161,7 +174,7 @@ const AdPostingForm = () => {
                         <TextField
                             label="Description" value={form.description} onChange={onChange('description')}
                             fullWidth multiline rows={3}
-                            placeholder="What you offer, and don't forget to mention your location..."
+                            placeholder="What you offer..."
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
@@ -171,6 +184,17 @@ const AdPostingForm = () => {
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                         <TextField label="Website/Contact Link (optional)" value={form.targetUrl} onChange={onChange('targetUrl')} fullWidth />
+                    </Grid>
+                    {!form.servesAllLocations && (
+                        <Grid size={12}>
+                            <LocationField value={form.location} onChange={onLocationChange} />
+                        </Grid>
+                    )}
+                    <Grid size={12}>
+                        <FormControlLabel
+                            control={<Checkbox checked={form.servesAllLocations} onChange={onServesAllLocationsChange} />}
+                            label="This business isn't tied to one location (e.g. online-only)"
+                        />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                         <TextField

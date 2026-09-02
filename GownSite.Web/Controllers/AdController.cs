@@ -13,6 +13,8 @@ namespace GownSite.Web.Controllers
         public string Description { get; set; }
         public string TargetUrl { get; set; }
         public string Category { get; set; }
+        public string Location { get; set; }
+        public bool ServesAllLocations { get; set; }
         public string PromoCode { get; set; }
         public IFormFile Image { get; set; }
         // Set when finalizing a draft that autosave already created, so this submit
@@ -27,6 +29,8 @@ namespace GownSite.Web.Controllers
         public string Description { get; set; }
         public string TargetUrl { get; set; }
         public string Category { get; set; }
+        public string Location { get; set; }
+        public bool ServesAllLocations { get; set; }
         public IFormFile Image { get; set; }
     }
 
@@ -39,6 +43,8 @@ namespace GownSite.Web.Controllers
         public string Description { get; set; }
         public string TargetUrl { get; set; }
         public string Category { get; set; }
+        public string Location { get; set; }
+        public bool ServesAllLocations { get; set; }
         public IFormFile Image { get; set; }
     }
 
@@ -69,6 +75,13 @@ namespace GownSite.Web.Controllers
         {
             var repo = new AdRepository(_connectionString);
             return repo.GetActive();
+        }
+
+        [HttpGet("locations")]
+        public List<string> GetLocations()
+        {
+            var repo = new AdRepository(_connectionString);
+            return repo.GetDistinctLocations();
         }
 
         [HttpGet("get")]
@@ -109,6 +122,8 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "An ad image is required." });
             if (!Enum.TryParse<AdCategory>(request.Category, out var category))
                 return BadRequest(new { message = "Please choose a valid category." });
+            if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
+                return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
 
             int? promoCodeId = null;
             decimal? monthlyFeeOverride = null;
@@ -140,7 +155,9 @@ namespace GownSite.Web.Controllers
                     Title = request.Title,
                     Description = request.Description,
                     TargetUrl = request.TargetUrl,
-                    Category = category
+                    Category = category,
+                    Location = request.ServesAllLocations ? null : request.Location,
+                    ServesAllLocations = request.ServesAllLocations
                 });
                 if (request.Image != null) repo.SetImage(existingDraft.Id, imageUrl);
                 if (promoCodeId.HasValue) repo.ApplyPromo(existingDraft.Id, promoCodeId.Value, monthlyFeeOverride, promoDurationMonths);
@@ -155,6 +172,8 @@ namespace GownSite.Web.Controllers
                     Description = request.Description,
                     TargetUrl = request.TargetUrl,
                     Category = category,
+                    Location = request.ServesAllLocations ? null : request.Location,
+                    ServesAllLocations = request.ServesAllLocations,
                     ImageUrl = imageUrl,
                     PromoCodeId = promoCodeId,
                     MonthlyFeeOverride = monthlyFeeOverride,
@@ -177,6 +196,8 @@ namespace GownSite.Web.Controllers
             if (existing.OwnerId != CurrentOwnerId()) return Forbid();
             if (!Enum.TryParse<AdCategory>(request.Category, out var category))
                 return BadRequest(new { message = "Please choose a valid category." });
+            if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
+                return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
 
             repo.Update(new Ad
             {
@@ -184,7 +205,9 @@ namespace GownSite.Web.Controllers
                 Title = request.Title,
                 Description = request.Description,
                 TargetUrl = request.TargetUrl,
-                Category = category
+                Category = category,
+                Location = request.ServesAllLocations ? null : request.Location,
+                ServesAllLocations = request.ServesAllLocations
             });
             if (request.Image != null)
                 repo.SetImage(request.Id, await _storage.SaveAsync(request.Image, "ads"));
@@ -218,7 +241,9 @@ namespace GownSite.Web.Controllers
                     Title = request.Title,
                     Description = request.Description,
                     TargetUrl = request.TargetUrl,
-                    Category = category
+                    Category = category,
+                    Location = request.ServesAllLocations ? null : request.Location,
+                    ServesAllLocations = request.ServesAllLocations
                 });
                 if (imageUrl != null) repo.SetImage(existing.Id, imageUrl);
 
@@ -233,6 +258,8 @@ namespace GownSite.Web.Controllers
                     Description = request.Description,
                     TargetUrl = request.TargetUrl,
                     Category = category,
+                    Location = request.ServesAllLocations ? null : request.Location,
+                    ServesAllLocations = request.ServesAllLocations,
                     ImageUrl = imageUrl
                 };
                 var id = repo.Create(ad);

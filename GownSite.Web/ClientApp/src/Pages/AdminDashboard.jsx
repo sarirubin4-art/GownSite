@@ -102,6 +102,7 @@ const ItemDetailDialog = ({ item, type, onClose, fullScreen }) => (
                         <DetailRow label="Title" value={item.title} />
                         <DetailRow label="Description" value={item.description} />
                         <DetailRow label="Category" value={item.category} />
+                        <DetailRow label="Location" value={item.servesAllLocations ? 'Serves All Locations' : item.location} />
                         <DetailRow label="Website/Contact" value={item.targetUrl} />
                     </>
                 )}

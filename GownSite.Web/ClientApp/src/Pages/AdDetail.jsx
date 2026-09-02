@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import { Box, Typography, Button, Chip } from '@mui/material';
+import { Box, Typography, Button, Chip, Stack } from '@mui/material';
+import PlaceIcon from '@mui/icons-material/Place';
+import PublicIcon from '@mui/icons-material/Public';
 import { adCategoryLabel } from '../constants/gownOptions';
 import usePageTitle from '../hooks/usePageTitle';
 
@@ -23,7 +25,14 @@ const AdDetail = () => {
 
     return (
         <Box sx={{ maxWidth: { xs: 720, lg: 880 }, mx: 'auto', textAlign: 'center' }}>
-            <Chip label={adCategoryLabel(ad.category)} color="primary" sx={{ mb: 2 }} />
+            <Stack direction="row" spacing={1} sx={{ justifyContent: 'center', mb: 2 }}>
+                <Chip label={adCategoryLabel(ad.category)} color="primary" />
+                {ad.servesAllLocations ? (
+                    <Chip icon={<PublicIcon />} label="Serves All Locations" variant="outlined" />
+                ) : ad.location ? (
+                    <Chip icon={<PlaceIcon />} label={ad.location} variant="outlined" />
+                ) : null}
+            </Stack>
             <Typography variant="h3" gutterBottom>{ad.title}</Typography>
             {ad.imageUrl && (
                 <Box sx={{ width: '100%', maxWidth: { xs: 420, lg: 520 }, aspectRatio: '1 / 1', mx: 'auto', borderRadius: 3, mb: 3, bgcolor: 'background.paper', overflow: 'hidden' }}>

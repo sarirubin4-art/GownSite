@@ -4,6 +4,7 @@ using GownSite.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GownSite.Data.Migrations
 {
     [DbContext(typeof(GownDataContext))]
-    partial class GownDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260902212105_AddAdLocation")]
+    partial class AddAdLocation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -65,9 +68,6 @@ namespace GownSite.Data.Migrations
 
                     b.Property<string>("RejectionReason")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("ServesAllLocations")
-                        .HasColumnType("bit");
 
                     b.Property<string>("StripeCustomerId")
                         .HasColumnType("nvarchar(max)");
