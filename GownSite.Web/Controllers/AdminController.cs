@@ -276,7 +276,9 @@ namespace GownSite.Web.Controllers
             await _emailSender.SendAsync(
                 posting.Owner.Email,
                 "Your gown listing is approved — Regowned",
-                EmailTemplates.Approved("gown listing", $"{frontendBaseUrl}/gown/{id}", frontendBaseUrl)
+                EmailTemplates.Approved(
+                    "gown listing", $"{frontendBaseUrl}/gown/{id}", frontendBaseUrl,
+                    EmailTemplates.GownSoldReminder($"{frontendBaseUrl}/mylistings", posting.Owner.IsBusinessAccount))
             );
 
             var alertMatcher = new AlertMatchingService(_connectionString, _emailSender);

@@ -14,6 +14,14 @@ namespace GownSite.Data
         public List<ListingType> ListingTypes { get; set; } = new();
         public decimal? MinPrice { get; set; }
         public decimal? MaxPrice { get; set; }
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 24;
+    }
+
+    public class GownSearchResult
+    {
+        public List<GownPosting> Items { get; set; }
+        public int TotalCount { get; set; }
     }
 
     public class GownRepository
@@ -24,7 +32,7 @@ namespace GownSite.Data
             _connectionString = connectionString;
         }
 
-        public List<GownPosting> Search(GownSearchFilters filters)
+        public GownSearchResult Search(GownSearchFilters filters)
         {
             using var context = new GownDataContext(_connectionString);
             var query = context.Gowns
@@ -70,7 +78,13 @@ namespace GownSite.Data
                 ).ToList();
             }
 
-            return results;
+            var page = filters.Page < 1 ? 1 : filters.Page;
+            var pageSize = filters.PageSize < 1 ? 24 : filters.PageSize;
+            return new GownSearchResult
+            {
+                Items = results.Skip((page - 1) * pageSize).Take(pageSize).ToList(),
+                TotalCount = results.Count
+            };
         }
 
         public List<string> GetDistinctLocations()

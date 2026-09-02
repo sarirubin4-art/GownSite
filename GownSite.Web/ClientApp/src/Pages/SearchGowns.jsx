@@ -1,17 +1,33 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import {
     Typography, Paper, Grid, Autocomplete, TextField, Card, CardActionArea,
     CardMedia, CardContent, Box, Chip, Snackbar, Alert, Button, Stack,
-    Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress
+    Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Pagination
 } from '@mui/material';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, styleLabel, formatPriceRange, sortSizes } from '../constants/gownOptions';
 import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import usePageTitle from '../hooks/usePageTitle';
 
 const emptyFilters = { colors: [], sizes: [], locations: [], styles: [], listingTypes: [], minPrice: '', maxPrice: '' };
+const PAGE_SIZE = 24;
+
+// Filters (and the current page) live in the URL rather than plain component state, so
+// the browser's own back/forward history — not just this component's lifetime — is what
+// remembers them. Array fields use repeated params (?colors=Navy&colors=Black) rather
+// than a joined string, since location values already contain commas ("Brooklyn, NY").
+const filtersFromParams = (params) => ({
+    colors: params.getAll('colors'),
+    sizes: params.getAll('sizes'),
+    locations: params.getAll('locations'),
+    styles: params.getAll('styles'),
+    listingTypes: params.getAll('listingTypes'),
+    minPrice: params.get('minPrice') || '',
+    maxPrice: params.get('maxPrice') || ''
+});
 
 // Multi-select filter field: stays open after each pick (instead of closing and
 // forcing you to reopen it for the next selection), and shows "All" as a placeholder
@@ -36,10 +52,13 @@ const SearchGowns = () => {
     usePageTitle('Browse Gowns for Rent & Sale', 'Search gowns for rent or sale by color, size, style, and location — find the perfect dress for your simcha.');
     const navigate = useNavigate();
     const routerLocation = useLocation();
-    const { adVisible, laneWidth } = useAdLane();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const { laneSx } = useAdLane();
     const fullScreen = useFullScreenDialog();
-    const [filters, setFilters] = useState(emptyFilters);
+    const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
+    const page = Math.max(1, Number(searchParams.get('page')) || 1);
     const [results, setResults] = useState([]);
+    const [totalCount, setTotalCount] = useState(0);
     const [searching, setSearching] = useState(true);
     const [locationOptions, setLocationOptions] = useState([]);
     const [showPostedNotice, setShowPostedNotice] = useState(!!routerLocation.state?.posted);
@@ -51,8 +70,33 @@ const SearchGowns = () => {
     const [showNotifySuccess, setShowNotifySuccess] = useState(false);
 
     const searchSeq = useRef(0);
+    const resultsTopRef = useRef(null);
+    const scrollRestoreRef = useRef(null);
 
-    const runSearch = async (f) => {
+    // Captured once on mount (not on every filter/page change, which re-renders this same
+    // component in place) so that arriving here via the browser's back button — after
+    // clicking into a gown — restores exactly where the user had scrolled to.
+    useEffect(() => {
+        const key = `searchScroll:${routerLocation.pathname}${routerLocation.search}`;
+        const saved = sessionStorage.getItem(key);
+        if (saved) scrollRestoreRef.current = Number(saved);
+    }, []);
+
+    useEffect(() => {
+        const key = `searchScroll:${routerLocation.pathname}${routerLocation.search}`;
+        let timeout;
+        const onScroll = () => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => sessionStorage.setItem(key, String(window.scrollY)), 150);
+        };
+        window.addEventListener('scroll', onScroll);
+        return () => {
+            window.removeEventListener('scroll', onScroll);
+            clearTimeout(timeout);
+        };
+    }, [routerLocation.pathname, routerLocation.search]);
+
+    const runSearch = async (f, p) => {
         const seq = ++searchSeq.current;
         setSearching(true);
         const body = {
@@ -62,29 +106,70 @@ const SearchGowns = () => {
             styles: f.styles,
             listingTypes: f.listingTypes,
             minPrice: f.minPrice === '' ? null : Number(f.minPrice),
-            maxPrice: f.maxPrice === '' ? null : Number(f.maxPrice)
+            maxPrice: f.maxPrice === '' ? null : Number(f.maxPrice),
+            page: p,
+            pageSize: PAGE_SIZE
         };
         try {
             const { data } = await axios.post('/api/gown/search', body);
             if (seq !== searchSeq.current) return; // a newer search already started; ignore this stale response
-            setResults(data);
-            setLocationOptions((prev) => Array.from(new Set([...prev, ...data.map(g => g.location)])).sort());
+            setResults(data.items);
+            setTotalCount(data.totalCount);
+            if (scrollRestoreRef.current != null) {
+                window.scrollTo(0, scrollRestoreRef.current);
+                scrollRestoreRef.current = null;
+            }
         } finally {
             if (seq === searchSeq.current) setSearching(false);
         }
     };
 
     useEffect(() => {
-        runSearch(filters);
-    }, [filters]);
+        runSearch(filters, page);
+    }, [searchParams]);
+
+    // The Location filter's option list needs every location in the marketplace, not just
+    // the ones on the current page of results — fetched once, independent of pagination.
+    useEffect(() => {
+        axios.get('/api/gown/locations').then(({ data }) => setLocationOptions(data));
+    }, []);
 
     useEffect(() => {
         if (routerLocation.state?.posted) {
-            navigate(routerLocation.pathname, { replace: true, state: {} });
+            navigate(routerLocation.pathname + routerLocation.search, { replace: true, state: {} });
         }
     }, []);
 
-    const setField = (field) => (event, value) => setFilters((prev) => ({ ...prev, [field]: value }));
+    // Every filter/page change replaces the current history entry (not a new one) so the
+    // URL's query string is always the single source of truth for "where the user is" —
+    // clicking into a gown then hitting Back lands on exactly the last filters/page shown.
+    const updateParams = (mutate, { resetPage = true } = {}) => {
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            mutate(next);
+            if (resetPage) next.delete('page');
+            return next;
+        }, { replace: true });
+    };
+
+    const setField = (field) => (event, value) => updateParams((next) => {
+        next.delete(field);
+        value.forEach((v) => next.append(field, v));
+    });
+
+    const setPriceField = (field) => (event) => updateParams((next) => {
+        if (event.target.value === '') next.delete(field);
+        else next.set(field, event.target.value);
+    });
+
+    const onPageChange = (event, value) => {
+        updateParams((next) => {
+            if (value > 1) next.set('page', String(value));
+            else next.delete('page');
+        }, { resetPage: false });
+        resultsTopRef.current?.scrollIntoView({ block: 'start' });
+    };
+
     const setNotifyField = (field) => (event, value) => setNotifyFilters((prev) => ({ ...prev, [field]: value }));
 
     const onOpenNotify = () => {
@@ -127,12 +212,30 @@ const SearchGowns = () => {
 
     return (
         <Box>
-            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1, mr: { xs: 0, md: adVisible ? `${laneWidth}px` : 0 } }}>
+            <Stack
+                direction="row"
+                useFlexGap
+                spacing={1.5}
+                sx={{ flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', mb: 1, mr: laneSx }}
+            >
                 <Typography variant="h4">Browse Gowns</Typography>
-                <Button variant="outlined" onClick={onOpenNotify}>Notify Me</Button>
+                <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    startIcon={<NotificationsActiveIcon />}
+                    onClick={onOpenNotify}
+                    sx={{
+                        boxShadow: '0 4px 16px rgba(198, 113, 122, 0.4)',
+                        '&:hover': { boxShadow: '0 6px 20px rgba(198, 113, 122, 0.55)' }
+                    }}
+                >
+                    <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>Notify Me</Box>
+                    <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Notify Me About New Gowns</Box>
+                </Button>
             </Stack>
 
-            <Paper variant="outlined" sx={{ p: 2.5, mb: 4, mr: { xs: 0, md: adVisible ? `${laneWidth}px` : 0 } }}>
+            <Paper variant="outlined" sx={{ p: 2.5, mb: 4, mr: laneSx }}>
                 <Grid container spacing={2}>
                     <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
                         <FilterAutocomplete
@@ -171,19 +274,20 @@ const SearchGowns = () => {
                         <TextField
                             size="small" label="Min Price" type="number" fullWidth
                             value={filters.minPrice}
-                            onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
+                            onChange={setPriceField('minPrice')}
                         />
                     </Grid>
                     <Grid size={{ xs: 6, sm: 3, md: 2 }}>
                         <TextField
                             size="small" label="Max Price" type="number" fullWidth
                             value={filters.maxPrice}
-                            onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
+                            onChange={setPriceField('maxPrice')}
                         />
                     </Grid>
                 </Grid>
             </Paper>
 
+            <Box ref={resultsTopRef} />
             {searching && results.length === 0 ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
                     <CircularProgress />
@@ -206,11 +310,10 @@ const SearchGowns = () => {
                                         }}>
                                             <Typography sx={{
                                                 fontFamily: `'Playfair Display', serif`, fontWeight: 700,
-                                                fontSize: '1.6rem', letterSpacing: 4, textTransform: 'uppercase',
-                                                color: 'rgba(255,255,255,0.92)', bgcolor: 'rgba(156, 78, 88, 0.62)',
-                                                border: '2px solid rgba(255,255,255,0.85)', borderRadius: 1,
-                                                px: 2.5, py: 0.5, transform: 'rotate(-16deg)',
-                                                boxShadow: '0 4px 14px rgba(0,0,0,0.25)'
+                                                fontSize: '2.3rem', letterSpacing: 6, textTransform: 'uppercase',
+                                                color: 'rgba(156, 78, 88, 0.88)',
+                                                transform: 'rotate(-16deg)',
+                                                textShadow: '0 2px 6px rgba(255,255,255,0.55)'
                                             }}>
                                                 Sold
                                             </Typography>
@@ -225,7 +328,7 @@ const SearchGowns = () => {
                                         sx={{
                                             objectFit: 'cover',
                                             bgcolor: 'background.default',
-                                            filter: gown.isSold ? 'grayscale(40%)' : 'none'
+                                            opacity: gown.isSold ? 0.55 : 1
                                         }}
                                     />
                                     <CardContent>
@@ -246,6 +349,18 @@ const SearchGowns = () => {
                         </Grid>
                     ))}
                 </Grid>
+            )}
+
+            {totalCount > PAGE_SIZE && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                    <Pagination
+                        count={Math.ceil(totalCount / PAGE_SIZE)}
+                        page={page}
+                        onChange={onPageChange}
+                        color="primary"
+                        size={fullScreen ? 'small' : 'medium'}
+                    />
+                </Box>
             )}
 
             <Snackbar

@@ -162,10 +162,18 @@ const MyListings = () => {
     if (loading || !owner) return null;
 
     const activeCount = listings.filter((g) => g.isActive).length;
+    const hasActiveUnsoldListing = listings.some((g) => g.isActive && !g.isSold);
 
     return (
         <Box>
             <Typography variant="h4" gutterBottom>My Listings</Typography>
+            {hasActiveUnsoldListing && (
+                <Alert severity="info" sx={{ mb: 3 }}>
+                    {owner.isBusinessAccount
+                        ? 'When a gown sells, click "Mark as Sold" below to free up a spot in your business plan\'s gown allowance.'
+                        : 'When a gown sells, click "Mark as Sold" below — that\'s what cancels its monthly subscription. It keeps renewing until you do.'}
+                </Alert>
+            )}
             {owner.isBusinessAccount && (
                 owner.businessBillingComplete ? (
                     <Box sx={{ mb: 3 }}>

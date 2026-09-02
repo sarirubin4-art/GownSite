@@ -51,7 +51,7 @@ const FloatingAds = ({ onVisibilityChange }) => {
                     position: 'fixed',
                     top: 84,
                     right: 20,
-                    width: 200,
+                    width: { md: 200, lg: 260, xl: 320 },
                     overflow: 'hidden',
                     cursor: 'pointer',
                     zIndex: 1300,
@@ -70,17 +70,18 @@ const FloatingAds = ({ onVisibilityChange }) => {
                     {ad.imageUrl && (
                         <Box component="img" src={ad.imageUrl} alt={ad.title} sx={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block' }} />
                     )}
-                    <Box sx={{ p: 1.25 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{ad.title}</Typography>
+                    <Box sx={{ p: { md: 1.25, xl: 1.75 } }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: { xl: '1.05rem' } }}>{ad.title}</Typography>
                         {ad.description && (
                             <Typography
                                 variant="body2"
                                 color="text.secondary"
                                 sx={{
                                     display: '-webkit-box',
-                                    WebkitLineClamp: 2,
+                                    WebkitLineClamp: { md: 2, xl: 3 },
                                     WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden'
+                                    overflow: 'hidden',
+                                    fontSize: { xl: '0.95rem' }
                                 }}
                             >
                                 {ad.description}

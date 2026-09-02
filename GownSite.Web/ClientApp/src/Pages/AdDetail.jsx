@@ -22,11 +22,11 @@ const AdDetail = () => {
     if (!ad) return null;
 
     return (
-        <Box sx={{ maxWidth: 720, mx: 'auto', textAlign: 'center' }}>
+        <Box sx={{ maxWidth: { xs: 720, lg: 880 }, mx: 'auto', textAlign: 'center' }}>
             <Chip label={adCategoryLabel(ad.category)} color="primary" sx={{ mb: 2 }} />
             <Typography variant="h3" gutterBottom>{ad.title}</Typography>
             {ad.imageUrl && (
-                <Box sx={{ width: '100%', maxWidth: 420, aspectRatio: '1 / 1', mx: 'auto', borderRadius: 3, mb: 3, bgcolor: 'background.paper', overflow: 'hidden' }}>
+                <Box sx={{ width: '100%', maxWidth: { xs: 420, lg: 520 }, aspectRatio: '1 / 1', mx: 'auto', borderRadius: 3, mb: 3, bgcolor: 'background.paper', overflow: 'hidden' }}>
                     <Box component="img" src={ad.imageUrl} alt={ad.title} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 </Box>
             )}

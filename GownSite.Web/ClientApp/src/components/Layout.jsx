@@ -249,7 +249,7 @@ const Layout = ({ children }) => {
                        the rare row that actually reaches the right edge (a filter bar's trailing
                        button, a tab strip) can reserve just enough space to clear the ad, without
                        the whole page shifting off-center to make permanent room for it. */
-                    <Container maxWidth="lg" sx={{ pt: { xs: adVisible ? '108px' : 4, md: 4 }, pb: 24 }}>
+                    <Container maxWidth="xl" sx={{ pt: { xs: adVisible ? '108px' : 4, md: 4 }, pb: 24 }}>
                         <AdLaneProvider adVisible={adVisible}>
                             {children}
                         </AdLaneProvider>

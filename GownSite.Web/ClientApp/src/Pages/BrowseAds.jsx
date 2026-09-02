@@ -10,7 +10,7 @@ import usePageTitle from '../hooks/usePageTitle';
 const BrowseAds = () => {
     usePageTitle('Ad Directory', 'Browse trusted simcha service providers — hair, makeup, alterations, gown rental/sales, apparel, and more.');
     const navigate = useNavigate();
-    const { adVisible, laneWidth } = useAdLane();
+    const { laneSx } = useAdLane();
     const [ads, setAds] = useState([]);
     const [category, setCategory] = useState('All');
 
@@ -36,7 +36,7 @@ const BrowseAds = () => {
                 onChange={(e, value) => setCategory(value)}
                 variant="scrollable"
                 scrollButtons="auto"
-                sx={{ mb: 4, mr: { xs: 0, md: adVisible ? `${laneWidth}px` : 0 }, borderBottom: 1, borderColor: 'divider' }}
+                sx={{ mb: 4, mr: laneSx, borderBottom: 1, borderColor: 'divider' }}
             >
                 <Tab label="All" value="All" />
                 {AD_CATEGORY_OPTIONS.map(c => (
@@ -60,7 +60,7 @@ const BrowseAds = () => {
                                         src={ad.imageUrl}
                                         alt={ad.title}
                                         sx={{
-                                            width: { xs: '100%', sm: 240 },
+                                            width: { xs: '100%', sm: 240, lg: 300 },
                                             aspectRatio: '1 / 1',
                                             objectFit: 'cover',
                                             flexShrink: 0

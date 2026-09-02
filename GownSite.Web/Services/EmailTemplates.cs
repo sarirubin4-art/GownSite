@@ -50,12 +50,24 @@ namespace GownSite.Web.Services
                 EmailLayout.Button("Review My Listings", myListingsUrl),
                 frontendBaseUrl);
 
-        public static string Approved(string type, string listingUrl, string frontendBaseUrl) =>
+        public static string Approved(string type, string listingUrl, string frontendBaseUrl, string extraHtml = null) =>
             EmailLayout.Wrap(
                 EmailLayout.Heading("You're Live!") +
                 $"<p>Good news — your {type} on Regowned has been approved and is now live!</p>" +
-                EmailLayout.Button("View It", listingUrl),
+                EmailLayout.Button("View It", listingUrl) +
+                (extraHtml ?? ""),
                 frontendBaseUrl);
+
+        // Shown only on gown-approval emails (not ads) — marking a gown Sold is the only
+        // thing that stops it from continuing to bill, and owners have no other way of
+        // knowing that until they try to cancel and find out it already renewed.
+        public static string GownSoldReminder(string myListingsUrl, bool isBusinessAccount) =>
+            isBusinessAccount
+                ? $"<p style=\"margin-top:24px;padding:14px 16px;background-color:#FFF6F3;border-radius:8px;font-size:14px;\">" +
+                  $"<strong>Tip:</strong> Once this gown sells, go to <a href=\"{myListingsUrl}\" style=\"color:#9C4E58;\">My Listings</a> and click <strong>Mark as Sold</strong> — that frees up a spot in your business plan's gown allowance.</p>"
+                : $"<p style=\"margin-top:24px;padding:14px 16px;background-color:#FFF6F3;border-radius:8px;font-size:14px;\">" +
+                  $"<strong>Important:</strong> Once this gown sells, go to <a href=\"{myListingsUrl}\" style=\"color:#9C4E58;\">My Listings</a> and click <strong>Mark as Sold</strong>. " +
+                  $"Your monthly subscription for this listing keeps renewing until you do this — marking it Sold is what cancels it.</p>";
 
         public static string Removed(string type, string reason, string frontendBaseUrl) =>
             EmailLayout.Wrap(

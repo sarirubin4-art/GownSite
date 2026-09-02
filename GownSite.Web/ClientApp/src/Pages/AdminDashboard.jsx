@@ -215,7 +215,7 @@ const ActiveList = ({ items, type, onTakeDownClick, onEditClick, error }) => (
 
 const AdminDashboard = () => {
     const { owner, loading } = useAuth();
-    const { adVisible, laneWidth } = useAdLane();
+    const { laneSx } = useAdLane();
     const fullScreen = useFullScreenDialog();
     const navigate = useNavigate();
     const [tab, setTab] = useState(0);
@@ -832,7 +832,7 @@ const AdminDashboard = () => {
             )}
             {tab === 4 && (
                 <Box sx={{ mt: 3 }}>
-                    <Stack direction="row" sx={{ justifyContent: 'flex-end', mb: 2, mr: { xs: 0, md: adVisible ? `${laneWidth}px` : 0 } }}>
+                    <Stack direction="row" sx={{ justifyContent: 'flex-end', mb: 2, mr: laneSx }}>
                         <Button variant="contained" onClick={() => { setPromoForm(emptyPromoForm); setEditingPromoId(null); setPromoError(''); setPromoDialogOpen(true); }}>
                             Create Promo Code
                         </Button>
@@ -1015,7 +1015,7 @@ const AdminDashboard = () => {
                 </Stack>
             )}
             {tab === 7 && (
-                <Box sx={{ mt: 3, mr: { xs: 0, md: adVisible ? `${laneWidth}px` : 0 } }}>
+                <Box sx={{ mt: 3, mr: laneSx }}>
                     <Stack direction="row" sx={{ justifyContent: 'flex-end', mb: 2 }}>
                         <FormControlLabel
                             control={<Switch checked={showResolvedMessages} onChange={(e) => onToggleShowResolved(e.target.checked)} />}
@@ -1087,7 +1087,7 @@ const AdminDashboard = () => {
             )}
 
             {tab === 8 && (
-                <Box sx={{ mt: 3, mr: { xs: 0, md: adVisible ? `${laneWidth}px` : 0 } }}>
+                <Box sx={{ mt: 3, mr: laneSx }}>
                     {conciergeQueue.length === 0 ? (
                         <Typography color="text.secondary">Nothing to show.</Typography>
                     ) : (

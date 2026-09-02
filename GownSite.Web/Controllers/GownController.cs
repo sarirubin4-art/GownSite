@@ -133,7 +133,7 @@ namespace GownSite.Web.Controllers
         }
 
         [HttpPost("search")]
-        public List<GownPosting> Search([FromBody] GownSearchFilters filters)
+        public GownSearchResult Search([FromBody] GownSearchFilters filters)
         {
             var repo = new GownRepository(_connectionString);
             return repo.Search(filters ?? new GownSearchFilters());

@@ -17,7 +17,7 @@ const ViewGown = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const fullScreen = useFullScreenDialog();
-    const { adVisible, laneWidth } = useAdLane();
+    const { laneSx } = useAdLane();
     const [gown, setGown] = useState(null);
     const [activeImage, setActiveImage] = useState(null);
     const [contactInfo, setContactInfo] = useState(null);
@@ -64,7 +64,7 @@ const ViewGown = () => {
             >
                 Back
             </Button>
-            <Grid container spacing={4} sx={{ mr: { xs: 0, md: adVisible ? `${laneWidth}px` : 0 } }}>
+            <Grid container spacing={4} sx={{ mr: laneSx }}>
                 <Grid size={{ xs: 12, md: 7 }}>
                     <Box sx={{ display: 'flex', gap: 2 }}>
                         <Stack spacing={1} sx={{ width: 72 }}>
@@ -103,7 +103,7 @@ const ViewGown = () => {
                                 component="img"
                                 src={activeImage}
                                 alt={gown.description}
-                                sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                                sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', opacity: gown.isSold ? 0.55 : 1 }}
                             />
                             <IconButton
                                 size="small"
@@ -122,11 +122,10 @@ const ViewGown = () => {
                                 }}>
                                     <Typography sx={{
                                         fontFamily: `'Playfair Display', serif`, fontWeight: 700,
-                                        fontSize: { xs: '2.25rem', sm: '3rem' }, letterSpacing: 6, textTransform: 'uppercase',
-                                        color: 'rgba(255,255,255,0.92)', bgcolor: 'rgba(156, 78, 88, 0.6)',
-                                        border: '3px solid rgba(255,255,255,0.85)', borderRadius: 1,
-                                        px: 4, py: 1, transform: 'rotate(-18deg)',
-                                        boxShadow: '0 6px 20px rgba(0,0,0,0.25)'
+                                        fontSize: { xs: '2.9rem', sm: '3.75rem' }, letterSpacing: 8, textTransform: 'uppercase',
+                                        color: 'rgba(156, 78, 88, 0.88)',
+                                        transform: 'rotate(-18deg)',
+                                        textShadow: '0 2px 8px rgba(255,255,255,0.55)'
                                     }}>
                                         Sold
                                     </Typography>
