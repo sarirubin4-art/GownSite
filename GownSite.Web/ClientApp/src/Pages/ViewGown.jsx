@@ -31,6 +31,7 @@ const ViewGown = () => {
     );
 
     useEffect(() => {
+        window.scrollTo(0, 0);
         const load = async () => {
             const { data } = await axios.get(`/api/gown/get?id=${id}`);
             setGown(data);

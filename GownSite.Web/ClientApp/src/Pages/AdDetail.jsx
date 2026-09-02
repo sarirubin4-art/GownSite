@@ -14,6 +14,7 @@ const AdDetail = () => {
     usePageTitle(ad ? ad.title : 'Simcha Service', ad ? ad.description : undefined);
 
     useEffect(() => {
+        window.scrollTo(0, 0);
         const load = async () => {
             const { data } = await axios.get(`/api/ad/get?id=${id}`);
             setAd(data);
