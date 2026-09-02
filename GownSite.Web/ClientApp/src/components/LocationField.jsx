@@ -16,9 +16,13 @@ const loadGoogleMaps = () => {
 
     mapsLoadPromise = new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_API_KEY}&libraries=places&loading=async`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_API_KEY}&loading=async`;
         script.async = true;
-        script.onload = () => resolve();
+        // Under loading=async, the `places` library isn't actually attached just because
+        // it's mentioned in the URL — it has to be explicitly imported.
+        script.onload = () => {
+            window.google.maps.importLibrary('places').then(resolve, reject);
+        };
         script.onerror = () => reject(new Error('Failed to load Google Maps'));
         document.head.appendChild(script);
     });
