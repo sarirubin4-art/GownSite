@@ -220,9 +220,6 @@ const SearchGowns = () => {
                 sx={{ flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', mb: 1, mr: laneSx }}
             >
                 <Typography variant="h4">Browse Gowns</Typography>
-                {/* On desktop, once the ad card is visible and measured, Notify Me moves to
-                    float below it instead — same call to action, but it stays in view while
-                    scrolling and the space reads as one natural stacked column. */}
                 <Button
                     variant="contained"
                     color="primary"
@@ -230,7 +227,6 @@ const SearchGowns = () => {
                     startIcon={<NotificationsActiveIcon />}
                     onClick={onOpenNotify}
                     sx={{
-                        display: showFixedNotify ? { xs: 'inline-flex', md: 'none' } : 'inline-flex',
                         boxShadow: '0 4px 16px rgba(198, 113, 122, 0.4)',
                         '&:hover': { boxShadow: '0 6px 20px rgba(198, 113, 122, 0.55)' }
                     }}
@@ -240,6 +236,9 @@ const SearchGowns = () => {
                 </Button>
             </Stack>
 
+            {/* On desktop, once the ad card is visible and measured, a second Notify Me
+                floats below it as a scroll-persistent reminder — the one above (which stays
+                put) is still the primary, guaranteed-visible call to action. */}
             {showFixedNotify && (
                 <Button
                     variant="contained"
