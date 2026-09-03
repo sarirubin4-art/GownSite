@@ -10,10 +10,13 @@ import React, { createContext, useContext } from 'react';
 // overlaps a lane still sized for its smaller, laptop-width self.
 const LANE_SX = { xs: 0, md: '220px', lg: '260px', xl: '300px' };
 
-const AdLaneContext = createContext({ adVisible: false, laneSx: 0 });
+const AdLaneContext = createContext({ adVisible: false, laneSx: 0, adStackTop: null });
 
-export const AdLaneProvider = ({ adVisible, children }) => (
-    <AdLaneContext.Provider value={{ adVisible, laneSx: adVisible ? LANE_SX : 0 }}>
+// adStackTop is the pixel `top` a fixed element should use to sit directly under the
+// desktop ad card (null until FloatingAds has measured it, or if no ad is showing) —
+// see FloatingAds' onStackTopChange.
+export const AdLaneProvider = ({ adVisible, adStackTop, children }) => (
+    <AdLaneContext.Provider value={{ adVisible, laneSx: adVisible ? LANE_SX : 0, adStackTop: adVisible ? adStackTop : null }}>
         {children}
     </AdLaneContext.Provider>
 );

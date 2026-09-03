@@ -53,7 +53,7 @@ const SearchGowns = () => {
     const navigate = useNavigate();
     const routerLocation = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
-    const { laneSx } = useAdLane();
+    const { laneSx, adVisible, adStackTop } = useAdLane();
     const fullScreen = useFullScreenDialog();
     const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
     const page = Math.max(1, Number(searchParams.get('page')) || 1);
@@ -209,6 +209,8 @@ const SearchGowns = () => {
         }
     };
 
+    const showFixedNotify = adVisible && adStackTop != null;
+
     return (
         <Box>
             <Stack
@@ -218,6 +220,9 @@ const SearchGowns = () => {
                 sx={{ flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', mb: 1, mr: laneSx }}
             >
                 <Typography variant="h4">Browse Gowns</Typography>
+                {/* On desktop, once the ad card is visible and measured, Notify Me moves to
+                    float below it instead — same call to action, but it stays in view while
+                    scrolling and the space reads as one natural stacked column. */}
                 <Button
                     variant="contained"
                     color="primary"
@@ -225,6 +230,7 @@ const SearchGowns = () => {
                     startIcon={<NotificationsActiveIcon />}
                     onClick={onOpenNotify}
                     sx={{
+                        display: showFixedNotify ? { xs: 'inline-flex', md: 'none' } : 'inline-flex',
                         boxShadow: '0 4px 16px rgba(198, 113, 122, 0.4)',
                         '&:hover': { boxShadow: '0 6px 20px rgba(198, 113, 122, 0.55)' }
                     }}
@@ -233,6 +239,28 @@ const SearchGowns = () => {
                     <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Notify Me About New Gowns</Box>
                 </Button>
             </Stack>
+
+            {showFixedNotify && (
+                <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<NotificationsActiveIcon />}
+                    onClick={onOpenNotify}
+                    sx={{
+                        display: { xs: 'none', md: 'inline-flex' },
+                        justifyContent: 'center',
+                        position: 'fixed',
+                        top: adStackTop,
+                        right: 20,
+                        zIndex: 1300,
+                        width: { md: 200, lg: 240, xl: 280 },
+                        boxShadow: '0 4px 16px rgba(198, 113, 122, 0.4)',
+                        '&:hover': { boxShadow: '0 6px 20px rgba(198, 113, 122, 0.55)' }
+                    }}
+                >
+                    Notify Me
+                </Button>
+            )}
 
             <Paper variant="outlined" sx={{ p: 2.5, mb: 4, mr: laneSx }}>
                 <Grid container spacing={2}>

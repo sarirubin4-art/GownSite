@@ -34,6 +34,7 @@ const Layout = ({ children }) => {
     const location = useLocation();
     const [menuAnchor, setMenuAnchor] = useState(null);
     const [adVisible, setAdVisible] = useState(false);
+    const [adStackTop, setAdStackTop] = useState(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [resendState, setResendState] = useState('idle'); // idle | sending | sent
     const [contactOpen, setContactOpen] = useState(false);
@@ -250,7 +251,7 @@ const Layout = ({ children }) => {
                        button, a tab strip) can reserve just enough space to clear the ad, without
                        the whole page shifting off-center to make permanent room for it. */
                     <Container maxWidth="xl" sx={{ pt: { xs: adVisible ? '108px' : 4, md: 4 }, pb: 24 }}>
-                        <AdLaneProvider adVisible={adVisible}>
+                        <AdLaneProvider adVisible={adVisible} adStackTop={adStackTop}>
                             {children}
                         </AdLaneProvider>
                     </Container>
@@ -276,7 +277,7 @@ const Layout = ({ children }) => {
                 title="Contact Customer Service"
                 promptText="How can we help? Send us a message and we'll follow up by email."
             />
-            <FloatingAds onVisibilityChange={setAdVisible} />
+            <FloatingAds onVisibilityChange={setAdVisible} onStackTopChange={setAdStackTop} />
         </Box>
     );
 };

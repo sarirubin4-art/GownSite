@@ -1,14 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Paper, Box, Typography, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
-const FloatingAds = ({ onVisibilityChange }) => {
+export const AD_TOP = 84;
+const STACK_GAP = 16;
+
+const FloatingAds = ({ onVisibilityChange, onStackTopChange }) => {
     const [ads, setAds] = useState([]);
     const [index, setIndex] = useState(0);
     const [dismissed, setDismissed] = useState(false);
     const navigate = useNavigate();
+    const cardRef = useRef(null);
 
     useEffect(() => {
         const load = async () => {
@@ -37,6 +41,23 @@ const FloatingAds = ({ onVisibilityChange }) => {
         return () => onVisibilityChange?.(false);
     }, [dismissed, ads]);
 
+    // Reports where the desktop ad card's bottom edge actually lands (it varies with each
+    // ad's own image/description length) so other fixed elements — the Notify Me button on
+    // the Browse Gowns page — can stack directly below it instead of guessing a fixed offset.
+    useEffect(() => {
+        if (dismissed || ads.length === 0 || !onStackTopChange) return;
+        const el = cardRef.current;
+        if (!el) return;
+        const report = () => onStackTopChange(AD_TOP + el.getBoundingClientRect().height + STACK_GAP);
+        report();
+        const observer = new ResizeObserver(report);
+        observer.observe(el);
+        return () => {
+            observer.disconnect();
+            onStackTopChange(null);
+        };
+    }, [dismissed, ads, index, onStackTopChange]);
+
     if (dismissed || ads.length === 0) return null;
     const ad = ads[index];
 
@@ -44,12 +65,13 @@ const FloatingAds = ({ onVisibilityChange }) => {
         <>
             {/* Desktop: a card floating over the page's right margin. */}
             <Paper
+                ref={cardRef}
                 elevation={6}
                 onClick={() => navigate(`/ad/${ad.id}`)}
                 sx={{
                     display: { xs: 'none', md: 'block' },
                     position: 'fixed',
-                    top: 84,
+                    top: AD_TOP,
                     right: 20,
                     width: { md: 200, lg: 240, xl: 280 },
                     overflow: 'hidden',
