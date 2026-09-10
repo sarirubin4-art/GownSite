@@ -345,19 +345,25 @@ const BulkGownPostingForm = () => {
                             <Grid size={{ xs: 12, sm: 4 }}>
                                 <Autocomplete
                                     multiple
+                                    autoHighlight
+                                    autoSelect
                                     options={COLOR_OPTIONS}
                                     value={g.colors}
                                     onChange={(e, value) => updateGown(g.localId, { colors: value })}
                                     renderInput={(params) => <TextField {...params} label="Color(s)" helperText="Choose all that apply." />}
+                                    slotProps={{ popper: { style: { zIndex: 1400 } } }}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 4 }}>
                                 <Autocomplete
                                     multiple
+                                    autoHighlight
+                                    autoSelect
                                     options={SIZE_OPTIONS}
                                     value={g.sizes}
                                     onChange={(e, value) => updateGown(g.localId, { sizes: value })}
                                     renderInput={(params) => <TextField {...params} label="Size(s)" />}
+                                    slotProps={{ popper: { style: { zIndex: 1400 } } }}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 4 }}>
