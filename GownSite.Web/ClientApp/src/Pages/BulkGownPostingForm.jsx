@@ -53,9 +53,12 @@ const BulkGownPostingForm = () => {
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [progressIndex, setProgressIndex] = useState(0);
-    const [submittedIds, setSubmittedIds] = useState([]);
-    const [failedIndex, setFailedIndex] = useState(null);
+    // Keyed by gown.localId (not array position) so a row removed mid-batch
+    // can't desync these from the gowns array — see submitFrom/removeGown.
+    const [savedGowns, setSavedGowns] = useState([]); // [{ localId, id }]
+    const [failedLocalId, setFailedLocalId] = useState(null);
     const [expanded, setExpanded] = useState(0);
+    const savedLocalIds = new Set(savedGowns.map((s) => s.localId));
 
     const [shared, setShared] = useState({
         location: '',
@@ -137,15 +140,29 @@ const BulkGownPostingForm = () => {
     };
 
     const removeGown = (localId) => {
-        setGowns((prev) => prev.filter((g) => g.localId !== localId));
+        // A gown already saved to the server can't be un-saved from here (there's no
+        // delete endpoint, and it would still ride along to payment setup) — its row
+        // stays so the "Saved" state remains visible and truthful.
+        if (savedLocalIds.has(localId)) return;
+        setGowns((prev) => {
+            const removedIndex = prev.findIndex((g) => g.localId === localId);
+            const next = prev.filter((g) => g.localId !== localId);
+            setExpanded((prevExpanded) => {
+                if (prevExpanded === removedIndex) return -1;
+                if (prevExpanded > removedIndex) return prevExpanded - 1;
+                return prevExpanded;
+            });
+            return next;
+        });
     };
 
     const gownLabel = (g, i) => g.description ? g.description.slice(0, 40) : `Gown ${i + 1}`;
 
     const validate = () => {
         if (!shared.location) return 'Please enter a location for this batch.';
-        for (let i = failedIndex ?? 0; i < gowns.length; i++) {
+        for (let i = 0; i < gowns.length; i++) {
             const g = gowns[i];
+            if (savedLocalIds.has(g.localId)) continue;
             if (!g.description || g.colors.length === 0 || g.sizes.length === 0 || !g.price) {
                 return `Gown ${i + 1}: please fill in description, color, size, and price.`;
             }
@@ -159,7 +176,7 @@ const BulkGownPostingForm = () => {
         return '';
     };
 
-    const submitFrom = async (startIndex) => {
+    const submitFrom = async () => {
         const validationError = validate();
         if (validationError) {
             setError(validationError);
@@ -167,12 +184,13 @@ const BulkGownPostingForm = () => {
         }
         setError('');
         setSubmitting(true);
-        setFailedIndex(null);
+        setFailedLocalId(null);
 
-        const ids = [...submittedIds];
-        for (let i = startIndex; i < gowns.length; i++) {
-            setProgressIndex(i);
+        const saved = [...savedGowns];
+        for (let i = 0; i < gowns.length; i++) {
             const g = gowns[i];
+            if (savedLocalIds.has(g.localId)) continue;
+            setProgressIndex(i);
             try {
                 const data = new FormData();
                 data.append('Description', g.description);
@@ -198,10 +216,10 @@ const BulkGownPostingForm = () => {
                 const { data: result } = await axios.post('/api/gown/create', data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
-                ids.push(result.id);
-                setSubmittedIds([...ids]);
+                saved.push({ localId: g.localId, id: result.id });
+                setSavedGowns([...saved]);
             } catch (err) {
-                setFailedIndex(i);
+                setFailedLocalId(g.localId);
                 setExpanded(i);
                 setError(`Gown ${i + 1} (${gownLabel(g, i)}) failed: ${err?.response?.data?.message || 'Something went wrong saving this listing.'}`);
                 setSubmitting(false);
@@ -210,6 +228,7 @@ const BulkGownPostingForm = () => {
         }
 
         localStorage.removeItem(DRAFT_KEY);
+        const ids = saved.map((s) => s.id);
 
         if (owner.isBusinessAccount) {
             if (!owner.businessBillingComplete) {
@@ -229,16 +248,17 @@ const BulkGownPostingForm = () => {
 
     const onContinueWithSaved = async () => {
         localStorage.removeItem(DRAFT_KEY);
+        const ids = savedGowns.map((s) => s.id);
         if (owner.isBusinessAccount) {
             if (!owner.businessBillingComplete) {
                 navigate('/business/billing-setup');
                 return;
             }
-            await Promise.all(submittedIds.map((id) => axios.post('/api/gown/submit-business', { id })));
+            await Promise.all(ids.map((id) => axios.post('/api/gown/submit-business', { id })));
             navigate('/mylistings');
             return;
         }
-        navigate(`/postagown/bulk-payment-setup?ids=${submittedIds.join(',')}`);
+        navigate(`/postagown/bulk-payment-setup?ids=${ids.join(',')}`);
     };
 
     if (loading || !owner) return null;
@@ -258,10 +278,10 @@ const BulkGownPostingForm = () => {
             {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
                     {error}
-                    {submittedIds.length > 0 && (
+                    {savedGowns.length > 0 && (
                         <Box sx={{ mt: 1.5 }}>
                             <Button size="small" variant="outlined" color="inherit" onClick={onContinueWithSaved}>
-                                Continue to payment with the {submittedIds.length} gown{submittedIds.length === 1 ? '' : 's'} already saved
+                                Continue to payment with the {savedGowns.length} gown{savedGowns.length === 1 ? '' : 's'} already saved
                             </Button>
                         </Box>
                     )}
@@ -315,15 +335,15 @@ const BulkGownPostingForm = () => {
                     key={g.localId}
                     expanded={expanded === i}
                     onChange={() => setExpanded(expanded === i ? -1 : i)}
-                    sx={{ mb: 1.5, border: '1px solid', borderColor: failedIndex === i ? 'error.main' : 'divider' }}
+                    sx={{ mb: 1.5, border: '1px solid', borderColor: failedLocalId === g.localId ? 'error.main' : 'divider' }}
                     variant="outlined"
                 >
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexGrow: 1, pr: 1 }}>
                             <Typography sx={{ flexGrow: 1 }}>{gownLabel(g, i)}</Typography>
-                            {submittedIds.length > i && <Chip size="small" color="success" label="Saved" />}
-                            {failedIndex === i && <Chip size="small" color="error" label="Failed" />}
-                            {gowns.length > 1 && (
+                            {savedLocalIds.has(g.localId) && <Chip size="small" color="success" label="Saved" />}
+                            {failedLocalId === g.localId && <Chip size="small" color="error" label="Failed" />}
+                            {gowns.length > 1 && !savedLocalIds.has(g.localId) && (
                                 <IconButton
                                     size="small"
                                     onClick={(e) => { e.stopPropagation(); removeGown(g.localId); }}
@@ -441,11 +461,11 @@ const BulkGownPostingForm = () => {
             <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
                 <Button
                     variant="contained" size="large" disabled={submitting}
-                    onClick={() => submitFrom(failedIndex ?? submittedIds.length)}
+                    onClick={() => submitFrom()}
                 >
                     {submitting
                         ? 'Saving...'
-                        : failedIndex !== null
+                        : failedLocalId !== null
                             ? 'Retry From Failed Gown'
                             : `Confirm ${gowns.length} Gown${gowns.length === 1 ? '' : 's'} & Continue to Payment`}
                 </Button>
