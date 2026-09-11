@@ -172,6 +172,9 @@ const MyListings = () => {
     return (
         <Box>
             <Typography variant="h4" gutterBottom>My Listings</Typography>
+            <Typography color="text.secondary" sx={{ mb: 2 }}>
+                {activeCount} gown{activeCount === 1 ? '' : 's'} live
+            </Typography>
             {hasActiveUnsoldListing && (
                 <Alert severity="info" sx={{ mb: 3 }}>
                     {owner.isBusinessAccount

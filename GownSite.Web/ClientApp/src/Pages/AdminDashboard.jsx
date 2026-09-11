@@ -962,6 +962,7 @@ const AdminDashboard = () => {
                                         <TableCell>Email</TableCell>
                                         <TableCell>Phone</TableCell>
                                         <TableCell>Role</TableCell>
+                                        <TableCell>Live Listings</TableCell>
                                         <TableCell />
                                     </TableRow>
                                 </TableHead>
@@ -981,6 +982,11 @@ const AdminDashboard = () => {
                                                         />
                                                     )}
                                                 </Stack>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" color="text.secondary" noWrap>
+                                                    {o.activeGownCount ?? 0} gown{o.activeGownCount === 1 ? '' : 's'} &middot; {o.activeAdCount ?? 0} ad{o.activeAdCount === 1 ? '' : 's'}
+                                                </Typography>
                                             </TableCell>
                                             <TableCell align="right">
                                                 <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>

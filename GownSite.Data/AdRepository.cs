@@ -71,6 +71,12 @@ namespace GownSite.Data
                 .ToList();
         }
 
+        public int CountActiveByOwner(int ownerId)
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Ads.Count(a => a.OwnerId == ownerId && a.IsActive);
+        }
+
         public int Create(Ad ad)
         {
             using var context = new GownDataContext(_connectionString);

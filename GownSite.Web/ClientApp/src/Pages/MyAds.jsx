@@ -100,9 +100,16 @@ const MyAds = () => {
 
     if (loading || !owner) return null;
 
+    const activeCount = ads.filter((a) => a.isActive).length;
+
     return (
         <Box>
             <Typography variant="h4" gutterBottom>My Ads</Typography>
+            {ads.length > 0 && (
+                <Typography color="text.secondary" sx={{ mb: 2 }}>
+                    {activeCount} ad{activeCount === 1 ? '' : 's'} live
+                </Typography>
+            )}
             {ads.length === 0 && (
                 <Typography color="text.secondary">You haven't placed any ads yet.</Typography>
             )}

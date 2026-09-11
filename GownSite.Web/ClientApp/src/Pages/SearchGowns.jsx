@@ -44,6 +44,7 @@ const filtersFromParams = (params) => ({
 const GownCard = ({ gown, navigate }) => {
     const images = [gown.primaryPictureUrl, ...(gown.morePictures || []).map((p) => p.url)];
     const [index, setIndex] = useState(0);
+    const [hovered, setHovered] = useState(false);
     const hasMultiple = images.length > 1;
 
     const step = (delta) => (e) => {
@@ -52,12 +53,28 @@ const GownCard = ({ gown, navigate }) => {
         setIndex((prev) => (prev + delta + images.length) % images.length);
     };
 
+    const arrowSx = {
+        position: 'absolute', top: 110, transform: 'translateY(-50%)', zIndex: 1,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', color: '#fff',
+        bgcolor: 'rgba(0,0,0,0.4)',
+        transition: 'background-color 0.1s ease, transform 0.1s ease',
+        '&:hover': { bgcolor: 'rgba(0,0,0,0.6)' },
+        '&:active': { bgcolor: 'rgba(0,0,0,0.7)', transform: 'translateY(-50%) scale(0.88)' }
+    };
+
     return (
-        <Card sx={{ position: 'relative' }}>
-            <CardActionArea
-                onClick={() => navigate(`/gown/${gown.id}`)}
-                sx={{ '&:hover .gown-card-image': { objectFit: 'contain' } }}
-            >
+        // Hover state is tracked in React (not a CSS :hover on CardActionArea) so the
+        // "show the full uncropped photo" effect stays on while the mouse is over the
+        // arrows too — the arrows are siblings of CardActionArea (see note below), so a
+        // CSS-only `&:hover` scoped to the button wouldn't fire while hovering them, and
+        // switching photos would keep resetting back to the cropped view.
+        <Card
+            sx={{ position: 'relative' }}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+        >
+            <CardActionArea onClick={() => navigate(`/gown/${gown.id}`)}>
                 {gown.isSold && (
                     <Box sx={{
                         position: 'absolute', top: 0, left: 0, width: '100%', height: 220, zIndex: 1,
@@ -79,9 +96,8 @@ const GownCard = ({ gown, navigate }) => {
                     height="220"
                     image={images[index]}
                     alt={gown.description}
-                    className="gown-card-image"
                     sx={{
-                        objectFit: 'cover',
+                        objectFit: hovered ? 'contain' : 'cover',
                         bgcolor: 'background.default',
                         opacity: gown.isSold ? 0.55 : 1
                     }}
@@ -102,32 +118,10 @@ const GownCard = ({ gown, navigate }) => {
             </CardActionArea>
             {hasMultiple && (
                 <>
-                    <Box
-                        onClick={step(-1)}
-                        sx={{
-                            position: 'absolute', top: 110, left: 6, transform: 'translateY(-50%)', zIndex: 1,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            width: 26, height: 26, borderRadius: '50%', cursor: 'pointer', color: '#fff',
-                            filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.75))',
-                            opacity: 0.85, transition: 'opacity 0.1s ease, background-color 0.1s ease, transform 0.1s ease',
-                            '&:hover': { opacity: 1 },
-                            '&:active': { opacity: 1, bgcolor: 'rgba(255,255,255,0.3)', transform: 'translateY(-50%) scale(0.88)' }
-                        }}
-                    >
+                    <Box onClick={step(-1)} sx={{ ...arrowSx, left: 8 }}>
                         <ChevronLeftIcon fontSize="small" />
                     </Box>
-                    <Box
-                        onClick={step(1)}
-                        sx={{
-                            position: 'absolute', top: 110, right: 6, transform: 'translateY(-50%)', zIndex: 1,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            width: 26, height: 26, borderRadius: '50%', cursor: 'pointer', color: '#fff',
-                            filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.75))',
-                            opacity: 0.85, transition: 'opacity 0.1s ease, background-color 0.1s ease, transform 0.1s ease',
-                            '&:hover': { opacity: 1 },
-                            '&:active': { opacity: 1, bgcolor: 'rgba(255,255,255,0.3)', transform: 'translateY(-50%) scale(0.88)' }
-                        }}
-                    >
+                    <Box onClick={step(1)} sx={{ ...arrowSx, right: 8 }}>
                         <ChevronRightIcon fontSize="small" />
                     </Box>
                     <Stack direction="row" spacing={0.5} sx={{ position: 'absolute', top: 196, left: 0, right: 0, justifyContent: 'center', pointerEvents: 'none' }}>

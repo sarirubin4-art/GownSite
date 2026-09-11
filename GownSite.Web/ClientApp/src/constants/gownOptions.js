@@ -56,6 +56,7 @@ export const AD_CATEGORY_OPTIONS = [
     { value: 'Alterations', label: 'Alterations' },
     { value: 'GownRental', label: 'Gown Rental/Sales' },
     { value: 'GirlsWomensApparel', label: 'Girls/Womens Apparel' },
+    { value: 'Bridal', label: 'Bridal' },
     { value: 'Photography', label: 'Photography' },
     { value: 'PartyPlanners', label: 'Party Planners' },
     { value: 'Gemachs', label: 'Gemachs' },

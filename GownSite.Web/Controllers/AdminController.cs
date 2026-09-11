@@ -566,6 +566,7 @@ namespace GownSite.Web.Controllers
         {
             var ownerRepo = new OwnerRepository(_connectionString);
             var gownRepo = new GownRepository(_connectionString);
+            var adRepo = new AdRepository(_connectionString);
             var owners = ownerRepo.GetAll().Select(o => new
             {
                 o.Id,
@@ -579,7 +580,8 @@ namespace GownSite.Web.Controllers
                 o.BusinessGownAllowance,
                 o.BusinessOverageFeePerGownUsd,
                 BusinessBillingComplete = !string.IsNullOrEmpty(o.BusinessStripeSubscriptionId),
-                ActiveGownCount = o.IsBusinessAccount ? gownRepo.CountActiveByOwner(o.Id) : (int?)null
+                ActiveGownCount = gownRepo.CountActiveByOwner(o.Id),
+                ActiveAdCount = adRepo.CountActiveByOwner(o.Id)
             });
             return Ok(owners);
         }
