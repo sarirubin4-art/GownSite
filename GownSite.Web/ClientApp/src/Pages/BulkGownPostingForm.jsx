@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
     Container, Typography, TextField, Button, Stack, MenuItem, Grid,
-    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box, Autocomplete,
+    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box,
     Accordion, AccordionSummary, AccordionDetails, IconButton, LinearProgress, Chip
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import LocationField from '../components/LocationField';
 import PriceField from '../components/PriceField';
 import MorePicturesInput from '../components/MorePicturesInput';
+import FilterAutocomplete from '../components/FilterAutocomplete';
 
 const MAX_BATCH_GOWNS = 20;
 const DRAFT_KEY = 'regowned_bulk_posting_draft';
@@ -363,26 +364,24 @@ const BulkGownPostingForm = () => {
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 4 }}>
-                                <Autocomplete
-                                    multiple
+                                <FilterAutocomplete
+                                    label="Color(s)" helperText="Choose all that apply."
                                     autoHighlight
                                     autoSelect
                                     options={COLOR_OPTIONS}
                                     value={g.colors}
                                     onChange={(e, value) => updateGown(g.localId, { colors: value })}
-                                    renderInput={(params) => <TextField {...params} label="Color(s)" helperText="Choose all that apply." />}
                                     slotProps={{ popper: { style: { zIndex: 1400 } } }}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 4 }}>
-                                <Autocomplete
-                                    multiple
+                                <FilterAutocomplete
+                                    label="Size(s)"
                                     autoHighlight
                                     autoSelect
                                     options={SIZE_OPTIONS}
                                     value={g.sizes}
                                     onChange={(e, value) => updateGown(g.localId, { sizes: value })}
-                                    renderInput={(params) => <TextField {...params} label="Size(s)" />}
                                     slotProps={{ popper: { style: { zIndex: 1400 } } }}
                                 />
                             </Grid>

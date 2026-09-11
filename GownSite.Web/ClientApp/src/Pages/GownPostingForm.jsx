@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import {
     Container, Typography, TextField, Button, Stack, MenuItem, Grid,
-    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box, Autocomplete
+    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box
 } from '@mui/material';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, sortSizes } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +11,7 @@ import LocationField from '../components/LocationField';
 import PriceField from '../components/PriceField';
 import ContactAdminDialog from '../components/ContactAdminDialog';
 import MorePicturesInput from '../components/MorePicturesInput';
+import FilterAutocomplete from '../components/FilterAutocomplete';
 
 const GownPostingForm = () => {
     const { owner, loading } = useAuth();
@@ -230,21 +231,19 @@ const GownPostingForm = () => {
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 4 }}>
-                        <Autocomplete
-                            multiple
+                        <FilterAutocomplete
+                            label="Color(s)" helperText="Choose all that apply."
                             options={COLOR_OPTIONS}
                             value={form.colors}
                             onChange={(e, value) => { markDirty(); setForm({ ...form, colors: value }); }}
-                            renderInput={(params) => <TextField {...params} label="Color(s)" helperText="Choose all that apply." />}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 4 }}>
-                        <Autocomplete
-                            multiple
+                        <FilterAutocomplete
+                            label="Size(s)" helperText="Fits a range? Select each size it fits."
                             options={SIZE_OPTIONS}
                             value={form.sizes}
                             onChange={(e, value) => { markDirty(); setForm({ ...form, sizes: value }); }}
-                            renderInput={(params) => <TextField {...params} label="Size(s)" helperText="Fits a range? Select each size it fits." />}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 4 }}>

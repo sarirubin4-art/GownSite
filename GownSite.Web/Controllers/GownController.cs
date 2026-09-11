@@ -106,6 +106,7 @@ namespace GownSite.Web.Controllers
         public int? BatchSize { get; set; }
         public string PromoCode { get; set; }
         public IFormFile PrimaryPicture { get; set; }
+        public List<IFormFile> MorePictures { get; set; } = new();
     }
 
     public class ConciergeNotifyRequest
@@ -441,6 +442,8 @@ namespace GownSite.Web.Controllers
             if (string.IsNullOrWhiteSpace(request.Location)) return BadRequest(new { message = "Location is required." });
             if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType)) return BadRequest(new { message = "Rent or sale is required." });
             if (request.BatchId == Guid.Empty) return BadRequest(new { message = "Missing batch identifier." });
+            if (request.MorePictures?.Count > MaxMorePictures)
+                return BadRequest(new { message = $"You can upload up to {MaxMorePictures} additional photos." });
 
             var pricing = PromoCodeCalculator.ResolvePricing(
                 _connectionString, request.PromoCode, _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m),
@@ -475,6 +478,15 @@ namespace GownSite.Web.Controllers
                 PromoDurationMonths = pricing.PromoDurationMonths
             };
             var id = repo.Create(posting);
+
+            if (request.MorePictures?.Count > 0)
+            {
+                var urls = new List<string>();
+                foreach (var file in request.MorePictures)
+                    urls.Add(await _storage.SaveAsync(file, "gowns"));
+                repo.AddPictures(id, urls);
+            }
+
             return Ok(new { id });
         }
 

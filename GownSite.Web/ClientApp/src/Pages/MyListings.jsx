@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
     Box, Typography, Grid, Card, CardMedia, CardContent, Chip, Button, Stack,
-    Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Autocomplete,
+    Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem,
     Checkbox, FormControlLabel, FormGroup, Alert
 } from '@mui/material';
 import { COLOR_OPTIONS, SIZE_OPTIONS, LISTING_TYPE_OPTIONS, STYLE_OPTIONS, formatPriceRange, sortSizes } from '../constants/gownOptions';
@@ -13,6 +13,8 @@ import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import LocationField from '../components/LocationField';
 import PriceField from '../components/PriceField';
 import MorePicturesInput from '../components/MorePicturesInput';
+import ImageZoomDialog from '../components/ImageZoomDialog';
+import FilterAutocomplete from '../components/FilterAutocomplete';
 
 const MyListings = () => {
     const { owner, loading } = useAuth();
@@ -32,6 +34,7 @@ const MyListings = () => {
     const [removePictureIds, setRemovePictureIds] = useState([]);
     const [newMorePictures, setNewMorePictures] = useState([]);
     const [resubmitting, setResubmitting] = useState(false);
+    const [zoomPrimaryOpen, setZoomPrimaryOpen] = useState(false);
 
     const load = async () => {
         const { data } = await axios.get('/api/gown/mylistings');
@@ -331,9 +334,11 @@ const MyListings = () => {
                                     component="img"
                                     src={newPrimaryPreview || editTarget.primaryPictureUrl}
                                     alt="Primary"
+                                    onClick={() => setZoomPrimaryOpen(true)}
                                     sx={{
                                         width: 100, height: 100, borderRadius: 2, objectFit: 'cover',
-                                        border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper'
+                                        border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper',
+                                        cursor: 'zoom-in'
                                     }}
                                 />
                                 <Button variant="outlined" component="label" size="small">
@@ -341,6 +346,12 @@ const MyListings = () => {
                                     <input type="file" accept="image/*" hidden onChange={onEditPictureChange} />
                                 </Button>
                             </Stack>
+                            <ImageZoomDialog
+                                open={zoomPrimaryOpen}
+                                onClose={() => setZoomPrimaryOpen(false)}
+                                images={[newPrimaryPreview || editTarget.primaryPictureUrl]}
+                                fullScreen={fullScreen}
+                            />
                             <MorePicturesInput
                                 files={newMorePictures}
                                 onFilesChange={setNewMorePictures}
@@ -350,21 +361,17 @@ const MyListings = () => {
                             <TextField label="Description" multiline rows={2} value={editTarget.description}
                                 onChange={(e) => setEditTarget({ ...editTarget, description: e.target.value })} />
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                                <Autocomplete
-                                    multiple
-                                    fullWidth
+                                <FilterAutocomplete
+                                    label="Color(s)" helperText="Choose all that apply." fullWidth
                                     options={COLOR_OPTIONS}
                                     value={editTarget.colors}
                                     onChange={(e, value) => setEditTarget({ ...editTarget, colors: value })}
-                                    renderInput={(params) => <TextField {...params} label="Color(s)" helperText="Choose all that apply." />}
                                 />
-                                <Autocomplete
-                                    multiple
-                                    fullWidth
+                                <FilterAutocomplete
+                                    label="Size(s)" fullWidth
                                     options={SIZE_OPTIONS}
                                     value={editTarget.sizes}
                                     onChange={(e, value) => setEditTarget({ ...editTarget, sizes: value })}
-                                    renderInput={(params) => <TextField {...params} label="Size(s)" />}
                                 />
                             </Stack>
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="flex-start">

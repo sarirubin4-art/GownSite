@@ -5,7 +5,7 @@ import {
     Box, Typography, Tabs, Tab, Grid, Card, CardMedia, CardContent, CardActionArea, Button, Stack,
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert, MenuItem,
     Table, TableHead, TableBody, TableRow, TableCell, Switch, Chip, Divider,
-    Autocomplete, FormControlLabel, Checkbox, FormGroup,
+    FormControlLabel, Checkbox, FormGroup,
     Accordion, AccordionSummary, AccordionDetails, IconButton, LinearProgress
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -18,6 +18,8 @@ import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, AD_CA
 import LocationField from '../components/LocationField';
 import PriceField from '../components/PriceField';
 import MorePicturesInput from '../components/MorePicturesInput';
+import ImageZoomDialog from '../components/ImageZoomDialog';
+import FilterAutocomplete from '../components/FilterAutocomplete';
 
 const MAX_POST_FOR_PATRON_GOWNS = 20;
 
@@ -60,7 +62,12 @@ const DetailRow = ({ label, value }) => {
     );
 };
 
-const ItemDetailDialog = ({ item, type, onClose, fullScreen }) => (
+const ItemDetailDialog = ({ item, type, onClose, fullScreen, onEditClick }) => {
+    const [zoomIndex, setZoomIndex] = useState(null);
+    const images = item
+        ? [type === 'gown' ? item.primaryPictureUrl : item.imageUrl, ...(item.morePictures || []).map((p) => p.url)].filter(Boolean)
+        : [];
+    return (
     <Dialog open={!!item} onClose={onClose} maxWidth="sm" fullWidth fullScreen={fullScreen}>
         <DialogTitle>{type === 'gown' ? 'Gown Details' : 'Ad Details'}</DialogTitle>
         {item && (
@@ -69,15 +76,23 @@ const ItemDetailDialog = ({ item, type, onClose, fullScreen }) => (
                     component="img"
                     src={type === 'gown' ? item.primaryPictureUrl : item.imageUrl}
                     alt=""
-                    sx={{ width: '100%', maxHeight: 360, objectFit: 'contain', borderRadius: 2, bgcolor: 'background.default', mb: 2 }}
+                    onClick={() => setZoomIndex(0)}
+                    sx={{ width: '100%', maxHeight: 360, objectFit: 'contain', borderRadius: 2, bgcolor: 'background.default', mb: 2, cursor: 'zoom-in' }}
                 />
                 {item.morePictures?.length > 0 && (
                     <Stack direction="row" spacing={1} sx={{ mb: 2, overflowX: 'auto' }}>
-                        {item.morePictures.map((p) => (
-                            <Box key={p.url} component="img" src={p.url} alt="" sx={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }} />
+                        {item.morePictures.map((p, i) => (
+                            <Box key={p.url} component="img" src={p.url} alt="" onClick={() => setZoomIndex(i + 1)} sx={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 1, flexShrink: 0, cursor: 'zoom-in' }} />
                         ))}
                     </Stack>
                 )}
+                <ImageZoomDialog
+                    open={zoomIndex !== null}
+                    onClose={() => setZoomIndex(null)}
+                    images={images}
+                    initialIndex={zoomIndex ?? 0}
+                    fullScreen={fullScreen}
+                />
                 <Divider sx={{ mb: 1.5 }} />
                 <DetailRow label="Owner" value={item.owner ? `${item.owner.name} (${item.owner.email}${item.owner.number ? `, ${item.owner.number}` : ''})` : null} />
                 {type === 'gown' ? (
@@ -109,12 +124,16 @@ const ItemDetailDialog = ({ item, type, onClose, fullScreen }) => (
             </DialogContent>
         )}
         <DialogActions>
+            {type === 'gown' && onEditClick && (
+                <Button onClick={() => onEditClick(item)}>Edit Details</Button>
+            )}
             <Button onClick={onClose}>Close</Button>
         </DialogActions>
     </Dialog>
-);
+    );
+};
 
-const PendingList = ({ items, type, onApprove, onRejectClick, error, fullScreen }) => {
+const PendingList = ({ items, type, onApprove, onRejectClick, error, fullScreen, onEditClick }) => {
     const batchCounts = items.reduce((acc, i) => {
         if (i.batchId) acc[i.batchId] = (acc[i.batchId] || 0) + 1;
         return acc;
@@ -166,7 +185,10 @@ const PendingList = ({ items, type, onApprove, onRejectClick, error, fullScreen 
                 ))}
             </Grid>
         )}
-        <ItemDetailDialog item={detailItem} type={type} onClose={() => setDetailItem(null)} fullScreen={fullScreen} />
+        <ItemDetailDialog
+            item={detailItem} type={type} onClose={() => setDetailItem(null)} fullScreen={fullScreen}
+            onEditClick={onEditClick ? (item) => { setDetailItem(null); onEditClick(item); } : undefined}
+        />
     </Box>
     );
 };
@@ -232,6 +254,7 @@ const AdminDashboard = () => {
     const [editGownError, setEditGownError] = useState('');
     const [editGownRemovePictureIds, setEditGownRemovePictureIds] = useState([]);
     const [editGownNewMorePictures, setEditGownNewMorePictures] = useState([]);
+    const [zoomEditGownPrimary, setZoomEditGownPrimary] = useState(false);
     const [editAdTarget, setEditAdTarget] = useState(null);
     const [editAdNewImage, setEditAdNewImage] = useState(null);
     const [editAdNewImagePreview, setEditAdNewImagePreview] = useState(null);
@@ -267,6 +290,7 @@ const AdminDashboard = () => {
     const [postForPatronSending, setPostForPatronSending] = useState(false);
     const [postForPatronProgressIndex, setPostForPatronProgressIndex] = useState(0);
     const [postForPatronSavedCount, setPostForPatronSavedCount] = useState(0);
+    const [zoomPostForPatronId, setZoomPostForPatronId] = useState(null);
     const [postForPatronFailedIndex, setPostForPatronFailedIndex] = useState(null);
     const [postForPatronSuccess, setPostForPatronSuccess] = useState(false);
     const [contactMessages, setContactMessages] = useState([]);
@@ -585,6 +609,7 @@ const AdminDashboard = () => {
             await axios.post('/api/admin/gowns/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
             onCloseEditGownDialog();
             await loadActive();
+            await loadPending();
             await loadConciergeQueue();
         } catch (err) {
             setEditGownError(err?.response?.data?.message || 'Could not save changes.');
@@ -843,6 +868,7 @@ const AdminDashboard = () => {
                     error={error}
                     onApprove={(id) => onApprove('gown', id)}
                     onRejectClick={(id) => setRejectTarget({ type: 'gown', id })}
+                    onEditClick={onEditGownClick}
                     fullScreen={fullScreen}
                 />
             )}
@@ -1253,9 +1279,11 @@ const AdminDashboard = () => {
                                     component="img"
                                     src={editGownNewPrimaryPreview || editGownTarget.primaryPictureUrl}
                                     alt="Primary"
+                                    onClick={() => setZoomEditGownPrimary(true)}
                                     sx={{
                                         width: 100, height: 100, borderRadius: 2, objectFit: 'cover',
-                                        border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper'
+                                        border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper',
+                                        cursor: 'zoom-in'
                                     }}
                                 />
                                 <Button variant="outlined" component="label" size="small">
@@ -1263,6 +1291,12 @@ const AdminDashboard = () => {
                                     <input type="file" accept="image/*" hidden onChange={onEditGownPictureChange} />
                                 </Button>
                             </Stack>
+                            <ImageZoomDialog
+                                open={zoomEditGownPrimary}
+                                onClose={() => setZoomEditGownPrimary(false)}
+                                images={[editGownNewPrimaryPreview || editGownTarget.primaryPictureUrl]}
+                                fullScreen={fullScreen}
+                            />
                             <MorePicturesInput
                                 files={editGownNewMorePictures}
                                 onFilesChange={setEditGownNewMorePictures}
@@ -1272,21 +1306,17 @@ const AdminDashboard = () => {
                             <TextField label="Description" multiline rows={2} value={editGownTarget.description}
                                 onChange={(e) => setEditGownTarget({ ...editGownTarget, description: e.target.value })} />
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                                <Autocomplete
-                                    multiple
-                                    fullWidth
+                                <FilterAutocomplete
+                                    label="Color(s)" helperText="Choose all that apply." fullWidth
                                     options={COLOR_OPTIONS}
                                     value={editGownTarget.colors}
                                     onChange={(e, value) => setEditGownTarget({ ...editGownTarget, colors: value })}
-                                    renderInput={(params) => <TextField {...params} label="Color(s)" helperText="Choose all that apply." />}
                                 />
-                                <Autocomplete
-                                    multiple
-                                    fullWidth
+                                <FilterAutocomplete
+                                    label="Size(s)" fullWidth
                                     options={SIZE_OPTIONS}
                                     value={editGownTarget.sizes}
                                     onChange={(e, value) => setEditGownTarget({ ...editGownTarget, sizes: value })}
-                                    renderInput={(params) => <TextField {...params} label="Size(s)" />}
                                 />
                             </Stack>
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="flex-start">
@@ -1582,21 +1612,19 @@ const AdminDashboard = () => {
                                                 />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
-                                                <Autocomplete
-                                                    multiple
+                                                <FilterAutocomplete
+                                                    label="Color(s)" helperText="Choose all that apply."
                                                     options={COLOR_OPTIONS}
                                                     value={g.colors}
                                                     onChange={(e, value) => updatePostForPatronGown(g.localId, { colors: value })}
-                                                    renderInput={(params) => <TextField {...params} label="Color(s)" helperText="Choose all that apply." />}
                                                 />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
-                                                <Autocomplete
-                                                    multiple
+                                                <FilterAutocomplete
+                                                    label="Size(s)"
                                                     options={SIZE_OPTIONS}
                                                     value={g.sizes}
                                                     onChange={(e, value) => updatePostForPatronGown(g.localId, { sizes: value })}
-                                                    renderInput={(params) => <TextField {...params} label="Size(s)" />}
                                                 />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
@@ -1614,13 +1642,22 @@ const AdminDashboard = () => {
                                             </Grid>
                                             {g.primaryPreview && (
                                                 <Grid size={{ xs: 12, sm: 6 }}>
-                                                    <Box sx={{
-                                                        width: 100, height: 75, borderRadius: 2, overflow: 'hidden',
-                                                        bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider',
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                                    }}>
+                                                    <Box
+                                                        onClick={() => setZoomPostForPatronId(g.localId)}
+                                                        sx={{
+                                                            width: 100, height: 75, borderRadius: 2, overflow: 'hidden',
+                                                            bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-in'
+                                                        }}
+                                                    >
                                                         <Box component="img" src={g.primaryPreview} alt="Primary preview" sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                                                     </Box>
+                                                    <ImageZoomDialog
+                                                        open={zoomPostForPatronId === g.localId}
+                                                        onClose={() => setZoomPostForPatronId(null)}
+                                                        images={[g.primaryPreview]}
+                                                        fullScreen={fullScreen}
+                                                    />
                                                 </Grid>
                                             )}
                                             <Grid size={12}>

@@ -6,12 +6,12 @@ import {
     DialogContent, DialogActions, CircularProgress, IconButton
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CloseIcon from '@mui/icons-material/Close';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import { styleLabel, formatPriceRange, sortSizes } from '../constants/gownOptions';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import usePageTitle from '../hooks/usePageTitle';
 import { useAdLane } from '../context/AdLaneContext';
+import ImageZoomDialog from '../components/ImageZoomDialog';
 
 const ViewGown = () => {
     const { id } = useParams();
@@ -196,43 +196,15 @@ const ViewGown = () => {
                 </DialogActions>
             </Dialog>
 
-            <Dialog
-                open={zoomOpen} onClose={() => setZoomOpen(false)} maxWidth="lg" fullScreen={fullScreen}
-                slotProps={{ paper: { sx: { bgcolor: 'rgba(0,0,0,0.92)', boxShadow: 'none' } } }}
-            >
-                <IconButton
-                    onClick={() => setZoomOpen(false)}
-                    sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1, color: '#fff', bgcolor: 'rgba(0,0,0,0.4)', '&:hover': { bgcolor: 'rgba(0,0,0,0.6)' } }}
-                >
-                    <CloseIcon />
-                </IconButton>
-                <DialogContent
-                    sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', p: { xs: 1, sm: 3 } }}
-                >
-                    <Box
-                        component="img"
-                        src={activeImage}
-                        alt={gown.description}
-                        sx={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain' }}
-                    />
-                </DialogContent>
-                {thumbnails.length > 1 && (
-                    <Stack direction="row" spacing={1} justifyContent="center" sx={{ pb: 2, flexWrap: 'wrap', px: 2 }}>
-                        {thumbnails.map((url) => (
-                            <Box
-                                key={url}
-                                component="img"
-                                src={url}
-                                onClick={() => setActiveImage(url)}
-                                sx={{
-                                    width: 56, height: 56, objectFit: 'cover', borderRadius: 1, cursor: 'pointer',
-                                    border: '2px solid', borderColor: activeImage === url ? 'primary.main' : 'transparent'
-                                }}
-                            />
-                        ))}
-                    </Stack>
-                )}
-            </Dialog>
+            <ImageZoomDialog
+                open={zoomOpen}
+                onClose={() => setZoomOpen(false)}
+                images={thumbnails}
+                initialIndex={Math.max(thumbnails.indexOf(activeImage), 0)}
+                onIndexChange={(i) => setActiveImage(thumbnails[i])}
+                alt={gown.description}
+                fullScreen={fullScreen}
+            />
         </Box>
     );
 };

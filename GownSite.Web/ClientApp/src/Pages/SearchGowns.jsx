@@ -1,16 +1,19 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import {
-    Typography, Paper, Grid, Autocomplete, TextField, Card, CardActionArea,
+    Typography, Paper, Grid, TextField, Card, CardActionArea,
     CardMedia, CardContent, Box, Chip, Snackbar, Alert, Button, Stack,
     Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Pagination
 } from '@mui/material';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, styleLabel, formatPriceRange, sortSizes } from '../constants/gownOptions';
 import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import usePageTitle from '../hooks/usePageTitle';
+import FilterAutocomplete from '../components/FilterAutocomplete';
 
 const emptyFilters = { colors: [], sizes: [], locations: [], styles: [], listingTypes: [], minPrice: '', maxPrice: '' };
 const PAGE_SIZE = 24;
@@ -29,24 +32,113 @@ const filtersFromParams = (params) => ({
     maxPrice: params.get('maxPrice') || ''
 });
 
-// Multi-select filter field: stays open after each pick (instead of closing and
-// forcing you to reopen it for the next selection), and shows "All" as a placeholder
-// once the label shrinks out of the way, so it's clear the field is optional.
-const FilterAutocomplete = ({ label, options, value, onChange, getOptionLabel, size = 'small' }) => (
-    <Autocomplete
-        multiple size={size} disableCloseOnSelect
-        options={options} value={value} onChange={onChange}
-        getOptionLabel={getOptionLabel}
-        renderInput={(params) => (
-            <TextField
-                {...params}
-                label={label}
-                placeholder={value.length === 0 ? 'All' : undefined}
-                slotProps={{ ...params.slotProps, inputLabel: { ...params.slotProps?.inputLabel, shrink: true } }}
-            />
-        )}
-    />
-);
+// Browse-card with prev/next arrows to page through a gown's other photos (only shown
+// when it has more than one). The arrows/dots are siblings of CardActionArea — NOT
+// nested inside it — for two reasons: (1) CardActionArea renders a <button>, and a real
+// <button> nested inside another <button> is invalid HTML that breaks click handling;
+// (2) MUI's CardActionArea paints its own hover/press overlay based on the actual DOM
+// hierarchy (a CSS :hover/:active effect on the ancestor button), which a descendant's
+// stopPropagation() can't suppress — clicking an arrow nested inside it visibly flashed
+// a dark overlay across the whole image. Keeping the arrows as external siblings avoids
+// both problems entirely.
+const GownCard = ({ gown, navigate }) => {
+    const images = [gown.primaryPictureUrl, ...(gown.morePictures || []).map((p) => p.url)];
+    const [index, setIndex] = useState(0);
+    const hasMultiple = images.length > 1;
+
+    const step = (delta) => (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        setIndex((prev) => (prev + delta + images.length) % images.length);
+    };
+
+    return (
+        <Card sx={{ position: 'relative' }}>
+            <CardActionArea
+                onClick={() => navigate(`/gown/${gown.id}`)}
+                sx={{ '&:hover .gown-card-image': { objectFit: 'contain' } }}
+            >
+                {gown.isSold && (
+                    <Box sx={{
+                        position: 'absolute', top: 0, left: 0, width: '100%', height: 220, zIndex: 1,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none'
+                    }}>
+                        <Typography sx={{
+                            fontFamily: `'Playfair Display', serif`, fontWeight: 700,
+                            fontSize: '2.3rem', letterSpacing: 6, textTransform: 'uppercase',
+                            color: 'rgba(156, 78, 88, 0.88)',
+                            transform: 'rotate(-16deg)',
+                            textShadow: '0 2px 6px rgba(255,255,255,0.55)'
+                        }}>
+                            Sold
+                        </Typography>
+                    </Box>
+                )}
+                <CardMedia
+                    component="img"
+                    height="220"
+                    image={images[index]}
+                    alt={gown.description}
+                    className="gown-card-image"
+                    sx={{
+                        objectFit: 'cover',
+                        bgcolor: 'background.default',
+                        opacity: gown.isSold ? 0.55 : 1
+                    }}
+                />
+                <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+                        <Typography variant="h6">{formatPriceRange(gown.price, gown.priceMax)}</Typography>
+                        <Chip size="small" label={gown.listingType === 'Rent' ? 'For Rent' : 'For Sale'} color="primary" variant="outlined" />
+                    </Box>
+                    <Typography
+                        variant="body2" color="text.secondary"
+                        sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
+                        {gown.description && `${gown.description} · `}Size {sortSizes(gown.size).join(', ')}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">{gown.location}</Typography>
+                </CardContent>
+            </CardActionArea>
+            {hasMultiple && (
+                <>
+                    <Box
+                        onClick={step(-1)}
+                        sx={{
+                            position: 'absolute', top: 110, left: 6, transform: 'translateY(-50%)', zIndex: 1,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            width: 26, height: 26, cursor: 'pointer', color: '#fff',
+                            filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.75))',
+                            opacity: 0.85, '&:hover': { opacity: 1 }
+                        }}
+                    >
+                        <ChevronLeftIcon fontSize="small" />
+                    </Box>
+                    <Box
+                        onClick={step(1)}
+                        sx={{
+                            position: 'absolute', top: 110, right: 6, transform: 'translateY(-50%)', zIndex: 1,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            width: 26, height: 26, cursor: 'pointer', color: '#fff',
+                            filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.75))',
+                            opacity: 0.85, '&:hover': { opacity: 1 }
+                        }}
+                    >
+                        <ChevronRightIcon fontSize="small" />
+                    </Box>
+                    <Stack direction="row" spacing={0.5} sx={{ position: 'absolute', top: 196, left: 0, right: 0, justifyContent: 'center', pointerEvents: 'none' }}>
+                        {images.map((_, i) => (
+                            <Box key={i} sx={{
+                                width: 6, height: 6, borderRadius: '50%',
+                                bgcolor: i === index ? '#fff' : 'rgba(255,255,255,0.5)'
+                            }} />
+                        ))}
+                    </Stack>
+                </>
+            )}
+        </Card>
+    );
+};
 
 const SearchGowns = () => {
     usePageTitle('Browse Gowns for Rent & Sale', 'Search gowns for rent or sale by color, size, style, and location — find the perfect dress for your simcha.');
@@ -114,10 +206,6 @@ const SearchGowns = () => {
             if (seq !== searchSeq.current) return; // a newer search already started; ignore this stale response
             setResults(data.items);
             setTotalCount(data.totalCount);
-            if (scrollRestoreRef.current != null) {
-                window.scrollTo(0, scrollRestoreRef.current);
-                scrollRestoreRef.current = null;
-            }
         } finally {
             if (seq === searchSeq.current) setSearching(false);
         }
@@ -126,6 +214,16 @@ const SearchGowns = () => {
     useEffect(() => {
         runSearch(filters, page);
     }, [searchParams]);
+
+    // Runs after the new cards have actually been committed to the DOM (unlike calling
+    // scrollTo right after setResults, which fires before React repaints — the page is
+    // still its old, shorter height at that point and the scroll gets clamped short).
+    useLayoutEffect(() => {
+        if (results.length > 0 && scrollRestoreRef.current != null) {
+            window.scrollTo(0, scrollRestoreRef.current);
+            scrollRestoreRef.current = null;
+        }
+    }, [results]);
 
     // The Location filter's option list needs every location in the marketplace, not just
     // the ones on the current page of results — fetched once, independent of pagination.
@@ -323,54 +421,7 @@ const SearchGowns = () => {
                 <Grid container spacing={3} sx={{ opacity: searching ? 0.6 : 1, transition: 'opacity 0.2s', mr: laneSx }}>
                     {results.map((gown) => (
                         <Grid key={gown.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                            <Card sx={{ position: 'relative' }}>
-                                <CardActionArea
-                                    onClick={() => navigate(`/gown/${gown.id}`)}
-                                    sx={{ '&:hover .gown-card-image': { objectFit: 'contain' } }}
-                                >
-                                    {gown.isSold && (
-                                        <Box sx={{
-                                            position: 'absolute', top: 0, left: 0, width: '100%', height: 220, zIndex: 1,
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none'
-                                        }}>
-                                            <Typography sx={{
-                                                fontFamily: `'Playfair Display', serif`, fontWeight: 700,
-                                                fontSize: '2.3rem', letterSpacing: 6, textTransform: 'uppercase',
-                                                color: 'rgba(156, 78, 88, 0.88)',
-                                                transform: 'rotate(-16deg)',
-                                                textShadow: '0 2px 6px rgba(255,255,255,0.55)'
-                                            }}>
-                                                Sold
-                                            </Typography>
-                                        </Box>
-                                    )}
-                                    <CardMedia
-                                        component="img"
-                                        height="220"
-                                        image={gown.primaryPictureUrl}
-                                        alt={gown.description}
-                                        className="gown-card-image"
-                                        sx={{
-                                            objectFit: 'cover',
-                                            bgcolor: 'background.default',
-                                            opacity: gown.isSold ? 0.55 : 1
-                                        }}
-                                    />
-                                    <CardContent>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-                                            <Typography variant="h6">{formatPriceRange(gown.price, gown.priceMax)}</Typography>
-                                            <Chip size="small" label={gown.listingType === 'Rent' ? 'For Rent' : 'For Sale'} color="primary" variant="outlined" />
-                                        </Box>
-                                        <Typography
-                                            variant="body2" color="text.secondary"
-                                            sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                                        >
-                                            {gown.description && `${gown.description} · `}Size {sortSizes(gown.size).join(', ')}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">{gown.location}</Typography>
-                                    </CardContent>
-                                </CardActionArea>
-                            </Card>
+                            <GownCard gown={gown} navigate={navigate} />
                         </Grid>
                     ))}
                 </Grid>

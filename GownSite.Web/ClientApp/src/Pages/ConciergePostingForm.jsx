@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
     Container, Typography, TextField, Button, Stack, MenuItem, Grid,
-    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box, Autocomplete, Divider,
+    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box, Divider,
     Accordion, AccordionSummary, AccordionDetails, IconButton, LinearProgress, Chip
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -12,6 +12,8 @@ import AddIcon from '@mui/icons-material/Add';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import LocationField from '../components/LocationField';
+import MorePicturesInput from '../components/MorePicturesInput';
+import FilterAutocomplete from '../components/FilterAutocomplete';
 
 const MAX_BATCH_GOWNS = 20;
 const DRAFT_KEY = 'regowned_concierge_posting_draft';
@@ -19,7 +21,7 @@ const DRAFT_KEY = 'regowned_concierge_posting_draft';
 // Photos (File objects) can't survive localStorage — only text fields are saved,
 // so a restored gown always needs its photo re-attached before it can submit.
 const stripPhotos = (g) => {
-    const { primaryPicture, primaryPreview, ...rest } = g;
+    const { primaryPicture, primaryPreview, morePictures, ...rest } = g;
     return rest;
 };
 
@@ -41,7 +43,8 @@ const makeEmptyGown = () => ({
     styleTags: [],
     notes: '',
     primaryPicture: null,
-    primaryPreview: null
+    primaryPreview: null,
+    morePictures: []
 });
 
 const ConciergePostingForm = () => {
@@ -74,7 +77,7 @@ const ConciergePostingForm = () => {
         try {
             const parsed = JSON.parse(saved);
             if (!hasDraftContent(parsed)) return;
-            setGowns(parsed.map((g) => ({ ...g, primaryPicture: null, primaryPreview: null })));
+            setGowns(parsed.map((g) => ({ ...g, primaryPicture: null, primaryPreview: null, morePictures: [] })));
             setRestoredDraft(true);
         } catch {
             localStorage.removeItem(DRAFT_KEY);
@@ -115,6 +118,10 @@ const ConciergePostingForm = () => {
     const onPrimaryPictureChange = (localId) => (e) => {
         const file = e.target.files[0];
         updateGown(localId, { primaryPicture: file || null, primaryPreview: file ? URL.createObjectURL(file) : null });
+    };
+
+    const onMorePicturesChange = (localId) => (files) => {
+        updateGown(localId, { morePictures: files });
     };
 
     const addGown = () => {
@@ -173,6 +180,7 @@ const ConciergePostingForm = () => {
                 data.append('BatchSize', gowns.length);
                 if (promoCode.trim()) data.append('PromoCode', promoCode.trim());
                 data.append('PrimaryPicture', g.primaryPicture);
+                g.morePictures.forEach((file) => data.append('MorePictures', file));
 
                 const { data: result } = await axios.post('/api/gown/concierge-intake', data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
@@ -279,13 +287,18 @@ const ConciergePostingForm = () => {
                                     </Box>
                                 </Grid>
                             )}
+                            <Grid size={12}>
+                                <MorePicturesInput
+                                    files={g.morePictures}
+                                    onFilesChange={onMorePicturesChange(g.localId)}
+                                />
+                            </Grid>
                             <Grid size={{ xs: 12, sm: 4 }}>
-                                <Autocomplete
-                                    multiple
+                                <FilterAutocomplete
+                                    label="Size(s)"
                                     options={SIZE_OPTIONS}
                                     value={g.sizes}
                                     onChange={(e, value) => updateGown(g.localId, { sizes: value })}
-                                    renderInput={(params) => <TextField {...params} label="Size(s)" />}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 4 }}>
@@ -315,12 +328,11 @@ const ConciergePostingForm = () => {
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <Autocomplete
-                                    multiple
+                                <FilterAutocomplete
+                                    label="Color(s)" size="small" helperText="Choose all that apply."
                                     options={COLOR_OPTIONS}
                                     value={g.colors}
                                     onChange={(e, value) => updateGown(g.localId, { colors: value })}
-                                    renderInput={(params) => <TextField {...params} label="Color(s)" size="small" helperText="Choose all that apply." />}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>

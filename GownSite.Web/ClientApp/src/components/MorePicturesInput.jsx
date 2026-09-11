@@ -1,15 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Button, IconButton, Stack, Typography } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ImageZoomDialog from './ImageZoomDialog';
 
 export const MAX_MORE_PICTURES = 5;
 
-const Thumb = ({ src, onRemove }) => (
+const Thumb = ({ src, onRemove, onClick }) => (
     <Box sx={{ position: 'relative' }}>
-        <Box component="img" src={src} alt="" sx={{
-            width: 64, height: 64, borderRadius: 1, objectFit: 'cover',
-            border: '1px solid', borderColor: 'divider'
-        }} />
+        <Box
+            component="img" src={src} alt="" onClick={onClick}
+            sx={{
+                width: 64, height: 64, borderRadius: 1, objectFit: 'cover',
+                border: '1px solid', borderColor: 'divider', cursor: 'zoom-in'
+            }}
+        />
         <IconButton
             size="small"
             onClick={onRemove}
@@ -35,10 +39,12 @@ const Thumb = ({ src, onRemove }) => (
 // edit dialogs — omitted entirely for brand-new listings, which have none yet.
 const MorePicturesInput = ({ files, onFilesChange, existing = [], onRemoveExisting, max = MAX_MORE_PICTURES }) => {
     const [error, setError] = useState('');
+    const [zoomIndex, setZoomIndex] = useState(null);
     const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
     useEffect(() => () => previews.forEach((url) => URL.revokeObjectURL(url)), [previews]);
 
     const totalCount = existing.length + files.length;
+    const allThumbUrls = [...existing.map((p) => p.url), ...previews];
 
     const onInputChange = (e) => {
         const chosen = Array.from(e.target.files);
@@ -62,14 +68,20 @@ const MorePicturesInput = ({ files, onFilesChange, existing = [], onRemoveExisti
             <Typography variant="subtitle2" sx={{ mb: 1 }}>Additional Photos</Typography>
             {(existing.length > 0 || files.length > 0) && (
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
-                    {existing.map((p) => (
-                        <Thumb key={`existing-${p.id}`} src={p.url} onRemove={() => onRemoveExisting(p.id)} />
+                    {existing.map((p, i) => (
+                        <Thumb key={`existing-${p.id}`} src={p.url} onRemove={() => onRemoveExisting(p.id)} onClick={() => setZoomIndex(i)} />
                     ))}
                     {previews.map((src, i) => (
-                        <Thumb key={`new-${i}`} src={src} onRemove={() => removeNewFile(i)} />
+                        <Thumb key={`new-${i}`} src={src} onRemove={() => removeNewFile(i)} onClick={() => setZoomIndex(existing.length + i)} />
                     ))}
                 </Stack>
             )}
+            <ImageZoomDialog
+                open={zoomIndex !== null}
+                onClose={() => setZoomIndex(null)}
+                images={allThumbUrls}
+                initialIndex={zoomIndex ?? 0}
+            />
             <Button variant="outlined" component="label" size="small" disabled={totalCount >= max}>
                 {totalCount > 0 ? `Add More Pictures (${totalCount}/${max})` : `Add More Pictures (up to ${max}, optional)`}
                 <input type="file" accept="image/*" multiple hidden onChange={onInputChange} />
