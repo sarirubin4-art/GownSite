@@ -32,7 +32,15 @@ const DISCOUNT_TYPE_OPTIONS = [
 
 const VOLUME_TIER_DESCRIPTION = '$5/gown for 1-4, $4/gown for 5-9, $3.50/gown for 10-14, $3/gown for 15-20 — based on the total size of the batch it\'s applied to.';
 
-const emptyPromoForm = { code: '', discountType: 'PercentOff', discountValue: '', maxUses: '', expiresAt: '', durationMonths: '' };
+const PROMO_APPLIES_TO_OPTIONS = [
+    { value: 'Both', label: 'Gowns & Ads (default)' },
+    { value: 'Gown', label: 'Gowns only' },
+    { value: 'Ad', label: 'Ads only' },
+    { value: 'Business', label: 'Business plan subscriptions only' }
+];
+const promoAppliesToLabel = (value) => PROMO_APPLIES_TO_OPTIONS.find(o => o.value === (value || 'Both'))?.label;
+
+const emptyPromoForm = { code: '', discountType: 'PercentOff', discountValue: '', maxUses: '', expiresAt: '', durationMonths: '', appliesTo: 'Both' };
 
 // Quick-fill starting points for the business-plan dialog — the fields stay fully
 // editable after picking one, so these are just convenient defaults, not fixed tiers.
@@ -437,7 +445,8 @@ const AdminDashboard = () => {
             discountValue: isVolumeTiered ? 0 : Number(promoForm.discountValue),
             maxUses: promoForm.maxUses === '' ? null : Number(promoForm.maxUses),
             expiresAt: promoForm.expiresAt === '' ? null : promoForm.expiresAt,
-            durationMonths: promoForm.durationMonths === '' ? null : Number(promoForm.durationMonths)
+            durationMonths: promoForm.durationMonths === '' ? null : Number(promoForm.durationMonths),
+            appliesTo: promoForm.appliesTo
         };
         try {
             if (editingPromoId) {
@@ -461,7 +470,8 @@ const AdminDashboard = () => {
             discountValue: p.discountValue ?? '',
             maxUses: p.maxUses ?? '',
             expiresAt: p.expiresAt ? p.expiresAt.slice(0, 10) : '',
-            durationMonths: p.durationMonths ?? ''
+            durationMonths: p.durationMonths ?? '',
+            appliesTo: p.appliesTo ?? 'Both'
         });
         setEditingPromoId(p.id);
         setPromoError('');
@@ -916,6 +926,7 @@ const AdminDashboard = () => {
                                 <TableRow>
                                     <TableCell>Code</TableCell>
                                     <TableCell>Discount</TableCell>
+                                    <TableCell>Applies To</TableCell>
                                     <TableCell>Uses</TableCell>
                                     <TableCell>Expires</TableCell>
                                     <TableCell>Active</TableCell>
@@ -933,6 +944,7 @@ const AdminDashboard = () => {
                                             {p.discountType === 'VolumeTiered' && 'Volume-tiered bulk pricing'}
                                             {p.durationMonths ? ` for ${p.durationMonths} mo${p.durationMonths === 1 ? '' : 's'}, then full price` : ''}
                                         </TableCell>
+                                        <TableCell>{promoAppliesToLabel(p.appliesTo)}</TableCell>
                                         <TableCell>{p.timesUsed}{p.maxUses != null ? ` / ${p.maxUses}` : ''}</TableCell>
                                         <TableCell>{p.expiresAt ? new Date(p.expiresAt).toLocaleDateString() : '—'}</TableCell>
                                         <TableCell>
@@ -1762,6 +1774,14 @@ const AdminDashboard = () => {
                             onChange={(e) => setPromoForm({ ...promoForm, discountType: e.target.value })}
                         >
                             {DISCOUNT_TYPE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+                        </TextField>
+                        <TextField
+                            select label="Applies To" fullWidth
+                            value={promoForm.appliesTo}
+                            onChange={(e) => setPromoForm({ ...promoForm, appliesTo: e.target.value })}
+                            helperText="Restrict this code so it can only be redeemed where it's meant to."
+                        >
+                            {PROMO_APPLIES_TO_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
                         </TextField>
                         {promoForm.discountType === 'VolumeTiered' ? (
                             <Alert severity="info">{VOLUME_TIER_DESCRIPTION}</Alert>

@@ -121,7 +121,7 @@ namespace GownSite.Web.Controllers
             var promoRepo = new PromoCodeRepository(_connectionString);
             var promo = promoRepo.GetByCode(request.PromoCode);
             var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m);
-            var resolved = PromoCodeCalculator.Resolve(promo, feeUsd, 1);
+            var resolved = PromoCodeCalculator.Resolve(promo, feeUsd, 1, PromoAppliesTo.Gown);
             if (!resolved.Success)
                 return BadRequest(new { message = resolved.Error });
 
@@ -153,7 +153,7 @@ namespace GownSite.Web.Controllers
             var promoRepo = new PromoCodeRepository(_connectionString);
             var promo = promoRepo.GetByCode(request.PromoCode);
             var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m);
-            var resolved = PromoCodeCalculator.Resolve(promo, feeUsd, 1);
+            var resolved = PromoCodeCalculator.Resolve(promo, feeUsd, 1, PromoAppliesTo.Ad);
             if (!resolved.Success)
                 return BadRequest(new { message = resolved.Error });
 

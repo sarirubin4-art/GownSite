@@ -27,7 +27,7 @@ namespace GownSite.Web.Services
             (1, 5.00m)
         };
 
-        public static PromoResolveResult Resolve(PromoCode promo, decimal baseFee, int quantity = 1)
+        public static PromoResolveResult Resolve(PromoCode promo, decimal baseFee, int quantity, PromoAppliesTo context)
         {
             if (promo == null)
                 return new PromoResolveResult { Success = false, Error = "That promo code doesn't exist." };
@@ -37,6 +37,17 @@ namespace GownSite.Web.Services
                 return new PromoResolveResult { Success = false, Error = "That promo code has expired." };
             if (promo.MaxUses.HasValue && promo.TimesUsed >= promo.MaxUses.Value)
                 return new PromoResolveResult { Success = false, Error = "That promo code has reached its usage limit." };
+            if (promo.AppliesTo != PromoAppliesTo.Both && promo.AppliesTo != context)
+            {
+                var scopeName = promo.AppliesTo switch
+                {
+                    PromoAppliesTo.Gown => "gown listings",
+                    PromoAppliesTo.Ad => "ads",
+                    PromoAppliesTo.Business => "business plan subscriptions",
+                    _ => "a different context"
+                };
+                return new PromoResolveResult { Success = false, Error = $"That promo code only applies to {scopeName}." };
+            }
 
             var fee = promo.DiscountType switch
             {
@@ -71,7 +82,7 @@ namespace GownSite.Web.Services
             {
                 var promoRepo = new PromoCodeRepository(connectionString);
                 var promo = promoRepo.GetByCode(promoCode);
-                var resolved = Resolve(promo, baseFee, batchSize);
+                var resolved = Resolve(promo, baseFee, batchSize, PromoAppliesTo.Gown);
                 if (!resolved.Success)
                     return new PricingResolveResult { Success = false, Error = resolved.Error };
 

@@ -790,11 +790,29 @@ namespace GownSite.Web.Controllers
             return Ok(new { sent, total = emails.Count });
         }
 
+        // Volume-tiered pricing is keyed by gown-batch size (see PromoCodeCalculator.VolumeTiers)
+        // and has no meaning for ads or the flat business-plan fee, which are always resolved
+        // with quantity=1 — applied there, it would silently price them at the "1-4 gowns" tier
+        // rate instead of the actual base fee. Reject that combination at creation time rather
+        // than letting a mispriced redemption happen later.
+        private static bool VolumeTieredNeedsGownScope(PromoCode request, out string error)
+        {
+            if (request.DiscountType == DiscountType.VolumeTiered && request.AppliesTo != PromoAppliesTo.Gown)
+            {
+                error = "Volume-tiered pricing only makes sense for gown listings — set Applies To to \"Gowns only\".";
+                return true;
+            }
+            error = null;
+            return false;
+        }
+
         [HttpPost("promocodes/create")]
         public IActionResult CreatePromoCode([FromBody] PromoCode request)
         {
             if (string.IsNullOrWhiteSpace(request.Code))
                 return BadRequest(new { message = "A code is required." });
+            if (VolumeTieredNeedsGownScope(request, out var scopeError))
+                return BadRequest(new { message = scopeError });
 
             var repo = new PromoCodeRepository(_connectionString);
             if (repo.GetByCode(request.Code) != null)
@@ -808,7 +826,8 @@ namespace GownSite.Web.Controllers
                 IsActive = true,
                 MaxUses = request.MaxUses,
                 ExpiresAt = request.ExpiresAt,
-                DurationMonths = request.DurationMonths
+                DurationMonths = request.DurationMonths,
+                AppliesTo = request.AppliesTo
             });
             return Ok(created);
         }
@@ -818,6 +837,8 @@ namespace GownSite.Web.Controllers
         {
             if (string.IsNullOrWhiteSpace(request.Code))
                 return BadRequest(new { message = "A code is required." });
+            if (VolumeTieredNeedsGownScope(request, out var scopeError))
+                return BadRequest(new { message = scopeError });
 
             var repo = new PromoCodeRepository(_connectionString);
             var existingWithCode = repo.GetByCode(request.Code);
@@ -832,7 +853,8 @@ namespace GownSite.Web.Controllers
                 DiscountValue = request.DiscountValue,
                 MaxUses = request.MaxUses,
                 ExpiresAt = request.ExpiresAt,
-                DurationMonths = request.DurationMonths
+                DurationMonths = request.DurationMonths,
+                AppliesTo = request.AppliesTo
             });
             return Ok();
         }

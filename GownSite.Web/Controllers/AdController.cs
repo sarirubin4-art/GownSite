@@ -133,7 +133,7 @@ namespace GownSite.Web.Controllers
                 var promoRepo = new PromoCodeRepository(_connectionString);
                 var promo = promoRepo.GetByCode(request.PromoCode);
                 var baseFee = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m);
-                var resolved = PromoCodeCalculator.Resolve(promo, baseFee);
+                var resolved = PromoCodeCalculator.Resolve(promo, baseFee, 1, PromoAppliesTo.Ad);
                 if (!resolved.Success)
                     return BadRequest(new { message = resolved.Error });
 

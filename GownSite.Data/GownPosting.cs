@@ -169,6 +169,20 @@ namespace GownSite.Data
         VolumeTiered
     }
 
+    // Both = 0 so every promo code created before this feature existed (and any new one
+    // whose AppliesTo isn't explicitly set) keeps applying everywhere, matching the old
+    // unscoped behavior exactly. Business is its own value (not folded into Gown) because
+    // the business flat-monthly-fee subscription is a distinct billable product from a
+    // per-gown listing fee — a promo scoped to one should not silently redeem against the
+    // other. "Both" only ever means "gowns and ads", never "including business".
+    public enum PromoAppliesTo
+    {
+        Both,
+        Gown,
+        Ad,
+        Business
+    }
+
     public class PromoCode
     {
         public int Id { get; set; }
@@ -183,6 +197,7 @@ namespace GownSite.Data
         // How many billing cycles the discount applies before reverting to the full price.
         // Null = applies for the life of the subscription (today's behavior, unchanged).
         public int? DurationMonths { get; set; }
+        public PromoAppliesTo AppliesTo { get; set; }
     }
 
     public class SearchAlert

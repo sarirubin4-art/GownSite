@@ -158,7 +158,7 @@ namespace GownSite.Web.Controllers
             var promoRepo = new PromoCodeRepository(_connectionString);
             var promo = promoRepo.GetByCode(request.PromoCode);
             var feeUsd = owner.BusinessMonthlyFeeUsd!.Value;
-            var resolved = PromoCodeCalculator.Resolve(promo, feeUsd, 1);
+            var resolved = PromoCodeCalculator.Resolve(promo, feeUsd, 1, PromoAppliesTo.Business);
             if (!resolved.Success)
                 return BadRequest(new { message = resolved.Error });
 

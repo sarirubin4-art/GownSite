@@ -45,6 +45,7 @@ namespace GownSite.Data
             existing.DiscountValue = promo.DiscountValue;
             existing.MaxUses = promo.MaxUses;
             existing.ExpiresAt = promo.ExpiresAt;
+            existing.AppliesTo = promo.AppliesTo;
             context.SaveChanges();
         }
 
