@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { Container, Typography, TextField, Button, Stack, MenuItem, Grid, Paper, Alert, Box, FormControlLabel, Checkbox } from '@mui/material';
+import { Container, Typography, TextField, Button, Stack, Grid, Paper, Alert, Box, FormControlLabel, Checkbox } from '@mui/material';
 import { AD_CATEGORY_OPTIONS } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import LocationField from '../components/LocationField';
+import FilterAutocomplete from '../components/FilterAutocomplete';
 
 const AdPostingForm = () => {
     const { owner, loading } = useAuth();
@@ -25,7 +26,7 @@ const AdPostingForm = () => {
     const [form, setForm] = useState({
         title: '',
         description: '',
-        category: '',
+        categories: [],
         targetUrl: '',
         location: '',
         servesAllLocations: false,
@@ -47,7 +48,7 @@ const AdPostingForm = () => {
             setForm({
                 title: data.title || '',
                 description: data.description || '',
-                category: data.category || '',
+                categories: (data.categories || '').split(',').filter(Boolean),
                 targetUrl: data.targetUrl || '',
                 location: data.location || '',
                 servesAllLocations: !!data.servesAllLocations,
@@ -88,7 +89,7 @@ const AdPostingForm = () => {
                 data.append('Title', form.title);
                 data.append('Description', form.description);
                 data.append('TargetUrl', form.targetUrl);
-                data.append('Category', form.category);
+                data.append('Category', form.categories.join(','));
                 data.append('Location', form.location);
                 data.append('ServesAllLocations', form.servesAllLocations);
                 if (image) data.append('Image', image);
@@ -115,8 +116,8 @@ const AdPostingForm = () => {
     };
 
     const validate = () => {
-        if (!form.title || !form.description || !form.category) {
-            return 'Please fill in title, description, and category.';
+        if (!form.title || !form.description || form.categories.length === 0) {
+            return 'Please fill in title, description, and at least one category.';
         }
         if (!form.servesAllLocations && !form.location) {
             return 'Please choose a location, or mark this ad as not tied to one location.';
@@ -140,7 +141,7 @@ const AdPostingForm = () => {
             if (draftId) data.append('Id', draftId);
             data.append('Title', form.title);
             data.append('Description', form.description);
-            data.append('Category', form.category);
+            data.append('Category', form.categories.join(','));
             data.append('TargetUrl', form.targetUrl);
             data.append('Location', form.location);
             data.append('ServesAllLocations', form.servesAllLocations);
@@ -178,9 +179,13 @@ const AdPostingForm = () => {
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                        <TextField select label="Category" value={form.category} onChange={onChange('category')} fullWidth>
-                            {AD_CATEGORY_OPTIONS.map(c => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
-                        </TextField>
+                        <FilterAutocomplete
+                            label="Category" helperText="Choose all that apply — your ad shows up in every category you pick."
+                            options={AD_CATEGORY_OPTIONS.map(c => c.value)}
+                            getOptionLabel={(value) => AD_CATEGORY_OPTIONS.find(c => c.value === value)?.label || value}
+                            value={form.categories}
+                            onChange={(e, value) => { markDirty(); setForm({ ...form, categories: value }); }}
+                        />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                         <TextField label="Website/Contact Link (optional)" value={form.targetUrl} onChange={onChange('targetUrl')} fullWidth />

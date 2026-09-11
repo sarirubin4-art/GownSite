@@ -14,7 +14,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { useAuth } from '../context/AuthContext';
 import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
-import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, AD_CATEGORY_OPTIONS, formatPriceRange, sortSizes } from '../constants/gownOptions';
+import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, AD_CATEGORY_OPTIONS, formatPriceRange, sortSizes, adCategoryLabels } from '../constants/gownOptions';
 import LocationField from '../components/LocationField';
 import PriceField from '../components/PriceField';
 import MorePicturesInput from '../components/MorePicturesInput';
@@ -124,7 +124,7 @@ const ItemDetailDialog = ({ item, type, onClose, fullScreen, onEditClick }) => {
                     <>
                         <DetailRow label="Title" value={item.title} />
                         <DetailRow label="Description" value={item.description} />
-                        <DetailRow label="Category" value={item.category} />
+                        <DetailRow label="Category" value={adCategoryLabels(item.categories).join(', ')} />
                         <DetailRow label="Location" value={item.servesAllLocations ? 'Serves All Locations' : item.location} />
                         <DetailRow label="Website/Contact" value={item.targetUrl} />
                     </>
@@ -628,7 +628,7 @@ const AdminDashboard = () => {
 
     const onEditAdClick = (a) => setEditAdTarget({
         id: a.id, title: a.title, description: a.description, targetUrl: a.targetUrl || '',
-        category: a.category, location: a.location || '', servesAllLocations: !!a.servesAllLocations,
+        categories: (a.categories || '').split(',').filter(Boolean), location: a.location || '', servesAllLocations: !!a.servesAllLocations,
         imageUrl: a.imageUrl
     });
 
@@ -652,7 +652,7 @@ const AdminDashboard = () => {
         data.append('Title', editAdTarget.title);
         data.append('Description', editAdTarget.description);
         data.append('TargetUrl', editAdTarget.targetUrl);
-        data.append('Category', editAdTarget.category);
+        data.append('Category', editAdTarget.categories.join(','));
         data.append('Location', editAdTarget.location);
         data.append('ServesAllLocations', editAdTarget.servesAllLocations);
         if (editAdNewImage) data.append('Image', editAdNewImage);
@@ -1415,10 +1415,13 @@ const AdminDashboard = () => {
                                 onChange={(e) => setEditAdTarget({ ...editAdTarget, title: e.target.value })} />
                             <TextField label="Description" multiline rows={2} value={editAdTarget.description}
                                 onChange={(e) => setEditAdTarget({ ...editAdTarget, description: e.target.value })} />
-                            <TextField select label="Category" fullWidth value={editAdTarget.category}
-                                onChange={(e) => setEditAdTarget({ ...editAdTarget, category: e.target.value })}>
-                                {AD_CATEGORY_OPTIONS.map(c => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
-                            </TextField>
+                            <FilterAutocomplete
+                                label="Category" helperText="Choose all that apply."
+                                options={AD_CATEGORY_OPTIONS.map(c => c.value)}
+                                getOptionLabel={(value) => AD_CATEGORY_OPTIONS.find(c => c.value === value)?.label || value}
+                                value={editAdTarget.categories}
+                                onChange={(e, value) => setEditAdTarget({ ...editAdTarget, categories: value })}
+                            />
                             <TextField label="Website/Contact Link" value={editAdTarget.targetUrl}
                                 onChange={(e) => setEditAdTarget({ ...editAdTarget, targetUrl: e.target.value })} />
                             {!editAdTarget.servesAllLocations && (

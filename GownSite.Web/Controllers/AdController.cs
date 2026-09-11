@@ -120,8 +120,8 @@ namespace GownSite.Web.Controllers
 
             if (request.Image == null && existingDraft?.ImageUrl == null)
                 return BadRequest(new { message = "An ad image is required." });
-            if (!Enum.TryParse<AdCategory>(request.Category, out var category))
-                return BadRequest(new { message = "Please choose a valid category." });
+            if (!AdCategoryHelper.TryNormalize(request.Category, out var normalizedCategories))
+                return BadRequest(new { message = "Please choose at least one valid category." });
             if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
                 return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
 
@@ -155,7 +155,7 @@ namespace GownSite.Web.Controllers
                     Title = request.Title,
                     Description = request.Description,
                     TargetUrl = request.TargetUrl,
-                    Category = category,
+                    Categories = normalizedCategories,
                     Location = request.ServesAllLocations ? null : request.Location,
                     ServesAllLocations = request.ServesAllLocations
                 });
@@ -171,7 +171,7 @@ namespace GownSite.Web.Controllers
                     Title = request.Title,
                     Description = request.Description,
                     TargetUrl = request.TargetUrl,
-                    Category = category,
+                    Categories = normalizedCategories,
                     Location = request.ServesAllLocations ? null : request.Location,
                     ServesAllLocations = request.ServesAllLocations,
                     ImageUrl = imageUrl,
@@ -194,8 +194,8 @@ namespace GownSite.Web.Controllers
             var existing = repo.Get(request.Id);
             if (existing == null) return NotFound();
             if (existing.OwnerId != CurrentOwnerId()) return Forbid();
-            if (!Enum.TryParse<AdCategory>(request.Category, out var category))
-                return BadRequest(new { message = "Please choose a valid category." });
+            if (!AdCategoryHelper.TryNormalize(request.Category, out var normalizedCategories))
+                return BadRequest(new { message = "Please choose at least one valid category." });
             if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
                 return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
 
@@ -205,7 +205,7 @@ namespace GownSite.Web.Controllers
                 Title = request.Title,
                 Description = request.Description,
                 TargetUrl = request.TargetUrl,
-                Category = category,
+                Categories = normalizedCategories,
                 Location = request.ServesAllLocations ? null : request.Location,
                 ServesAllLocations = request.ServesAllLocations
             });
@@ -222,7 +222,7 @@ namespace GownSite.Web.Controllers
         public async Task<IActionResult> SaveDraft([FromForm] SaveDraftAdRequest request)
         {
             var repo = new AdRepository(_connectionString);
-            Enum.TryParse<AdCategory>(request.Category, out var category);
+            AdCategoryHelper.TryNormalize(request.Category, out var normalizedCategories);
 
             string imageUrl = null;
             if (request.Image != null)
@@ -241,7 +241,7 @@ namespace GownSite.Web.Controllers
                     Title = request.Title,
                     Description = request.Description,
                     TargetUrl = request.TargetUrl,
-                    Category = category,
+                    Categories = normalizedCategories,
                     Location = request.ServesAllLocations ? null : request.Location,
                     ServesAllLocations = request.ServesAllLocations
                 });
@@ -257,7 +257,7 @@ namespace GownSite.Web.Controllers
                     Title = request.Title,
                     Description = request.Description,
                     TargetUrl = request.TargetUrl,
-                    Category = category,
+                    Categories = normalizedCategories,
                     Location = request.ServesAllLocations ? null : request.Location,
                     ServesAllLocations = request.ServesAllLocations,
                     ImageUrl = imageUrl

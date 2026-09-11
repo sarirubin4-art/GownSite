@@ -3,13 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import {
     Box, Typography, Grid, Card, CardMedia, CardContent, Chip, Button, Stack,
-    Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Snackbar, Alert,
+    Dialog, DialogTitle, DialogContent, DialogActions, TextField, Snackbar, Alert,
     FormControlLabel, Checkbox
 } from '@mui/material';
-import { AD_CATEGORY_OPTIONS, adCategoryLabel } from '../constants/gownOptions';
+import { AD_CATEGORY_OPTIONS, adCategoryLabels } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import LocationField from '../components/LocationField';
+import FilterAutocomplete from '../components/FilterAutocomplete';
 
 const MyAds = () => {
     const { owner, loading } = useAuth();
@@ -24,6 +25,7 @@ const MyAds = () => {
     const [promoMessage, setPromoMessage] = useState(null); // { type: 'success'|'error', text }
     const [newImage, setNewImage] = useState(null);
     const [newImagePreview, setNewImagePreview] = useState(null);
+    const [editError, setEditError] = useState('');
 
     const load = async () => {
         const { data } = await axios.get('/api/ad/myads');
@@ -51,21 +53,26 @@ const MyAds = () => {
     };
 
     const onSaveEdit = async () => {
+        setEditError('');
         const data = new FormData();
         data.append('Id', editTarget.id);
         data.append('Title', editTarget.title);
         data.append('Description', editTarget.description);
         data.append('TargetUrl', editTarget.targetUrl);
-        data.append('Category', editTarget.category);
+        data.append('Category', editTarget.categories.join(','));
         data.append('Location', editTarget.location);
         data.append('ServesAllLocations', editTarget.servesAllLocations);
         if (newImage) data.append('Image', newImage);
 
-        await axios.post('/api/ad/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
-        setEditTarget(null);
-        setNewImage(null);
-        setNewImagePreview(null);
-        load();
+        try {
+            await axios.post('/api/ad/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+            setEditTarget(null);
+            setNewImage(null);
+            setNewImagePreview(null);
+            load();
+        } catch (err) {
+            setEditError(err?.response?.data?.message || 'Could not save changes.');
+        }
     };
 
     const onEditImageChange = (e) => {
@@ -80,6 +87,7 @@ const MyAds = () => {
         setPromoMessage(null);
         setNewImage(null);
         setNewImagePreview(null);
+        setEditError('');
     };
 
     const onApplyPromo = async () => {
@@ -137,7 +145,7 @@ const MyAds = () => {
                                             a.isActive ? 'success' : 'default'
                                         }
                                     />
-                                    <Typography variant="body2" color="text.secondary">{adCategoryLabel(a.category)}</Typography>
+                                    <Typography variant="body2" color="text.secondary">{adCategoryLabels(a.categories).join(', ')}</Typography>
                                 </Stack>
                                 <Typography variant="h6">{a.title}</Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>{a.description}</Typography>
@@ -149,7 +157,7 @@ const MyAds = () => {
                                 <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
                                     <Button size="small" variant="outlined" onClick={() => setEditTarget({
                                         id: a.id, title: a.title, description: a.description,
-                                        targetUrl: a.targetUrl || '', category: a.category,
+                                        targetUrl: a.targetUrl || '', categories: (a.categories || '').split(',').filter(Boolean),
                                         location: a.location || '', servesAllLocations: !!a.servesAllLocations,
                                         isActive: a.isActive, imageUrl: a.imageUrl
                                     })}>
@@ -180,6 +188,7 @@ const MyAds = () => {
                 {editTarget && (
                     <DialogContent>
                         <Stack spacing={2} sx={{ mt: 1 }}>
+                            {editError && <Alert severity="error">{editError}</Alert>}
                             {editTarget.isActive && (
                                 <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.default', border: '1px solid', borderColor: 'divider' }}>
                                     <Typography variant="subtitle2" gutterBottom>Apply a Promo Code</Typography>
@@ -221,10 +230,13 @@ const MyAds = () => {
                                 onChange={(e) => setEditTarget({ ...editTarget, title: e.target.value })} />
                             <TextField label="Description" multiline rows={2} value={editTarget.description}
                                 onChange={(e) => setEditTarget({ ...editTarget, description: e.target.value })} />
-                            <TextField select label="Category" fullWidth value={editTarget.category}
-                                onChange={(e) => setEditTarget({ ...editTarget, category: e.target.value })}>
-                                {AD_CATEGORY_OPTIONS.map(c => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
-                            </TextField>
+                            <FilterAutocomplete
+                                label="Category" helperText="Choose all that apply."
+                                options={AD_CATEGORY_OPTIONS.map(c => c.value)}
+                                getOptionLabel={(value) => AD_CATEGORY_OPTIONS.find(c => c.value === value)?.label || value}
+                                value={editTarget.categories}
+                                onChange={(e, value) => setEditTarget({ ...editTarget, categories: value })}
+                            />
                             <TextField label="Website/Contact Link" value={editTarget.targetUrl}
                                 onChange={(e) => setEditTarget({ ...editTarget, targetUrl: e.target.value })} />
                             {!editTarget.servesAllLocations && (

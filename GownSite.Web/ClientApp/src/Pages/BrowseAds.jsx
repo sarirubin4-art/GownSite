@@ -5,7 +5,7 @@ import { Box, Typography, Tabs, Tab, Card, CardActionArea, Chip, Stack, Button, 
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import PlaceIcon from '@mui/icons-material/Place';
 import PublicIcon from '@mui/icons-material/Public';
-import { AD_CATEGORY_OPTIONS, adCategoryLabel } from '../constants/gownOptions';
+import { AD_CATEGORY_OPTIONS, adCategoryLabels } from '../constants/gownOptions';
 import { useAdLane } from '../context/AdLaneContext';
 import usePageTitle from '../hooks/usePageTitle';
 
@@ -30,7 +30,7 @@ const BrowseAds = () => {
     }, []);
 
     const visibleAds = ads
-        .filter(a => category === 'All' || a.category === category)
+        .filter(a => category === 'All' || (a.categories || '').split(',').includes(category))
         // An ad marked "serves all locations" is relevant no matter which location is
         // selected, so it isn't filtered out the way a location mismatch normally would.
         .filter(a => location === ALL_LOCATIONS || a.servesAllLocations || a.location === location);
@@ -88,8 +88,10 @@ const BrowseAds = () => {
                                     />
                                 )}
                                 <Box sx={{ p: 2.5, flex: 1, minWidth: 0 }}>
-                                    <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-                                        <Chip size="small" label={adCategoryLabel(ad.category)} color="primary" variant="outlined" />
+                                    <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap', rowGap: 1 }}>
+                                        {adCategoryLabels(ad.categories).map((label) => (
+                                            <Chip key={label} size="small" label={label} color="primary" variant="outlined" />
+                                        ))}
                                         {ad.servesAllLocations ? (
                                             <Chip size="small" icon={<PublicIcon />} label="All Locations" variant="outlined" />
                                         ) : ad.location ? (

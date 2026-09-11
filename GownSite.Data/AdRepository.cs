@@ -97,7 +97,7 @@ namespace GownSite.Data
             existing.Title = ad.Title;
             existing.Description = ad.Description;
             existing.TargetUrl = ad.TargetUrl;
-            existing.Category = ad.Category;
+            existing.Categories = ad.Categories;
             existing.Location = ad.Location;
             existing.ServesAllLocations = ad.ServesAllLocations;
             context.SaveChanges();

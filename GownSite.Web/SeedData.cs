@@ -15,7 +15,7 @@ public static class SeedData
                 new Ad
                 {
                     Title = "Radiant Bridal Makeup",
-                    Category = AdCategory.Makeup,
+                    Categories = AdCategory.Makeup.ToString(),
                     ImageUrl = "https://picsum.photos/seed/gownsite-makeup/400/300",
                     Description = "Flawless, long-lasting makeup for your big day and every simcha in between.",
                     TargetUrl = null,
@@ -24,7 +24,7 @@ public static class SeedData
                 new Ad
                 {
                     Title = "Updo & Blowout Studio",
-                    Category = AdCategory.Hair,
+                    Categories = AdCategory.Hair.ToString(),
                     ImageUrl = "https://picsum.photos/seed/gownsite-hair/400/300",
                     Description = "Professional styling for brides, mothers, and guests of every simcha.",
                     TargetUrl = null,
@@ -33,7 +33,7 @@ public static class SeedData
                 new Ad
                 {
                     Title = "Precision Gown Alterations",
-                    Category = AdCategory.Alterations,
+                    Categories = AdCategory.Alterations.ToString(),
                     ImageUrl = "https://picsum.photos/seed/gownsite-alterations/400/300",
                     Description = "Perfect fit guaranteed - hemming, taking in, bustling, and more.",
                     TargetUrl = null,

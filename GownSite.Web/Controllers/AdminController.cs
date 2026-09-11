@@ -418,8 +418,8 @@ namespace GownSite.Web.Controllers
             var repo = new AdRepository(_connectionString);
             var existing = repo.Get(request.Id);
             if (existing == null) return NotFound();
-            if (!Enum.TryParse<AdCategory>(request.Category, out var category))
-                return BadRequest(new { message = "Please choose a valid category." });
+            if (!AdCategoryHelper.TryNormalize(request.Category, out var normalizedCategories))
+                return BadRequest(new { message = "Please choose at least one valid category." });
             if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
                 return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
 
@@ -429,7 +429,7 @@ namespace GownSite.Web.Controllers
                 Title = request.Title,
                 Description = request.Description,
                 TargetUrl = request.TargetUrl,
-                Category = category,
+                Categories = normalizedCategories,
                 Location = request.ServesAllLocations ? null : request.Location,
                 ServesAllLocations = request.ServesAllLocations
             });

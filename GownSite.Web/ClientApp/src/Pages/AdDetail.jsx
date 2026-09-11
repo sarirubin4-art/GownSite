@@ -4,7 +4,7 @@ import axios from 'axios';
 import { Box, Typography, Button, Chip, Stack } from '@mui/material';
 import PlaceIcon from '@mui/icons-material/Place';
 import PublicIcon from '@mui/icons-material/Public';
-import { adCategoryLabel } from '../constants/gownOptions';
+import { adCategoryLabels } from '../constants/gownOptions';
 import usePageTitle from '../hooks/usePageTitle';
 
 const AdDetail = () => {
@@ -26,8 +26,10 @@ const AdDetail = () => {
 
     return (
         <Box sx={{ maxWidth: { xs: 720, lg: 880 }, mx: 'auto', textAlign: 'center' }}>
-            <Stack direction="row" spacing={1} sx={{ justifyContent: 'center', mb: 2 }}>
-                <Chip label={adCategoryLabel(ad.category)} color="primary" />
+            <Stack direction="row" spacing={1} sx={{ justifyContent: 'center', mb: 2, flexWrap: 'wrap', rowGap: 1 }}>
+                {adCategoryLabels(ad.categories).map((label) => (
+                    <Chip key={label} label={label} color="primary" />
+                ))}
                 {ad.servesAllLocations ? (
                     <Chip icon={<PublicIcon />} label="Serves All Locations" variant="outlined" />
                 ) : ad.location ? (

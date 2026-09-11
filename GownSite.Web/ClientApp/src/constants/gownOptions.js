@@ -73,3 +73,9 @@ export const formatPriceRange = (price, priceMax) =>
 
 export const styleLabel = (value) => STYLE_OPTIONS.find(s => s.value === value)?.label || value;
 export const adCategoryLabel = (value) => AD_CATEGORY_OPTIONS.find(c => c.value === value)?.label || value;
+// Ad.categories comes back from the API as a comma-separated string (e.g. "Makeup,Hair") —
+// same wire format as gown Color/Size. Splits it and maps each to its display label.
+export const adCategoryLabels = (categories) => {
+    const list = Array.isArray(categories) ? categories : (categories || '').split(',').filter(Boolean);
+    return list.map(adCategoryLabel);
+};

@@ -131,6 +131,36 @@ namespace GownSite.Data
         Bridal
     }
 
+    public static class AdCategoryHelper
+    {
+        // Parses a comma-separated list of AdCategory names (the wire format for
+        // Ad.Categories — see that property's comment), validates and de-duplicates it,
+        // and hands back the normalized comma-joined string ready to store — every
+        // caller just did `string.Join(",", categories)` on the result anyway, so this
+        // saves repeating that at each of the six call sites.
+        //
+        // All-or-nothing: `normalized` is only ever set on success (built in a local
+        // scratch list, not written incrementally to the out param), so a caller that
+        // forgets to check the return value — as AdController.SaveDraft deliberately
+        // does, since drafts have no required fields — gets an empty result on a bad
+        // list rather than a silently truncated prefix of it.
+        public static bool TryNormalize(string raw, out string normalized)
+        {
+            normalized = "";
+            var tokens = (raw ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (tokens.Length == 0) return false;
+
+            var categories = new List<AdCategory>();
+            foreach (var token in tokens)
+            {
+                if (!Enum.TryParse<AdCategory>(token, out var parsed)) return false;
+                if (!categories.Contains(parsed)) categories.Add(parsed);
+            }
+            normalized = string.Join(",", categories);
+            return true;
+        }
+    }
+
     public class Ad
     {
         public int Id { get; set; }
@@ -146,7 +176,10 @@ namespace GownSite.Data
         // value — kept as its own flag rather than a sentinel Location string so filtering
         // logic can just OR it in without special-casing a magic value.
         public bool ServesAllLocations { get; set; }
-        public AdCategory Category { get; set; }
+        // Comma-separated AdCategory names (e.g. "Makeup,Hair") — same convention as
+        // GownPosting.Color/Size/StyleTags. An ad can belong to more than one category
+        // and surfaces under every one it's tagged with, while staying a single record.
+        public string Categories { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedDate { get; set; }
         public string StripeSubscriptionId { get; set; }
