@@ -107,9 +107,11 @@ const GownCard = ({ gown, navigate }) => {
                         sx={{
                             position: 'absolute', top: 110, left: 6, transform: 'translateY(-50%)', zIndex: 1,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            width: 26, height: 26, cursor: 'pointer', color: '#fff',
+                            width: 26, height: 26, borderRadius: '50%', cursor: 'pointer', color: '#fff',
                             filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.75))',
-                            opacity: 0.85, '&:hover': { opacity: 1 }
+                            opacity: 0.85, transition: 'opacity 0.1s ease, background-color 0.1s ease, transform 0.1s ease',
+                            '&:hover': { opacity: 1 },
+                            '&:active': { opacity: 1, bgcolor: 'rgba(255,255,255,0.3)', transform: 'translateY(-50%) scale(0.88)' }
                         }}
                     >
                         <ChevronLeftIcon fontSize="small" />
@@ -119,9 +121,11 @@ const GownCard = ({ gown, navigate }) => {
                         sx={{
                             position: 'absolute', top: 110, right: 6, transform: 'translateY(-50%)', zIndex: 1,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            width: 26, height: 26, cursor: 'pointer', color: '#fff',
+                            width: 26, height: 26, borderRadius: '50%', cursor: 'pointer', color: '#fff',
                             filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.75))',
-                            opacity: 0.85, '&:hover': { opacity: 1 }
+                            opacity: 0.85, transition: 'opacity 0.1s ease, background-color 0.1s ease, transform 0.1s ease',
+                            '&:hover': { opacity: 1 },
+                            '&:active': { opacity: 1, bgcolor: 'rgba(255,255,255,0.3)', transform: 'translateY(-50%) scale(0.88)' }
                         }}
                     >
                         <ChevronRightIcon fontSize="small" />
