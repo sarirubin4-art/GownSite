@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
-const DEFAULT_TITLE = 'Regowned | Buy, Sell & Rent Gowns for Every Simcha';
-const DEFAULT_DESCRIPTION = "Buy, sell, and rent gowns for every simcha. Find the perfect dress nearby, or give one you love a beautiful second life.";
+const DEFAULT_TITLE = 'Regowned | Buy, Sell & Rent Gowns for Every Event';
+const DEFAULT_DESCRIPTION = "Buy, sell, and rent gowns for every event. Find the perfect dress nearby, or give one you love a beautiful second life.";
 
 // Sets the document title and meta description per page. The app is a client-rendered
 // SPA with a single static index.html, so without this every route would report the

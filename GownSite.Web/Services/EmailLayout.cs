@@ -28,7 +28,7 @@ namespace GownSite.Web.Services
           {bodyHtml}
         </td></tr>
         <tr><td style=""padding:18px 28px;text-align:center;border-top:1px solid {Divider};"">
-          <p style=""margin:0;font-size:12px;color:{TextSecondary};font-family:'Segoe UI',Arial,sans-serif;"">Regowned &middot; Buy, sell, and rent gowns for every simcha.</p>
+          <p style=""margin:0;font-size:12px;color:{TextSecondary};font-family:'Segoe UI',Arial,sans-serif;"">Regowned &middot; Buy, sell, and rent gowns for every event.</p>
         </td></tr>
       </table>
     </td></tr>

@@ -106,7 +106,7 @@ namespace GownSite.Web.Services
 
             return EmailLayout.Wrap(
                 EmailLayout.Heading("Have You Heard About Regowned?") +
-                $"<p>Regowned is the easiest way to buy, sell, or rent gently-loved gowns for every simcha — and to find trusted vendors for hair, makeup, alterations, and more, all in one place.</p>" +
+                $"<p>Regowned is the easiest way to buy, sell, or rent gently-loved gowns for every event — and to find trusted vendors for hair, makeup, alterations, and more, all in one place.</p>" +
                 grid +
                 EmailLayout.Button("Visit Regowned", frontendBaseUrl),
                 frontendBaseUrl);
