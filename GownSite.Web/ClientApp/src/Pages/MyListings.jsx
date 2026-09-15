@@ -66,8 +66,11 @@ const MyListings = () => {
         load();
     };
 
-    const onDeleteDraftClick = async (id) => {
-        if (!window.confirm('This will permanently delete this draft. Continue?')) return;
+    const onDeleteDraftClick = async (id, isPendingReview) => {
+        const message = isPendingReview
+            ? "This listing has already been submitted and is awaiting review — deleting it now will withdraw it entirely, not just save it as a draft. This can't be undone. Continue?"
+            : 'This will permanently delete this draft. Continue?';
+        if (!window.confirm(message)) return;
         await axios.post('/api/gown/delete-draft', { id });
         load();
     };
@@ -300,7 +303,11 @@ const MyListings = () => {
                                         <Button size="small" color="success" variant="outlined" disabled={resubmitting} onClick={() => onResubmitClick(g.id)}>
                                             Resubmit for Review
                                         </Button>
-                                    ) : g.moderationStatus === 'PendingReview' || g.moderationStatus === 'Removed' ? null : g.isSold ? null : g.isActive ? (
+                                    ) : g.moderationStatus === 'PendingReview' ? (
+                                        <Button size="small" color="error" variant="outlined" onClick={() => onDeleteDraftClick(g.id, true)}>
+                                            Delete
+                                        </Button>
+                                    ) : g.moderationStatus === 'Removed' ? null : g.isSold ? null : g.isActive ? (
                                         <>
                                             <Button size="small" color="secondary" variant="outlined" onClick={() => onMarkSoldClick(g.id)}>
                                                 Mark as Sold

@@ -52,8 +52,11 @@ const MyAds = () => {
         load();
     };
 
-    const onDeleteDraftClick = async (id) => {
-        if (!window.confirm('This will permanently delete this draft. Continue?')) return;
+    const onDeleteDraftClick = async (id, isPendingReview) => {
+        const message = isPendingReview
+            ? "This ad has already been submitted and is awaiting review — deleting it now will withdraw it entirely, not just save it as a draft. This can't be undone. Continue?"
+            : 'This will permanently delete this draft. Continue?';
+        if (!window.confirm(message)) return;
         await axios.post('/api/ad/delete-draft', { id });
         load();
     };
@@ -178,7 +181,11 @@ const MyAds = () => {
                                                 Delete
                                             </Button>
                                         </>
-                                    ) : a.moderationStatus === 'PendingReview' || a.moderationStatus === 'Rejected' || a.moderationStatus === 'Removed' ? null : a.isActive ? (
+                                    ) : a.moderationStatus === 'PendingReview' ? (
+                                        <Button size="small" color="error" variant="outlined" onClick={() => onDeleteDraftClick(a.id, true)}>
+                                            Delete
+                                        </Button>
+                                    ) : a.moderationStatus === 'Rejected' || a.moderationStatus === 'Removed' ? null : a.isActive ? (
                                         <Button size="small" color="error" variant="outlined" onClick={() => onCancelClick(a.id)}>
                                             Cancel & Remove
                                         </Button>

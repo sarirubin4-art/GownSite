@@ -366,10 +366,11 @@ namespace GownSite.Data
             context.SaveChanges();
         }
 
-        // Only ever called on a Draft (see GownController.DeleteDraft) — a draft never went
-        // live, so there's no Stripe subscription or moderation history to worry about.
-        // GownPicture's FK uses DeleteBehavior.Restrict (see GownDataContext), so its rows
-        // must be removed before the GownPosting row itself.
+        // Only ever called on a Draft or a still-PendingReview listing (see
+        // GownController.DeleteDraft) — neither has gone live yet, so there's no active
+        // Stripe subscription to cancel first. GownPicture's FK uses
+        // DeleteBehavior.Restrict (see GownDataContext), so its rows must be removed
+        // before the GownPosting row itself.
         public void DeleteDraft(int id)
         {
             using var context = new GownDataContext(_connectionString);

@@ -193,8 +193,9 @@ namespace GownSite.Data
             context.SaveChanges();
         }
 
-        // Only ever called on a Draft (see AdController.DeleteDraft) — a draft never went
-        // live, so there's no Stripe subscription or moderation history to worry about.
+        // Only ever called on a Draft or a still-PendingReview ad (see
+        // AdController.DeleteDraft) — neither has gone live yet, so there's no active
+        // Stripe subscription to cancel first.
         public void DeleteDraft(int id)
         {
             using var context = new GownDataContext(_connectionString);

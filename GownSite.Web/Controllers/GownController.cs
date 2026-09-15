@@ -567,8 +567,8 @@ namespace GownSite.Web.Controllers
             var existing = repo.Get(request.Id);
             if (existing == null) return NotFound();
             if (existing.OwnerId != CurrentOwnerId()) return Forbid();
-            if (existing.ModerationStatus != ModerationStatus.Draft)
-                return BadRequest(new { message = "Only a draft that hasn't been submitted yet can be deleted." });
+            if (existing.ModerationStatus != ModerationStatus.Draft && existing.ModerationStatus != ModerationStatus.PendingReview)
+                return BadRequest(new { message = "Only a draft or a listing still awaiting review can be deleted." });
 
             repo.DeleteDraft(request.Id);
             return Ok();
