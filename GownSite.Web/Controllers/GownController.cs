@@ -559,6 +559,21 @@ namespace GownSite.Web.Controllers
             return Ok();
         }
 
+        [HttpPost("delete-draft")]
+        [Authorize]
+        public IActionResult DeleteDraft([FromBody] IdRequest request)
+        {
+            var repo = new GownRepository(_connectionString);
+            var existing = repo.Get(request.Id);
+            if (existing == null) return NotFound();
+            if (existing.OwnerId != CurrentOwnerId()) return Forbid();
+            if (existing.ModerationStatus != ModerationStatus.Draft)
+                return BadRequest(new { message = "Only a draft that hasn't been submitted yet can be deleted." });
+
+            repo.DeleteDraft(request.Id);
+            return Ok();
+        }
+
         [HttpPost("marksold")]
         [Authorize]
         public async Task<IActionResult> MarkSold([FromBody] IdRequest request)

@@ -66,6 +66,12 @@ const MyListings = () => {
         load();
     };
 
+    const onDeleteDraftClick = async (id) => {
+        if (!window.confirm('This will permanently delete this draft. Continue?')) return;
+        await axios.post('/api/gown/delete-draft', { id });
+        load();
+    };
+
     const onResubmitClick = async (id) => {
         setResubmitting(true);
         try {
@@ -275,11 +281,21 @@ const MyListings = () => {
                                         Edit
                                     </Button>
                                     {g.moderationStatus === 'Draft' && g.needsConciergeDraft ? (
-                                        <Chip size="small" label="Our team is preparing this listing" />
+                                        <>
+                                            <Chip size="small" label="Our team is preparing this listing" />
+                                            <Button size="small" color="error" variant="outlined" onClick={() => onDeleteDraftClick(g.id)}>
+                                                Delete
+                                            </Button>
+                                        </>
                                     ) : g.moderationStatus === 'Draft' ? (
-                                        <Button size="small" color="success" variant="outlined" onClick={() => navigate(`/postagown/form?resume=${g.id}`)}>
-                                            Complete Setup
-                                        </Button>
+                                        <>
+                                            <Button size="small" color="success" variant="outlined" onClick={() => navigate(`/postagown/form?resume=${g.id}`)}>
+                                                Complete Setup
+                                            </Button>
+                                            <Button size="small" color="error" variant="outlined" onClick={() => onDeleteDraftClick(g.id)}>
+                                                Delete
+                                            </Button>
+                                        </>
                                     ) : g.moderationStatus === 'Rejected' ? (
                                         <Button size="small" color="success" variant="outlined" disabled={resubmitting} onClick={() => onResubmitClick(g.id)}>
                                             Resubmit for Review

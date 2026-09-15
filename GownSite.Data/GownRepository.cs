@@ -365,5 +365,20 @@ namespace GownSite.Data
             context.GownPictures.RemoveRange(toRemove);
             context.SaveChanges();
         }
+
+        // Only ever called on a Draft (see GownController.DeleteDraft) — a draft never went
+        // live, so there's no Stripe subscription or moderation history to worry about.
+        // GownPicture's FK uses DeleteBehavior.Restrict (see GownDataContext), so its rows
+        // must be removed before the GownPosting row itself.
+        public void DeleteDraft(int id)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var existing = context.Gowns.Include(g => g.MorePictures).FirstOrDefault(g => g.Id == id);
+            if (existing == null) return;
+
+            context.GownPictures.RemoveRange(existing.MorePictures);
+            context.Gowns.Remove(existing);
+            context.SaveChanges();
+        }
     }
 }

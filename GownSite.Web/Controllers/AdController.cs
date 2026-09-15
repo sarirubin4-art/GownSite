@@ -308,6 +308,21 @@ namespace GownSite.Web.Controllers
             return Ok();
         }
 
+        [HttpPost("delete-draft")]
+        [Authorize]
+        public IActionResult DeleteDraft([FromBody] AdIdRequest request)
+        {
+            var repo = new AdRepository(_connectionString);
+            var existing = repo.Get(request.Id);
+            if (existing == null) return NotFound();
+            if (existing.OwnerId != CurrentOwnerId()) return Forbid();
+            if (existing.ModerationStatus != ModerationStatus.Draft)
+                return BadRequest(new { message = "Only a draft that hasn't been submitted yet can be deleted." });
+
+            repo.DeleteDraft(request.Id);
+            return Ok();
+        }
+
         private int CurrentOwnerId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         private bool IsCurrentOwner(int? ownerId)

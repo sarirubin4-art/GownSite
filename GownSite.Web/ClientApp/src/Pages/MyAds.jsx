@@ -52,6 +52,12 @@ const MyAds = () => {
         load();
     };
 
+    const onDeleteDraftClick = async (id) => {
+        if (!window.confirm('This will permanently delete this draft. Continue?')) return;
+        await axios.post('/api/ad/delete-draft', { id });
+        load();
+    };
+
     const onSaveEdit = async () => {
         setEditError('');
         const data = new FormData();
@@ -164,9 +170,14 @@ const MyAds = () => {
                                         Edit
                                     </Button>
                                     {a.moderationStatus === 'Draft' ? (
-                                        <Button size="small" color="success" variant="outlined" onClick={() => navigate(`/advertise/form?resume=${a.id}`)}>
-                                            Complete Setup
-                                        </Button>
+                                        <>
+                                            <Button size="small" color="success" variant="outlined" onClick={() => navigate(`/advertise/form?resume=${a.id}`)}>
+                                                Complete Setup
+                                            </Button>
+                                            <Button size="small" color="error" variant="outlined" onClick={() => onDeleteDraftClick(a.id)}>
+                                                Delete
+                                            </Button>
+                                        </>
                                     ) : a.moderationStatus === 'PendingReview' || a.moderationStatus === 'Rejected' || a.moderationStatus === 'Removed' ? null : a.isActive ? (
                                         <Button size="small" color="error" variant="outlined" onClick={() => onCancelClick(a.id)}>
                                             Cancel & Remove

@@ -192,5 +192,17 @@ namespace GownSite.Data
             existing.IsActive = false;
             context.SaveChanges();
         }
+
+        // Only ever called on a Draft (see AdController.DeleteDraft) — a draft never went
+        // live, so there's no Stripe subscription or moderation history to worry about.
+        public void DeleteDraft(int id)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var existing = context.Ads.FirstOrDefault(a => a.Id == id);
+            if (existing == null) return;
+
+            context.Ads.Remove(existing);
+            context.SaveChanges();
+        }
     }
 }
