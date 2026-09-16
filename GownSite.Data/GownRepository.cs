@@ -60,6 +60,14 @@ namespace GownSite.Data
                     !string.IsNullOrEmpty(g.Color) &&
                     g.Color.Split(',').Any(c => filters.Colors.Contains(c))
                 ).ToList();
+
+                // Only meaningful with a single color selected — with several selected,
+                // "most of which color" is ambiguous, so leave the default CreatedDate order.
+                if (filters.Colors.Count == 1)
+                {
+                    var targetColor = filters.Colors[0];
+                    results = results.OrderByDescending(g => GetColorScore(g.ColorScoresJson, targetColor)).ToList();
+                }
             }
 
             if (filters.Styles.Count > 0)
@@ -167,6 +175,35 @@ namespace GownSite.Data
 
             existing.PrimaryPictureUrl = url;
             context.SaveChanges();
+        }
+
+        public void SetColorScores(int id, string colorScoresJson)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var existing = context.Gowns.FirstOrDefault(g => g.Id == id);
+            if (existing == null) return;
+
+            existing.ColorScoresJson = colorScoresJson;
+            context.SaveChanges();
+        }
+
+        // Null/missing (a gown scored before this feature shipped, or tagged with a
+        // non-solid option like Floral/Multi/Other that never gets a score) sorts last.
+        // If every candidate is missing — e.g. the selected color is one of those
+        // non-solid options — this is a no-op and the prior CreatedDate order survives,
+        // since OrderByDescending is a stable sort.
+        private static double GetColorScore(string colorScoresJson, string color)
+        {
+            if (string.IsNullOrEmpty(colorScoresJson)) return double.MinValue;
+            try
+            {
+                var scores = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, double>>(colorScoresJson);
+                return scores != null && scores.TryGetValue(color, out var score) ? score : double.MinValue;
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return double.MinValue;
+            }
         }
 
         public void ActivateListing(int id, string stripeSubscriptionId, string stripeCustomerId)

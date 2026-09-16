@@ -85,6 +85,14 @@ namespace GownSite.Data
         public int? PromoDurationMonths { get; set; }
         public Guid? BatchId { get; set; }
 
+        // Per-tagged-color "% of primary photo's pixels that match this color" score,
+        // stored as JSON (e.g. {"Navy":61.4,"Gold":9.2}) — one entry per value in Color,
+        // since a gown can carry more than one color tag. Recomputed by
+        // IGownColorScoreService whenever the gown goes live or its photo/Color changes.
+        // Used only to sort search results when exactly one color filter is selected —
+        // see GownRepository.Search.
+        public string ColorScoresJson { get; set; }
+
         // Concierge posting service (see AdminController's concierge/* endpoints and
         // GownController.ConciergeIntake): NeedsConciergeDraft marks a gown a customer
         // submitted with only the bare minimum, awaiting admin to flesh it out.

@@ -46,6 +46,8 @@ public class Program
             builder.Services.AddSingleton<IFileStorageService, LocalFileStorageService>();
         }
 
+        builder.Services.AddSingleton<IGownColorScoreService, GownColorScoreService>();
+
         var emailConnectionString = builder.Configuration["Email:ConnectionString"];
         if (!string.IsNullOrEmpty(emailConnectionString))
         {

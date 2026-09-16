@@ -95,13 +95,15 @@ namespace GownSite.Web.Controllers
         private readonly IConfiguration _configuration;
         private readonly IEmailSender _emailSender;
         private readonly IFileStorageService _storage;
+        private readonly IGownColorScoreService _colorScoreService;
 
-        public AdminController(IConfiguration configuration, IEmailSender emailSender, IFileStorageService storage)
+        public AdminController(IConfiguration configuration, IEmailSender emailSender, IFileStorageService storage, IGownColorScoreService colorScoreService)
         {
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("ConStr");
             _emailSender = emailSender;
             _storage = storage;
+            _colorScoreService = colorScoreService;
         }
 
         private string FrontendBaseUrl()
@@ -272,6 +274,8 @@ namespace GownSite.Web.Controllers
                 }
             }
 
+            await _colorScoreService.RecomputeAsync(id);
+
             var frontendBaseUrl = FrontendBaseUrl();
             await _emailSender.SendAsync(
                 posting.Owner.Email,
@@ -384,8 +388,12 @@ namespace GownSite.Web.Controllers
                 Notes = request.Notes
             });
 
+            byte[] newPrimaryImageBytes = null;
             if (request.PrimaryPicture != null)
+            {
+                newPrimaryImageBytes = await request.PrimaryPicture.ToByteArrayAsync();
                 repo.SetPrimaryPicture(request.Id, await _storage.SaveAsync(request.PrimaryPicture, "gowns"));
+            }
 
             if (removeIds.Count > 0)
                 repo.RemovePictures(request.Id, removeIds);
@@ -397,6 +405,8 @@ namespace GownSite.Web.Controllers
                     urls.Add(await _storage.SaveAsync(file, "gowns"));
                 repo.AddPictures(request.Id, urls);
             }
+
+            await _colorScoreService.RecomputeAsync(request.Id, newPrimaryImageBytes);
 
             return Ok();
         }
@@ -661,8 +671,14 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = pricing.Error });
 
             string primaryUrl = null;
+            byte[] primaryImageBytes = null;
             if (request.PrimaryPicture != null)
+            {
+                // Only worth buffering when Finalize will actually consume it below —
+                // the normal (non-Finalize) posting flow never calls RecomputeAsync here.
+                if (request.Finalize) primaryImageBytes = await request.PrimaryPicture.ToByteArrayAsync();
                 primaryUrl = await _storage.SaveAsync(request.PrimaryPicture, "gowns");
+            }
 
             var repo = new GownRepository(_connectionString);
             var posting = new GownPosting
@@ -700,7 +716,10 @@ namespace GownSite.Web.Controllers
             }
 
             if (request.Finalize)
+            {
                 repo.ActivateListing(id, null, null);
+                await _colorScoreService.RecomputeAsync(id, primaryImageBytes);
+            }
             return Ok(new { id, finalized = request.Finalize });
         }
 

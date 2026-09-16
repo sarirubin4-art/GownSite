@@ -24,5 +24,12 @@ namespace GownSite.Web.Services
             await file.CopyToAsync(stream);
             return $"/uploads/{container}/{fileName}";
         }
+
+        public async Task<byte[]> ReadAsync(string url, CancellationToken cancellationToken = default)
+        {
+            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+            var path = Path.Combine(webRoot, url.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+            return File.Exists(path) ? await File.ReadAllBytesAsync(path, cancellationToken) : null;
+        }
     }
 }

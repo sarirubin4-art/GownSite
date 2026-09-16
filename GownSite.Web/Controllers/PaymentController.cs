@@ -50,12 +50,14 @@ namespace GownSite.Web.Controllers
         private readonly string _connectionString;
         private readonly IConfiguration _configuration;
         private readonly IEmailSender _emailSender;
+        private readonly IGownColorScoreService _colorScoreService;
 
-        public PaymentController(IConfiguration configuration, IEmailSender emailSender)
+        public PaymentController(IConfiguration configuration, IEmailSender emailSender, IGownColorScoreService colorScoreService)
         {
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("ConStr");
             _emailSender = emailSender;
+            _colorScoreService = colorScoreService;
         }
 
         private string FrontendBaseUrl()
@@ -245,6 +247,7 @@ namespace GownSite.Web.Controllers
             if (posting.OwnerId != CurrentOwnerId()) return Forbid();
 
             gownRepo.ActivateListing(postingId, session.SubscriptionId, session.CustomerId);
+            await _colorScoreService.RecomputeAsync(postingId);
             return Ok(new { postingId });
         }
 

@@ -123,14 +123,16 @@ namespace GownSite.Web.Controllers
         private readonly IFileStorageService _storage;
         private readonly IConfiguration _configuration;
         private readonly IEmailSender _emailSender;
+        private readonly IGownColorScoreService _colorScoreService;
 
-        public GownController(IConfiguration configuration, IWebHostEnvironment env, IFileStorageService storage, IEmailSender emailSender)
+        public GownController(IConfiguration configuration, IWebHostEnvironment env, IFileStorageService storage, IEmailSender emailSender, IGownColorScoreService colorScoreService)
         {
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("ConStr");
             _env = env;
             _storage = storage;
             _emailSender = emailSender;
+            _colorScoreService = colorScoreService;
         }
 
         [HttpPost("search")]
@@ -413,8 +415,12 @@ namespace GownSite.Web.Controllers
                 Notes = request.Notes
             });
 
+            byte[] newPrimaryImageBytes = null;
             if (request.PrimaryPicture != null)
+            {
+                newPrimaryImageBytes = await request.PrimaryPicture.ToByteArrayAsync();
                 repo.SetPrimaryPicture(request.Id, await _storage.SaveAsync(request.PrimaryPicture, "gowns"));
+            }
 
             if (removeIds.Count > 0)
                 repo.RemovePictures(request.Id, removeIds);
@@ -426,6 +432,8 @@ namespace GownSite.Web.Controllers
                     urls.Add(await _storage.SaveAsync(file, "gowns"));
                 repo.AddPictures(request.Id, urls);
             }
+
+            await _colorScoreService.RecomputeAsync(request.Id, newPrimaryImageBytes);
 
             return Ok();
         }
@@ -518,7 +526,7 @@ namespace GownSite.Web.Controllers
 
         [HttpPost("activate-test")]
         [Authorize]
-        public IActionResult ActivateTest([FromBody] IdRequest request)
+        public async Task<IActionResult> ActivateTest([FromBody] IdRequest request)
         {
             // Dev-only fallback so the posting -> search flow can be verified before Stripe test keys are configured.
             // Real activation happens via PaymentController.ConfirmSession once Stripe is wired up.
@@ -530,6 +538,7 @@ namespace GownSite.Web.Controllers
             if (existing.OwnerId != CurrentOwnerId()) return Forbid();
 
             repo.ActivateListing(request.Id, null, null);
+            await _colorScoreService.RecomputeAsync(request.Id);
             return Ok();
         }
 
