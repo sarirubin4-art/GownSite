@@ -195,7 +195,7 @@ namespace GownSite.Web.Controllers
         public async Task<IActionResult> ApproveGown(int id)
         {
             var repo = new GownRepository(_connectionString);
-            var posting = repo.Get(id);
+            var posting = repo.GetWithOwner(id);
             if (posting == null) return NotFound();
             if (posting.ModerationStatus != ModerationStatus.PendingReview)
                 return BadRequest(new { message = "This listing is no longer pending review." });
@@ -302,7 +302,7 @@ namespace GownSite.Web.Controllers
         public async Task<IActionResult> RejectGown(int id, [FromBody] RejectRequest request)
         {
             var repo = new GownRepository(_connectionString);
-            var posting = repo.Get(id);
+            var posting = repo.GetWithOwner(id);
             if (posting == null) return NotFound();
             if (posting.ModerationStatus != ModerationStatus.PendingReview)
                 return BadRequest(new { message = "This listing is no longer pending review." });
@@ -329,7 +329,7 @@ namespace GownSite.Web.Controllers
         public async Task<IActionResult> TakeDownGown(int id, [FromBody] RejectRequest request)
         {
             var repo = new GownRepository(_connectionString);
-            var posting = repo.Get(id);
+            var posting = repo.GetWithOwner(id);
             if (posting == null) return NotFound();
             if (!posting.IsActive)
                 return BadRequest(new { message = "This listing isn't currently live." });

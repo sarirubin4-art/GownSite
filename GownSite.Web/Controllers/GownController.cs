@@ -375,7 +375,7 @@ namespace GownSite.Web.Controllers
         public async Task<IActionResult> SubmitBusiness([FromBody] IdRequest request)
         {
             var repo = new GownRepository(_connectionString);
-            var posting = repo.Get(request.Id);
+            var posting = repo.GetWithOwner(request.Id);
             if (posting == null) return NotFound();
             if (posting.OwnerId != CurrentOwnerId()) return Forbid();
             if (posting.ModerationStatus != ModerationStatus.Draft)
@@ -658,7 +658,7 @@ namespace GownSite.Web.Controllers
         public async Task<IActionResult> Resubmit([FromBody] IdRequest request)
         {
             var repo = new GownRepository(_connectionString);
-            var existing = repo.Get(request.Id);
+            var existing = repo.GetWithOwner(request.Id);
             if (existing == null) return NotFound();
             if (existing.OwnerId != CurrentOwnerId()) return Forbid();
             if (existing.ModerationStatus != ModerationStatus.Rejected)
@@ -685,7 +685,7 @@ namespace GownSite.Web.Controllers
         public IActionResult Inquire([FromBody] IdRequest request)
         {
             var repo = new GownRepository(_connectionString);
-            var posting = repo.Get(request.Id);
+            var posting = repo.GetWithOwner(request.Id);
             if (posting == null || !posting.IsActive) return NotFound();
             if (posting.IsSold) return BadRequest(new { message = "This gown has already been sold." });
 

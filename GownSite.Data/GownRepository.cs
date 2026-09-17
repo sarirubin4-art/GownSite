@@ -107,7 +107,21 @@ namespace GownSite.Data
                 .ToList();
         }
 
+        // Deliberately does NOT include Owner — this backs the public /api/gown/get response
+        // (and most other call sites, which only need the posting's own fields), and Owner
+        // has no [JsonIgnore] on Name/Number/Email, so including it here would serialize a
+        // patron's contact info into that public payload regardless of their
+        // DisplayOwnerName/Number/Email choices. Callers that genuinely need Owner (sending
+        // an email, building the gated Inquire response) should use GetWithOwner instead.
         public GownPosting Get(int id)
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Gowns
+                .Include(g => g.MorePictures)
+                .FirstOrDefault(g => g.Id == id);
+        }
+
+        public GownPosting GetWithOwner(int id)
         {
             using var context = new GownDataContext(_connectionString);
             return context.Gowns

@@ -357,7 +357,7 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "Could not identify the listing for this submission." });
 
             var gownRepo = new GownRepository(_connectionString);
-            var posting = gownRepo.Get(postingId);
+            var posting = gownRepo.GetWithOwner(postingId);
             if (posting == null) return NotFound();
             if (posting.OwnerId != CurrentOwnerId()) return Forbid();
 
@@ -449,7 +449,8 @@ namespace GownSite.Web.Controllers
             var postings = new List<GownPosting>();
             foreach (var id in ids)
             {
-                var posting = gownRepo.Get(id);
+                // GetWithOwner — postings[0].Owner.Name is needed for the admin notification below.
+                var posting = gownRepo.GetWithOwner(id);
                 if (posting == null) return NotFound();
                 if (posting.OwnerId != CurrentOwnerId()) return Forbid();
                 postings.Add(posting);
