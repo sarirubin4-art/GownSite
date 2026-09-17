@@ -62,6 +62,7 @@ export const AD_CATEGORY_OPTIONS = [
     { value: 'Gemachs', label: 'Gemachs' },
     { value: 'Cosmetics', label: 'Cosmetics' },
     { value: 'PartyRentals', label: 'Party Rentals' },
+    { value: 'Catering', label: 'Catering' },
     { value: 'Other', label: 'Other' },
 ];
 
