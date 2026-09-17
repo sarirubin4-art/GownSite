@@ -13,6 +13,27 @@ import usePageTitle from '../hooks/usePageTitle';
 import { useAdLane } from '../context/AdLaneContext';
 import ImageZoomDialog from '../components/ImageZoomDialog';
 
+const MIN_INTERESTED_TO_SHOW = 3;
+
+const interestedStorageKey = (id) => `regowned:interested:${id}`;
+
+const getCachedInterest = (id) => {
+    try {
+        const raw = localStorage.getItem(interestedStorageKey(id));
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+};
+
+const setCachedInterest = (id, contactInfo) => {
+    try {
+        localStorage.setItem(interestedStorageKey(id), JSON.stringify(contactInfo));
+    } catch {
+        // localStorage unavailable — dedupe just won't persist across visits
+    }
+};
+
 const ViewGown = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -41,11 +62,20 @@ const ViewGown = () => {
     }, [id]);
 
     const onInterestedClick = async () => {
+        const cached = getCachedInterest(id);
+        if (cached) {
+            setContactInfo(cached);
+            setDialogOpen(true);
+            return;
+        }
+
         setLoading(true);
         try {
             const { data } = await axios.post('/api/gown/inquire', { id: Number(id) });
             setContactInfo(data);
             setDialogOpen(true);
+            setCachedInterest(id, data);
+            setGown((prev) => (prev ? { ...prev, inquiryCount: data.inquiryCount } : prev));
         } finally {
             setLoading(false);
         }
@@ -179,6 +209,11 @@ const ViewGown = () => {
                         >
                             {loading ? <CircularProgress size={22} color="inherit" /> : "I'm Interested"}
                         </Button>
+                    )}
+                    {gown.inquiryCount >= MIN_INTERESTED_TO_SHOW && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
+                            {gown.inquiryCount} people are interested in this dress
+                        </Typography>
                     )}
                 </Grid>
             </Grid>
