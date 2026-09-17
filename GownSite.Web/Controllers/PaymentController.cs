@@ -191,15 +191,23 @@ namespace GownSite.Web.Controllers
                 postings.Add(posting);
             }
 
-            var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m);
-            DraftPromoApplier.Result result = null;
-            foreach (var posting in postings)
-            {
-                result = DraftPromoApplier.ApplyToGown(_connectionString, feeUsd, posting, request.PromoCode);
-                if (!result.Success) return BadRequest(new { message = result.Error });
-            }
+            if (string.IsNullOrWhiteSpace(request.PromoCode))
+                return BadRequest(new { message = "Enter a promo code." });
 
-            return Ok(new { resolvedFee = result.ResolvedFee, fullFee = result.FullFee, durationMonths = result.DurationMonths });
+            var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m);
+
+            // Resolve once, using the batch's real size (one lookup, not one per gown), so
+            // a promo that fails to resolve (expired, MaxUses hit, wrong scope) is caught
+            // before any row is written — not partway through the loop below.
+            var batchIdForSizing = postings.FirstOrDefault(p => p.BatchId.HasValue)?.BatchId;
+            var batchSize = batchIdForSizing.HasValue ? gownRepo.GetByBatchId(batchIdForSizing.Value).Count : postings.Count;
+            var pricing = PromoCodeCalculator.ResolvePricing(_connectionString, request.PromoCode, feeUsd, batchIdForSizing.HasValue, batchSize);
+            if (!pricing.Success) return BadRequest(new { message = pricing.Error });
+
+            foreach (var posting in postings)
+                gownRepo.ApplyPromo(posting.Id, pricing.PromoCodeId!.Value, pricing.MonthlyFeeOverride, pricing.PromoDurationMonths);
+
+            return Ok(new { resolvedFee = pricing.MonthlyFeeOverride, fullFee = feeUsd, durationMonths = pricing.PromoDurationMonths });
         }
 
         [HttpPost("apply-ad-promo-draft")]

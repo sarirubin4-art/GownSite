@@ -759,6 +759,8 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
             if (request.MorePictures != null && request.MorePictures.Any(f => !ImageUploadValidator.IsValidImage(f)))
                 return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+            if (!request.DisplayOwnerName && !request.DisplayOwnerNumber && !request.DisplayOwnerEmail)
+                return BadRequest(new { message = "Please allow at least one way for interested buyers to contact this patron." });
 
             if (request.Finalize)
             {

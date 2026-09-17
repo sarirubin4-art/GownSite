@@ -483,6 +483,8 @@ namespace GownSite.Web.Controllers
             if (string.IsNullOrWhiteSpace(request.Location)) return BadRequest(new { message = "Location is required." });
             if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType)) return BadRequest(new { message = "Rent or sale is required." });
             if (request.BatchId == Guid.Empty) return BadRequest(new { message = "Missing batch identifier." });
+            if (!request.DisplayOwnerName && !request.DisplayOwnerNumber && !request.DisplayOwnerEmail)
+                return BadRequest(new { message = "Please allow at least one way for interested buyers to contact you." });
             if (request.MorePictures?.Count > MaxMorePictures)
                 return BadRequest(new { message = $"You can upload up to {MaxMorePictures} additional photos." });
             if (!ImageUploadValidator.IsValidImage(request.PrimaryPicture))
