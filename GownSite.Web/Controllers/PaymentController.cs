@@ -92,6 +92,8 @@ namespace GownSite.Web.Controllers
             if (posting.OwnerId != CurrentOwnerId()) return Forbid();
             if (!posting.IsActive || string.IsNullOrEmpty(posting.StripeSubscriptionId))
                 return BadRequest(new { message = "This listing doesn't have an active subscription to apply a promo to." });
+            if (string.IsNullOrWhiteSpace(request.PromoCode))
+                return BadRequest(new { message = "Enter a promo code." });
 
             var promoRepo = new PromoCodeRepository(_connectionString);
             var promo = promoRepo.GetByCode(request.PromoCode);
@@ -128,6 +130,8 @@ namespace GownSite.Web.Controllers
             if (ad.OwnerId != CurrentOwnerId()) return Forbid();
             if (!ad.IsActive || string.IsNullOrEmpty(ad.StripeSubscriptionId))
                 return BadRequest(new { message = "This ad doesn't have an active subscription to apply a promo to." });
+            if (string.IsNullOrWhiteSpace(request.PromoCode))
+                return BadRequest(new { message = "Enter a promo code." });
 
             var promoRepo = new PromoCodeRepository(_connectionString);
             var promo = promoRepo.GetByCode(request.PromoCode);
@@ -212,8 +216,13 @@ namespace GownSite.Web.Controllers
             var pricing = PromoCodeCalculator.ResolvePricing(_connectionString, request.PromoCode, feeUsd, batchIdForSizing.HasValue, batchSize);
             if (!pricing.Success) return BadRequest(new { message = pricing.Error });
 
-            // One context/SaveChanges for the whole batch — see ApplyPromoToBatch's comment.
-            gownRepo.ApplyPromoToBatch(postings.Select(p => p.Id), pricing.PromoCodeId!.Value, pricing.MonthlyFeeOverride, pricing.PromoDurationMonths);
+            // One atomic UPDATE for the whole batch — see ApplyPromoToBatch's comment. If a gown
+            // vanished between the validation loop above and this call (e.g. concurrent delete),
+            // fewer rows get matched than requested — surface that instead of reporting success
+            // for gowns that didn't actually get the promo.
+            var updatedCount = gownRepo.ApplyPromoToBatch(postings.Select(p => p.Id), pricing.PromoCodeId!.Value, pricing.MonthlyFeeOverride, pricing.PromoDurationMonths);
+            if (updatedCount != postings.Count)
+                return BadRequest(new { message = "One or more gowns in this batch could no longer be found. Please refresh and try again." });
 
             return Ok(new { resolvedFee = pricing.MonthlyFeeOverride, fullFee = feeUsd, durationMonths = pricing.PromoDurationMonths });
         }

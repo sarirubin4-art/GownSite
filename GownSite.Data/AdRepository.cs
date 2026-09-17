@@ -14,20 +14,22 @@ namespace GownSite.Data
         }
 
         // Returns whether this call actually changed the row's PromoCodeId (vs. re-applying the
-        // code already on it) — callers use this, read fresh at write time, to decide whether to
-        // count a redemption, instead of comparing against a copy of the row fetched earlier in
-        // the request (which can go stale across an awaited Stripe call).
+        // code already on it) — callers use this to decide whether to count a redemption. The
+        // PromoCodeId change is detected and written in one atomic conditional UPDATE (not a
+        // SELECT followed by a separate write), so two concurrent calls for the same row can't
+        // both see "not yet applied" and both report a new application.
         public bool ApplyPromo(int id, int promoCodeId, decimal? monthlyFeeOverride, int? promoDurationMonths)
         {
             using var context = new GownDataContext(_connectionString);
-            var existing = context.Ads.FirstOrDefault(a => a.Id == id);
-            if (existing == null) return false;
+            var isNewApplication = context.Ads
+                .Where(a => a.Id == id && a.PromoCodeId != promoCodeId)
+                .ExecuteUpdate(s => s.SetProperty(a => a.PromoCodeId, promoCodeId)) > 0;
 
-            var isNewApplication = existing.PromoCodeId != promoCodeId;
-            existing.PromoCodeId = promoCodeId;
-            existing.MonthlyFeeOverride = monthlyFeeOverride;
-            existing.PromoDurationMonths = promoDurationMonths;
-            context.SaveChanges();
+            context.Ads.Where(a => a.Id == id)
+                .ExecuteUpdate(s => s
+                    .SetProperty(a => a.MonthlyFeeOverride, monthlyFeeOverride)
+                    .SetProperty(a => a.PromoDurationMonths, promoDurationMonths));
+
             return isNewApplication;
         }
 

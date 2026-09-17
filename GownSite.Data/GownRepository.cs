@@ -252,38 +252,38 @@ namespace GownSite.Data
         }
 
         // Returns whether this call actually changed the row's PromoCodeId (vs. re-applying the
-        // code already on it) — callers use this, read fresh at write time, to decide whether to
-        // count a redemption, instead of comparing against a copy of the row fetched earlier in
-        // the request (which can go stale across an awaited Stripe call).
+        // code already on it) — callers use this to decide whether to count a redemption. The
+        // PromoCodeId change is detected and written in one atomic conditional UPDATE (not a
+        // SELECT followed by a separate write), so two concurrent calls for the same row can't
+        // both see "not yet applied" and both report a new application.
         public bool ApplyPromo(int id, int promoCodeId, decimal? monthlyFeeOverride, int? promoDurationMonths)
         {
             using var context = new GownDataContext(_connectionString);
-            var existing = context.Gowns.FirstOrDefault(g => g.Id == id);
-            if (existing == null) return false;
+            var isNewApplication = context.Gowns
+                .Where(g => g.Id == id && g.PromoCodeId != promoCodeId)
+                .ExecuteUpdate(s => s.SetProperty(g => g.PromoCodeId, promoCodeId)) > 0;
 
-            var isNewApplication = existing.PromoCodeId != promoCodeId;
-            existing.PromoCodeId = promoCodeId;
-            existing.MonthlyFeeOverride = monthlyFeeOverride;
-            existing.PromoDurationMonths = promoDurationMonths;
-            context.SaveChanges();
+            context.Gowns.Where(g => g.Id == id)
+                .ExecuteUpdate(s => s
+                    .SetProperty(g => g.MonthlyFeeOverride, monthlyFeeOverride)
+                    .SetProperty(g => g.PromoDurationMonths, promoDurationMonths));
+
             return isNewApplication;
         }
 
-        // Writes the same promo to every id in one context/SaveChanges, so a mid-write failure
-        // (a row deleted concurrently, a transient DB error) can't leave some gowns in the batch
-        // discounted and others not — unlike calling ApplyPromo per id, where each call is its
-        // own independent transaction.
-        public void ApplyPromoToBatch(IEnumerable<int> ids, int promoCodeId, decimal? monthlyFeeOverride, int? promoDurationMonths)
+        // Writes the same promo to every id in one atomic UPDATE, so a mid-write failure (a
+        // transient DB error) can't leave some gowns in the batch discounted and others not.
+        // Returns the number of rows actually matched/updated — callers should compare this
+        // against the number of ids requested, since an id can vanish (e.g. concurrent delete)
+        // between an earlier validation pass and this call.
+        public int ApplyPromoToBatch(IEnumerable<int> ids, int promoCodeId, decimal? monthlyFeeOverride, int? promoDurationMonths)
         {
             using var context = new GownDataContext(_connectionString);
-            var existing = context.Gowns.Where(g => ids.Contains(g.Id)).ToList();
-            foreach (var posting in existing)
-            {
-                posting.PromoCodeId = promoCodeId;
-                posting.MonthlyFeeOverride = monthlyFeeOverride;
-                posting.PromoDurationMonths = promoDurationMonths;
-            }
-            context.SaveChanges();
+            return context.Gowns.Where(g => ids.Contains(g.Id))
+                .ExecuteUpdate(s => s
+                    .SetProperty(g => g.PromoCodeId, promoCodeId)
+                    .SetProperty(g => g.MonthlyFeeOverride, monthlyFeeOverride)
+                    .SetProperty(g => g.PromoDurationMonths, promoDurationMonths));
         }
 
         public List<GownPosting> GetActive()

@@ -8,6 +8,7 @@ import PublicIcon from '@mui/icons-material/Public';
 import { AD_CATEGORY_OPTIONS, adCategoryLabels } from '../constants/gownOptions';
 import { useAdLane } from '../context/AdLaneContext';
 import usePageTitle from '../hooks/usePageTitle';
+import useDragSelectGuard from '../hooks/useDragSelectGuard';
 
 const ALL_LOCATIONS = 'All';
 
@@ -19,6 +20,7 @@ const BrowseAds = () => {
     const [category, setCategory] = useState('All');
     const [location, setLocation] = useState(ALL_LOCATIONS);
     const [locationOptions, setLocationOptions] = useState([]);
+    const dragSelectGuard = useDragSelectGuard();
 
     useEffect(() => {
         const load = async () => {
@@ -55,7 +57,10 @@ const BrowseAds = () => {
                 ))}
             </Tabs>
 
-            <Stack direction="row" spacing={2} sx={{ mt: 2, mb: 4, mr: laneSx, flexWrap: 'wrap', rowGap: 2 }}>
+            <Stack
+                direction="row" spacing={2} sx={{ mt: 2, mb: 4, mr: laneSx, flexWrap: 'wrap', rowGap: 2 }}
+                {...dragSelectGuard}
+            >
                 {/* Mirrors the tab strip above (same category state) — the tabs alone can look
                     like a fixed, short list, so this dropdown makes the full category set
                     discoverable without needing to scroll the tabs to find it. */}
