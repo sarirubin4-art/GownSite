@@ -1,6 +1,7 @@
 import React from 'react';
 import { Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
+import ScrollToTop from './components/ScrollToTop';
 import { AuthProvider } from './context/AuthContext';
 import Home from './Pages/Home';
 import Login from './Pages/Login';
@@ -39,6 +40,7 @@ import ConciergePostingForm from './Pages/ConciergePostingForm';
 const App = () => {
     return (
         <AuthProvider>
+            <ScrollToTop />
             <Layout>
                 <Routes>
                     <Route path='/' element={<Home />} />
