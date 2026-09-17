@@ -32,11 +32,14 @@ namespace GownSite.Data
             _connectionString = connectionString;
         }
 
+        // No Owner include — this backs the public, unauthenticated /api/gown/search
+        // response (the main browse page), and nothing in the search results UI reads
+        // owner data. Including it here would serialize every matching listing's owner
+        // Name/Number/Email into one response, the same leak class as Get(int id) above.
         public GownSearchResult Search(GownSearchFilters filters)
         {
             using var context = new GownDataContext(_connectionString);
             var query = context.Gowns
-                .Include(g => g.Owner)
                 .Include(g => g.MorePictures)
                 .Where(g => g.IsActive)
                 .AsQueryable();
