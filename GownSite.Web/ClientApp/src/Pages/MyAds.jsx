@@ -11,6 +11,8 @@ import { useAuth } from '../context/AuthContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import LocationField from '../components/LocationField';
 import FilterAutocomplete from '../components/FilterAutocomplete';
+import PromoApplyBox from '../components/PromoApplyBox';
+import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
 
 const MyAds = () => {
     const { owner, loading } = useAuth();
@@ -20,7 +22,6 @@ const MyAds = () => {
     const [ads, setAds] = useState([]);
     const [editTarget, setEditTarget] = useState(null);
     const [showPostedNotice, setShowPostedNotice] = useState(!!routerLocation.state?.posted);
-    const [promoCodeInput, setPromoCodeInput] = useState('');
     const [promoApplying, setPromoApplying] = useState(false);
     const [promoMessage, setPromoMessage] = useState(null); // { type: 'success'|'error', text }
     const [newImage, setNewImage] = useState(null);
@@ -71,6 +72,9 @@ const MyAds = () => {
         data.append('Category', editTarget.categories.join(','));
         data.append('Location', editTarget.location);
         data.append('ServesAllLocations', editTarget.servesAllLocations);
+        data.append('ShowName', editTarget.showName);
+        data.append('ShowPhone', editTarget.showPhone);
+        data.append('ShowEmail', editTarget.showEmail);
         if (newImage) data.append('Image', newImage);
 
         try {
@@ -92,21 +96,18 @@ const MyAds = () => {
 
     const onCloseEditDialog = () => {
         setEditTarget(null);
-        setPromoCodeInput('');
         setPromoMessage(null);
         setNewImage(null);
         setNewImagePreview(null);
         setEditError('');
     };
 
-    const onApplyPromo = async () => {
-        if (!promoCodeInput.trim()) return;
+    const onApplyPromo = async (promoCode) => {
         setPromoApplying(true);
         setPromoMessage(null);
         try {
-            await axios.post('/api/payment/apply-ad-promo', { id: editTarget.id, promoCode: promoCodeInput.trim() });
+            await axios.post('/api/payment/apply-ad-promo', { id: editTarget.id, promoCode });
             setPromoMessage({ type: 'success', text: 'Promo applied! Your next bill will reflect the new price.' });
-            setPromoCodeInput('');
             load();
         } catch (err) {
             setPromoMessage({ type: 'error', text: err?.response?.data?.message || 'Could not apply promo code.' });
@@ -168,7 +169,8 @@ const MyAds = () => {
                                         id: a.id, title: a.title, description: a.description,
                                         targetUrl: a.targetUrl || '', categories: (a.categories || '').split(',').filter(Boolean),
                                         location: a.location || '', servesAllLocations: !!a.servesAllLocations,
-                                        isActive: a.isActive, imageUrl: a.imageUrl
+                                        isActive: a.isActive, imageUrl: a.imageUrl, promoCode: a.promoCode,
+                                        showName: a.showName, showPhone: a.showPhone, showEmail: a.showEmail
                                     })}>
                                         Edit
                                     </Button>
@@ -208,26 +210,12 @@ const MyAds = () => {
                         <Stack spacing={2} sx={{ mt: 1 }}>
                             {editError && <Alert severity="error">{editError}</Alert>}
                             {editTarget.isActive && (
-                                <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.default', border: '1px solid', borderColor: 'divider' }}>
-                                    <Typography variant="subtitle2" gutterBottom>Apply a Promo Code</Typography>
-                                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-                                        Applying a new code replaces any promo already on this ad. It takes effect on your next bill — nothing changes for the period you've already been charged for.
-                                    </Typography>
-                                    {promoMessage && (
-                                        <Typography variant="body2" color={promoMessage.type === 'success' ? 'success.main' : 'error.main'} sx={{ mb: 1 }}>
-                                            {promoMessage.text}
-                                        </Typography>
-                                    )}
-                                    <Stack direction="row" spacing={1}>
-                                        <TextField
-                                            size="small" fullWidth label="Promo Code" value={promoCodeInput}
-                                            onChange={(e) => setPromoCodeInput(e.target.value)}
-                                        />
-                                        <Button variant="outlined" disabled={promoApplying || !promoCodeInput.trim()} onClick={onApplyPromo}>
-                                            {promoApplying ? 'Applying...' : 'Apply'}
-                                        </Button>
-                                    </Stack>
-                                </Box>
+                                <PromoApplyBox
+                                    currentPromoCode={editTarget.promoCode?.code}
+                                    onApply={onApplyPromo}
+                                    applying={promoApplying}
+                                    message={promoMessage}
+                                />
                             )}
                             <Stack direction="row" spacing={2} alignItems="center">
                                 <Box
@@ -270,12 +258,24 @@ const MyAds = () => {
                                 }
                                 label="This business isn't tied to one location (e.g. online-only)"
                             />
+                            <ContactVisibilityCheckboxes
+                                showName={editTarget.showName}
+                                showPhone={editTarget.showPhone}
+                                showEmail={editTarget.showEmail}
+                                onChange={(next) => setEditTarget({ ...editTarget, ...next })}
+                                subjectLabel="my"
+                            />
                         </Stack>
                     </DialogContent>
                 )}
                 <DialogActions>
                     <Button onClick={onCloseEditDialog}>Cancel</Button>
-                    <Button variant="contained" onClick={onSaveEdit}>Save Changes</Button>
+                    <Button
+                        variant="contained" onClick={onSaveEdit}
+                        disabled={editTarget && !editTarget.showName && !editTarget.showPhone && !editTarget.showEmail}
+                    >
+                        Save Changes
+                    </Button>
                 </DialogActions>
             </Dialog>
 

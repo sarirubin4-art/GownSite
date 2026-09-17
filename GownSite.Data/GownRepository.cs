@@ -121,6 +121,7 @@ namespace GownSite.Data
             using var context = new GownDataContext(_connectionString);
             return context.Gowns
                 .Include(g => g.MorePictures)
+                .Include(g => g.PromoCode)
                 .Where(g => g.OwnerId == ownerId)
                 .OrderByDescending(g => g.CreatedDate)
                 .ToList();
@@ -158,6 +159,8 @@ namespace GownSite.Data
             existing.Location = posting.Location;
             existing.ListingType = posting.ListingType;
             existing.DisplayOwnerName = posting.DisplayOwnerName;
+            existing.DisplayOwnerNumber = posting.DisplayOwnerNumber;
+            existing.DisplayOwnerEmail = posting.DisplayOwnerEmail;
             existing.Brand = posting.Brand;
             existing.PricePaid = posting.PricePaid;
             existing.Condition = posting.Condition;
@@ -249,6 +252,7 @@ namespace GownSite.Data
             return context.Gowns
                 .Include(g => g.Owner)
                 .Include(g => g.MorePictures)
+                .Include(g => g.PromoCode)
                 .Where(g => g.IsActive)
                 .OrderByDescending(g => g.CreatedDate)
                 .ToList();
@@ -272,6 +276,7 @@ namespace GownSite.Data
             return context.Gowns
                 .Include(g => g.Owner)
                 .Include(g => g.MorePictures)
+                .Include(g => g.PromoCode)
                 .Where(g => g.ModerationStatus == ModerationStatus.PendingReview)
                 .OrderBy(g => g.CreatedDate)
                 .ToList();

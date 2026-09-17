@@ -23,7 +23,7 @@ public class GownDataContext : DbContext
             .IsUnique();
 
         modelBuilder.Entity<GownPosting>()
-            .HasOne<PromoCode>().WithMany()
+            .HasOne(g => g.PromoCode).WithMany()
             .HasForeignKey(g => g.PromoCodeId).IsRequired(false);
 
         modelBuilder.Entity<GownPosting>()
@@ -33,7 +33,7 @@ public class GownDataContext : DbContext
             .HasIndex(g => g.NeedsConciergeDraft);
 
         modelBuilder.Entity<Ad>()
-            .HasOne<PromoCode>().WithMany()
+            .HasOne(a => a.PromoCode).WithMany()
             .HasForeignKey(a => a.PromoCodeId).IsRequired(false);
 
         modelBuilder.Entity<ContactMessage>()

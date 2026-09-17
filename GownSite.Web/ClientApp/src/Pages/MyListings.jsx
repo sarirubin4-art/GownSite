@@ -15,6 +15,8 @@ import PriceField from '../components/PriceField';
 import MorePicturesInput from '../components/MorePicturesInput';
 import ImageZoomDialog from '../components/ImageZoomDialog';
 import FilterAutocomplete from '../components/FilterAutocomplete';
+import PromoApplyBox from '../components/PromoApplyBox';
+import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
 
 const MyListings = () => {
     const { owner, loading } = useAuth();
@@ -23,7 +25,6 @@ const MyListings = () => {
     const fullScreen = useFullScreenDialog();
     const [listings, setListings] = useState([]);
     const [editTarget, setEditTarget] = useState(null);
-    const [promoCodeInput, setPromoCodeInput] = useState('');
     const [promoApplying, setPromoApplying] = useState(false);
     const [promoMessage, setPromoMessage] = useState(null); // { type: 'success'|'error', text }
     const [businessPromoCodeInput, setBusinessPromoCodeInput] = useState('');
@@ -96,6 +97,8 @@ const MyListings = () => {
         data.append('Location', editTarget.location);
         data.append('ListingType', editTarget.listingType);
         data.append('DisplayOwnerName', editTarget.displayOwnerName);
+        data.append('DisplayOwnerNumber', editTarget.displayOwnerNumber);
+        data.append('DisplayOwnerEmail', editTarget.displayOwnerEmail);
         data.append('Brand', editTarget.brand);
         if (editTarget.pricePaid !== '') data.append('PricePaid', Number(editTarget.pricePaid));
         data.append('Condition', editTarget.condition);
@@ -134,7 +137,6 @@ const MyListings = () => {
 
     const onCloseEditDialog = () => {
         setEditTarget(null);
-        setPromoCodeInput('');
         setPromoMessage(null);
         setNewPrimaryPicture(null);
         setNewPrimaryPreview(null);
@@ -142,14 +144,12 @@ const MyListings = () => {
         setNewMorePictures([]);
     };
 
-    const onApplyPromo = async () => {
-        if (!promoCodeInput.trim()) return;
+    const onApplyPromo = async (promoCode) => {
         setPromoApplying(true);
         setPromoMessage(null);
         try {
-            await axios.post('/api/payment/apply-gown-promo', { id: editTarget.id, promoCode: promoCodeInput.trim() });
+            await axios.post('/api/payment/apply-gown-promo', { id: editTarget.id, promoCode });
             setPromoMessage({ type: 'success', text: 'Promo applied! Your next bill will reflect the new price.' });
-            setPromoCodeInput('');
             load();
         } catch (err) {
             setPromoMessage({ type: 'error', text: err?.response?.data?.message || 'Could not apply promo code.' });
@@ -275,10 +275,11 @@ const MyListings = () => {
                                     <Button size="small" variant="outlined" onClick={() => setEditTarget({
                                         id: g.id, description: g.description, colors: (g.color || '').split(',').filter(Boolean), sizes: sortSizes(g.size),
                                         price: g.price, priceMax: g.priceMax || '', location: g.location, listingType: g.listingType,
-                                        displayOwnerName: g.displayOwnerName, brand: g.brand || '', pricePaid: g.pricePaid || '',
+                                        displayOwnerName: g.displayOwnerName, displayOwnerNumber: g.displayOwnerNumber, displayOwnerEmail: g.displayOwnerEmail,
+                                        brand: g.brand || '', pricePaid: g.pricePaid || '',
                                         condition: g.condition || '', length: g.length || '',
                                         styleTags: (g.styleTags || '').split(',').filter(Boolean), notes: g.notes || '',
-                                        isActive: g.isActive, primaryPictureUrl: g.primaryPictureUrl,
+                                        isActive: g.isActive, primaryPictureUrl: g.primaryPictureUrl, promoCode: g.promoCode,
                                         morePictures: [...(g.morePictures || [])].sort((a, b) => a.sortOrder - b.sortOrder)
                                     })}>
                                         Edit
@@ -334,26 +335,12 @@ const MyListings = () => {
                     <DialogContent>
                         <Stack spacing={2} sx={{ mt: 1 }}>
                             {editTarget.isActive && (
-                                <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.default', border: '1px solid', borderColor: 'divider' }}>
-                                    <Typography variant="subtitle2" gutterBottom>Apply a Promo Code</Typography>
-                                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-                                        Applying a new code replaces any promo already on this listing. It takes effect on your next bill — nothing changes for the period you've already been charged for.
-                                    </Typography>
-                                    {promoMessage && (
-                                        <Typography variant="body2" color={promoMessage.type === 'success' ? 'success.main' : 'error.main'} sx={{ mb: 1 }}>
-                                            {promoMessage.text}
-                                        </Typography>
-                                    )}
-                                    <Stack direction="row" spacing={1}>
-                                        <TextField
-                                            size="small" fullWidth label="Promo Code" value={promoCodeInput}
-                                            onChange={(e) => setPromoCodeInput(e.target.value)}
-                                        />
-                                        <Button variant="outlined" disabled={promoApplying || !promoCodeInput.trim()} onClick={onApplyPromo}>
-                                            {promoApplying ? 'Applying...' : 'Apply'}
-                                        </Button>
-                                    </Stack>
-                                </Box>
+                                <PromoApplyBox
+                                    currentPromoCode={editTarget.promoCode?.code}
+                                    onApply={onApplyPromo}
+                                    applying={promoApplying}
+                                    message={promoMessage}
+                                />
                             )}
                             <Stack direction="row" spacing={2} alignItems="center">
                                 <Box
@@ -444,6 +431,18 @@ const MyListings = () => {
                             </Box>
                             <TextField label="Notes" multiline rows={2} value={editTarget.notes}
                                 onChange={(e) => setEditTarget({ ...editTarget, notes: e.target.value })} />
+                            <ContactVisibilityCheckboxes
+                                showName={editTarget.displayOwnerName}
+                                showPhone={editTarget.displayOwnerNumber}
+                                showEmail={editTarget.displayOwnerEmail}
+                                onChange={(next) => setEditTarget({
+                                    ...editTarget,
+                                    displayOwnerName: next.showName,
+                                    displayOwnerNumber: next.showPhone,
+                                    displayOwnerEmail: next.showEmail
+                                })}
+                                subjectLabel="my"
+                            />
                         </Stack>
                     </DialogContent>
                 )}
@@ -451,7 +450,10 @@ const MyListings = () => {
                     <Button onClick={onCloseEditDialog}>Cancel</Button>
                     <Button
                         variant="contained" onClick={onSaveEdit}
-                        disabled={editTarget && editTarget.priceMax !== '' && Number(editTarget.priceMax) <= Number(editTarget.price)}
+                        disabled={editTarget && (
+                            (editTarget.priceMax !== '' && Number(editTarget.priceMax) <= Number(editTarget.price)) ||
+                            (!editTarget.displayOwnerName && !editTarget.displayOwnerNumber && !editTarget.displayOwnerEmail)
+                        )}
                     >
                         Save Changes
                     </Button>

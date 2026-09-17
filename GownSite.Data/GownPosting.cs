@@ -75,12 +75,18 @@ namespace GownSite.Data
         public bool IsActive { get; set; }
         public bool IsSold { get; set; }
         public bool DisplayOwnerName { get; set; }
+        // Gate GownController.Inquire's ownerNumber/ownerEmail the same way DisplayOwnerName
+        // already gates ownerName. Both default true on existing rows (see the migration that
+        // adds them) since phone/email were shown unconditionally before this pair existed.
+        public bool DisplayOwnerNumber { get; set; }
+        public bool DisplayOwnerEmail { get; set; }
         public string StripeSubscriptionId { get; set; }
         public string StripeCustomerId { get; set; }
         public ModerationStatus ModerationStatus { get; set; }
         public string RejectionReason { get; set; }
         public string StripePaymentMethodId { get; set; }
         public int? PromoCodeId { get; set; }
+        public PromoCode PromoCode { get; set; }
         public decimal? MonthlyFeeOverride { get; set; }
         public int? PromoDurationMonths { get; set; }
         public Guid? BatchId { get; set; }
@@ -196,8 +202,18 @@ namespace GownSite.Data
         public string RejectionReason { get; set; }
         public string StripePaymentMethodId { get; set; }
         public int? PromoCodeId { get; set; }
+        public PromoCode PromoCode { get; set; }
         public decimal? MonthlyFeeOverride { get; set; }
         public int? PromoDurationMonths { get; set; }
+
+        // Contact-reveal visibility, gating AdController.Inquire's response the same way
+        // GownPosting.DisplayOwnerName/Number/Email gate GownController.Inquire's. Ads have
+        // no prior "always shown" behavior to preserve, so all three default false on
+        // existing rows — an old approved ad just shows no Contact section until edited.
+        public bool ShowName { get; set; }
+        public bool ShowPhone { get; set; }
+        public bool ShowEmail { get; set; }
+        public int InquiryCount { get; set; }
     }
 
     public enum DiscountType

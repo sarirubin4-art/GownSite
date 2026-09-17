@@ -17,6 +17,8 @@ namespace GownSite.Web.Controllers
         public string Location { get; set; }
         public string ListingType { get; set; }
         public bool DisplayOwnerName { get; set; }
+        public bool DisplayOwnerNumber { get; set; } = true;
+        public bool DisplayOwnerEmail { get; set; } = true;
         public string Brand { get; set; }
         public decimal? PricePaid { get; set; }
         public string Condition { get; set; }
@@ -47,6 +49,8 @@ namespace GownSite.Web.Controllers
         public string Location { get; set; }
         public string ListingType { get; set; }
         public bool DisplayOwnerName { get; set; }
+        public bool DisplayOwnerNumber { get; set; } = true;
+        public bool DisplayOwnerEmail { get; set; } = true;
         public string Brand { get; set; }
         public decimal? PricePaid { get; set; }
         public string Condition { get; set; }
@@ -67,6 +71,8 @@ namespace GownSite.Web.Controllers
         public string Location { get; set; }
         public string ListingType { get; set; }
         public bool DisplayOwnerName { get; set; }
+        public bool DisplayOwnerNumber { get; set; } = true;
+        public bool DisplayOwnerEmail { get; set; } = true;
         public string Brand { get; set; }
         public decimal? PricePaid { get; set; }
         public string Condition { get; set; }
@@ -96,6 +102,8 @@ namespace GownSite.Web.Controllers
         public string Location { get; set; }
         public string ListingType { get; set; }
         public bool DisplayOwnerName { get; set; }
+        public bool DisplayOwnerNumber { get; set; } = true;
+        public bool DisplayOwnerEmail { get; set; } = true;
         public string Brand { get; set; }
         public decimal? PricePaid { get; set; }
         public string Condition { get; set; }
@@ -190,6 +198,8 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "A primary picture is required." });
             if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType))
                 return BadRequest(new { message = "ListingType must be 'Rent' or 'Sale'." });
+            if (!request.DisplayOwnerName && !request.DisplayOwnerNumber && !request.DisplayOwnerEmail)
+                return BadRequest(new { message = "Please allow at least one way for interested buyers to contact you." });
             if (request.MorePictures?.Count > MaxMorePictures)
                 return BadRequest(new { message = $"You can upload up to {MaxMorePictures} additional photos." });
             if (request.PriceMax.HasValue && request.PriceMax.Value <= request.Price)
@@ -227,6 +237,8 @@ namespace GownSite.Web.Controllers
                     Location = request.Location,
                     ListingType = listingType,
                     DisplayOwnerName = request.DisplayOwnerName,
+                    DisplayOwnerNumber = request.DisplayOwnerNumber,
+                    DisplayOwnerEmail = request.DisplayOwnerEmail,
                     Brand = request.Brand,
                     PricePaid = request.PricePaid,
                     Condition = request.Condition,
@@ -251,6 +263,8 @@ namespace GownSite.Web.Controllers
                     Location = request.Location,
                     ListingType = listingType,
                     DisplayOwnerName = request.DisplayOwnerName,
+                    DisplayOwnerNumber = request.DisplayOwnerNumber,
+                    DisplayOwnerEmail = request.DisplayOwnerEmail,
                     Brand = request.Brand,
                     PricePaid = request.PricePaid,
                     Condition = request.Condition,
@@ -311,6 +325,8 @@ namespace GownSite.Web.Controllers
                     Location = request.Location,
                     ListingType = listingType,
                     DisplayOwnerName = request.DisplayOwnerName,
+                    DisplayOwnerNumber = request.DisplayOwnerNumber,
+                    DisplayOwnerEmail = request.DisplayOwnerEmail,
                     Brand = request.Brand,
                     PricePaid = request.PricePaid,
                     Condition = request.Condition,
@@ -335,6 +351,8 @@ namespace GownSite.Web.Controllers
                     Location = request.Location,
                     ListingType = listingType,
                     DisplayOwnerName = request.DisplayOwnerName,
+                    DisplayOwnerNumber = request.DisplayOwnerNumber,
+                    DisplayOwnerEmail = request.DisplayOwnerEmail,
                     Brand = request.Brand,
                     PricePaid = request.PricePaid,
                     Condition = request.Condition,
@@ -396,6 +414,8 @@ namespace GownSite.Web.Controllers
             if (existing.OwnerId != CurrentOwnerId()) return Forbid();
             if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType))
                 return BadRequest(new { message = "ListingType must be 'Rent' or 'Sale'." });
+            if (!request.DisplayOwnerName && !request.DisplayOwnerNumber && !request.DisplayOwnerEmail)
+                return BadRequest(new { message = "Please allow at least one way for interested buyers to contact you." });
             var removeIds = existing.MorePictures.Select(p => p.Id).Intersect(request.RemovePictureIds ?? new List<int>()).ToList();
             var remainingCount = existing.MorePictures.Count - removeIds.Count + (request.MorePictures?.Count ?? 0);
             if (remainingCount > MaxMorePictures)
@@ -418,6 +438,8 @@ namespace GownSite.Web.Controllers
                 Location = request.Location,
                 ListingType = listingType,
                 DisplayOwnerName = request.DisplayOwnerName,
+                DisplayOwnerNumber = request.DisplayOwnerNumber,
+                DisplayOwnerEmail = request.DisplayOwnerEmail,
                 Brand = request.Brand,
                 PricePaid = request.PricePaid,
                 Condition = request.Condition,
@@ -487,6 +509,8 @@ namespace GownSite.Web.Controllers
                 Location = request.Location,
                 ListingType = listingType,
                 DisplayOwnerName = request.DisplayOwnerName,
+                DisplayOwnerNumber = request.DisplayOwnerNumber,
+                DisplayOwnerEmail = request.DisplayOwnerEmail,
                 Brand = request.Brand,
                 PricePaid = request.PricePaid,
                 Condition = request.Condition,
@@ -669,8 +693,8 @@ namespace GownSite.Web.Controllers
             return Ok(new
             {
                 ownerName = posting.DisplayOwnerName ? posting.Owner.Name : null,
-                ownerNumber = posting.Owner.Number,
-                ownerEmail = posting.Owner.Email,
+                ownerNumber = posting.DisplayOwnerNumber ? posting.Owner.Number : null,
+                ownerEmail = posting.DisplayOwnerEmail ? posting.Owner.Email : null,
                 location = posting.Location,
                 inquiryCount = posting.InquiryCount
             });

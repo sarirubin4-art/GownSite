@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Container, Typography, Button, Paper, Alert, Stack, CircularProgress } from '@mui/material';
 import PriceSummary from '../components/PriceSummary';
+import PromoApplyBox from '../components/PromoApplyBox';
 
 const PaymentSetupPage = () => {
     const { postingId } = useParams();
@@ -15,6 +16,9 @@ const PaymentSetupPage = () => {
     const [fullFee, setFullFee] = useState(null);
     const [durationMonths, setDurationMonths] = useState(null);
     const [oneTimeFee, setOneTimeFee] = useState(0);
+    const [currentPromoCode, setCurrentPromoCode] = useState(null);
+    const [promoApplying, setPromoApplying] = useState(false);
+    const [promoMessage, setPromoMessage] = useState(null);
 
     useEffect(() => {
         if (searchParams.get('canceled')) {
@@ -22,27 +26,44 @@ const PaymentSetupPage = () => {
         }
     }, []);
 
+    const loadFee = async () => {
+        try {
+            const [{ data: pricing }, { data: listings }] = await Promise.all([
+                axios.get('/api/payment/pricing'),
+                axios.get('/api/gown/mylistings')
+            ]);
+            const posting = listings.find((g) => g.id === Number(postingId));
+            setGownFee(posting?.monthlyFeeOverride ?? pricing.gownMonthlyFee);
+            setFullFee(pricing.gownMonthlyFee);
+            setDurationMonths(posting?.promoDurationMonths ?? null);
+            // The one-time setup fee only applies to a solo listing with no promo/batch
+            // pricing already discounting it — matches the backend's charge-time logic.
+            const isSoloDefaultPricing = !posting?.batchId && posting?.monthlyFeeOverride == null;
+            setOneTimeFee(isSoloDefaultPricing ? pricing.gownPostingSetupFee : 0);
+            setCurrentPromoCode(posting?.promoCode?.code ?? null);
+        } catch {
+            // leave gownFee null; the fallback copy still reads fine without a number
+        }
+    };
+
     useEffect(() => {
-        const loadFee = async () => {
-            try {
-                const [{ data: pricing }, { data: listings }] = await Promise.all([
-                    axios.get('/api/payment/pricing'),
-                    axios.get('/api/gown/mylistings')
-                ]);
-                const posting = listings.find((g) => g.id === Number(postingId));
-                setGownFee(posting?.monthlyFeeOverride ?? pricing.gownMonthlyFee);
-                setFullFee(pricing.gownMonthlyFee);
-                setDurationMonths(posting?.promoDurationMonths ?? null);
-                // The one-time setup fee only applies to a solo listing with no promo/batch
-                // pricing already discounting it — matches the backend's charge-time logic.
-                const isSoloDefaultPricing = !posting?.batchId && posting?.monthlyFeeOverride == null;
-                setOneTimeFee(isSoloDefaultPricing ? pricing.gownPostingSetupFee : 0);
-            } catch {
-                // leave gownFee null; the fallback copy still reads fine without a number
-            }
-        };
         loadFee();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const onApplyPromo = async (promoCode) => {
+        setPromoApplying(true);
+        setPromoMessage(null);
+        try {
+            await axios.post('/api/payment/apply-gown-promo-draft', { id: Number(postingId), promoCode });
+            setPromoMessage({ type: 'success', text: 'Promo applied!' });
+            await loadFee();
+        } catch (err) {
+            setPromoMessage({ type: 'error', text: err?.response?.data?.message || 'Could not apply promo code.' });
+        } finally {
+            setPromoApplying(false);
+        }
+    };
 
     const onContinueClick = async () => {
         setError('');
@@ -81,6 +102,14 @@ const PaymentSetupPage = () => {
                     Every listing is reviewed before it goes live. Add a card to hold your spot — here's what you'll be charged once it's approved:
                 </Typography>
                 <PriceSummary label="Monthly Listing Fee" fullFee={fullFee} resolvedFee={gownFee} durationMonths={durationMonths} oneTimeFee={oneTimeFee} />
+                <Stack sx={{ mb: 3, textAlign: 'left' }}>
+                    <PromoApplyBox
+                        currentPromoCode={currentPromoCode}
+                        onApply={onApplyPromo}
+                        applying={promoApplying}
+                        message={promoMessage}
+                    />
+                </Stack>
                 {error && <Alert severity="warning" sx={{ mb: 2, textAlign: 'left' }}>{error}</Alert>}
                 {stripeUnavailable ? (
                     <Stack spacing={2}>

@@ -12,6 +12,7 @@ import PriceField from '../components/PriceField';
 import ContactAdminDialog from '../components/ContactAdminDialog';
 import MorePicturesInput from '../components/MorePicturesInput';
 import FilterAutocomplete from '../components/FilterAutocomplete';
+import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
 
 const GownPostingForm = () => {
     const { owner, loading } = useAuth();
@@ -40,13 +41,14 @@ const GownPostingForm = () => {
         location: '',
         listingType: 'Rent',
         displayOwnerName: false,
+        displayOwnerNumber: true,
+        displayOwnerEmail: true,
         brand: '',
         pricePaid: '',
         condition: '',
         length: '',
         styleTags: [],
-        notes: '',
-        promoCode: ''
+        notes: ''
     });
 
     useEffect(() => {
@@ -70,13 +72,14 @@ const GownPostingForm = () => {
                 location: data.location || '',
                 listingType: data.listingType || 'Rent',
                 displayOwnerName: data.displayOwnerName || false,
+                displayOwnerNumber: data.displayOwnerNumber ?? true,
+                displayOwnerEmail: data.displayOwnerEmail ?? true,
                 brand: data.brand || '',
                 pricePaid: data.pricePaid ?? '',
                 condition: data.condition || '',
                 length: data.length || '',
                 styleTags: (data.styleTags || '').split(',').filter(Boolean),
-                notes: data.notes || '',
-                promoCode: ''
+                notes: data.notes || ''
             });
             if (data.primaryPictureUrl) {
                 setHasExistingPhoto(true);
@@ -121,6 +124,8 @@ const GownPostingForm = () => {
                 data.append('Location', form.location);
                 data.append('ListingType', form.listingType);
                 data.append('DisplayOwnerName', form.displayOwnerName);
+                data.append('DisplayOwnerNumber', form.displayOwnerNumber);
+                data.append('DisplayOwnerEmail', form.displayOwnerEmail);
                 data.append('Brand', form.brand);
                 if (form.pricePaid !== '') data.append('PricePaid', form.pricePaid);
                 data.append('Condition', form.condition);
@@ -160,6 +165,9 @@ const GownPostingForm = () => {
         if (!primaryPicture && !hasExistingPhoto) {
             return 'Please add a primary picture of the gown.';
         }
+        if (!form.displayOwnerName && !form.displayOwnerNumber && !form.displayOwnerEmail) {
+            return 'Please allow at least one way for interested buyers to contact you.';
+        }
         return '';
     };
 
@@ -182,13 +190,14 @@ const GownPostingForm = () => {
             data.append('Location', form.location);
             data.append('ListingType', form.listingType);
             data.append('DisplayOwnerName', form.displayOwnerName);
+            data.append('DisplayOwnerNumber', form.displayOwnerNumber);
+            data.append('DisplayOwnerEmail', form.displayOwnerEmail);
             data.append('Brand', form.brand);
             data.append('PricePaid', form.pricePaid);
             data.append('Condition', form.condition);
             data.append('Length', form.length);
             data.append('StyleTags', form.styleTags.join(','));
             data.append('Notes', form.notes);
-            data.append('PromoCode', form.promoCode);
             if (primaryPicture) data.append('PrimaryPicture', primaryPicture);
             morePictures.forEach((file) => data.append('MorePictures', file));
 
@@ -321,19 +330,23 @@ const GownPostingForm = () => {
                             fullWidth multiline rows={3} placeholder="Anything else a buyer or renter should know"
                         />
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                        <TextField
-                            label="Promo Code" value={form.promoCode} onChange={onChange('promoCode')}
-                            fullWidth placeholder="Have a code? Enter it here"
-                            helperText="Add it here before checking out — it can't easily be applied after."
-                        />
-                    </Grid>
                 </Grid>
             </Paper>
 
-            <FormControlLabel
-                control={<Checkbox checked={form.displayOwnerName} onChange={(e) => { markDirty(); setForm({ ...form, displayOwnerName: e.target.checked }); }} />}
-                label="Show my name publicly on this listing"
+            <ContactVisibilityCheckboxes
+                showName={form.displayOwnerName}
+                showPhone={form.displayOwnerNumber}
+                showEmail={form.displayOwnerEmail}
+                onChange={(next) => {
+                    markDirty();
+                    setForm({
+                        ...form,
+                        displayOwnerName: next.showName,
+                        displayOwnerNumber: next.showPhone,
+                        displayOwnerEmail: next.showEmail
+                    });
+                }}
+                subjectLabel="my"
             />
 
             <Stack direction="row" sx={{ mt: 2, justifyContent: 'flex-end', alignItems: 'center' }} spacing={2}>

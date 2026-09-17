@@ -12,27 +12,9 @@ import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import usePageTitle from '../hooks/usePageTitle';
 import { useAdLane } from '../context/AdLaneContext';
 import ImageZoomDialog from '../components/ImageZoomDialog';
+import { getCachedInterest, setCachedInterest } from '../utils/interestCache';
 
 const MIN_INTERESTED_TO_SHOW = 3;
-
-const interestedStorageKey = (id) => `regowned:interested:${id}`;
-
-const getCachedInterest = (id) => {
-    try {
-        const raw = localStorage.getItem(interestedStorageKey(id));
-        return raw ? JSON.parse(raw) : null;
-    } catch {
-        return null;
-    }
-};
-
-const setCachedInterest = (id, contactInfo) => {
-    try {
-        localStorage.setItem(interestedStorageKey(id), JSON.stringify(contactInfo));
-    } catch {
-        // localStorage unavailable — dedupe just won't persist across visits
-    }
-};
 
 const ViewGown = () => {
     const { id } = useParams();
@@ -62,7 +44,7 @@ const ViewGown = () => {
     }, [id]);
 
     const onInterestedClick = async () => {
-        const cached = getCachedInterest(id);
+        const cached = getCachedInterest('gown', id);
         if (cached) {
             setContactInfo(cached);
             setDialogOpen(true);
@@ -74,7 +56,7 @@ const ViewGown = () => {
             const { data } = await axios.post('/api/gown/inquire', { id: Number(id) });
             setContactInfo(data);
             setDialogOpen(true);
-            setCachedInterest(id, data);
+            setCachedInterest('gown', id, data);
             setGown((prev) => (prev ? { ...prev, inquiryCount: data.inquiryCount } : prev));
         } finally {
             setLoading(false);
@@ -222,8 +204,8 @@ const ViewGown = () => {
                 <DialogTitle>Contact Info</DialogTitle>
                 <DialogContent>
                     {contactInfo?.ownerName && <Typography><strong>Name:</strong> {contactInfo.ownerName}</Typography>}
-                    <Typography><strong>Phone:</strong> {contactInfo?.ownerNumber}</Typography>
-                    <Typography><strong>Email:</strong> {contactInfo?.ownerEmail}</Typography>
+                    {contactInfo?.ownerNumber && <Typography><strong>Phone:</strong> {contactInfo.ownerNumber}</Typography>}
+                    {contactInfo?.ownerEmail && <Typography><strong>Email:</strong> {contactInfo.ownerEmail}</Typography>}
                     <Typography><strong>Location:</strong> {contactInfo?.location}</Typography>
                 </DialogContent>
                 <DialogActions>

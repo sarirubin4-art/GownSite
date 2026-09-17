@@ -15,6 +15,7 @@ import LocationField from '../components/LocationField';
 import PriceField from '../components/PriceField';
 import MorePicturesInput from '../components/MorePicturesInput';
 import FilterAutocomplete from '../components/FilterAutocomplete';
+import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
 
 const MAX_BATCH_GOWNS = 20;
 const DRAFT_KEY = 'regowned_bulk_posting_draft';
@@ -65,7 +66,8 @@ const BulkGownPostingForm = () => {
         location: '',
         listingType: 'Rent',
         displayOwnerName: false,
-        promoCode: ''
+        displayOwnerNumber: true,
+        displayOwnerEmail: true
     });
 
     const [gowns, setGowns] = useState([makeEmptyGown()]);
@@ -86,7 +88,10 @@ const BulkGownPostingForm = () => {
             const parsed = JSON.parse(saved);
             if (!hasDraftContent(parsed.gowns, parsed.shared)) return;
             setGowns(parsed.gowns.map((g) => ({ ...g, primaryPicture: null, primaryPreview: null, morePictures: [] })));
-            setShared(parsed.shared);
+            setShared({
+                displayOwnerNumber: true, displayOwnerEmail: true,
+                ...parsed.shared
+            });
             setRestoredDraft(true);
         } catch {
             localStorage.removeItem(DRAFT_KEY);
@@ -109,7 +114,7 @@ const BulkGownPostingForm = () => {
     const discardDraft = () => {
         localStorage.removeItem(DRAFT_KEY);
         setGowns([makeEmptyGown()]);
-        setShared({ location: '', listingType: 'Rent', displayOwnerName: false, promoCode: '' });
+        setShared({ location: '', listingType: 'Rent', displayOwnerName: false, displayOwnerNumber: true, displayOwnerEmail: true });
         setRestoredDraft(false);
     };
 
@@ -161,6 +166,9 @@ const BulkGownPostingForm = () => {
 
     const validate = () => {
         if (!shared.location) return 'Please enter a location for this batch.';
+        if (!shared.displayOwnerName && !shared.displayOwnerNumber && !shared.displayOwnerEmail) {
+            return 'Please allow at least one way for interested buyers to contact you.';
+        }
         for (let i = 0; i < gowns.length; i++) {
             const g = gowns[i];
             if (savedLocalIds.has(g.localId)) continue;
@@ -202,13 +210,14 @@ const BulkGownPostingForm = () => {
                 data.append('Location', shared.location);
                 data.append('ListingType', shared.listingType);
                 data.append('DisplayOwnerName', shared.displayOwnerName);
+                data.append('DisplayOwnerNumber', shared.displayOwnerNumber);
+                data.append('DisplayOwnerEmail', shared.displayOwnerEmail);
                 data.append('Brand', g.brand);
                 data.append('PricePaid', g.pricePaid);
                 data.append('Condition', g.condition);
                 data.append('Length', g.length);
                 data.append('StyleTags', g.styleTags.join(','));
                 data.append('Notes', g.notes);
-                data.append('PromoCode', shared.promoCode);
                 data.append('BatchId', batchId);
                 data.append('BatchSize', gowns.length);
                 data.append('PrimaryPicture', g.primaryPicture);
@@ -315,17 +324,18 @@ const BulkGownPostingForm = () => {
                             {LISTING_TYPE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
                         </TextField>
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                        <TextField
-                            label="Promo Code" value={shared.promoCode} onChange={(e) => setShared({ ...shared, promoCode: e.target.value })}
-                            fullWidth placeholder="Have a code? Enter it here"
-                            helperText="Add it here before checking out — it can't easily be applied after."
-                        />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <FormControlLabel
-                            control={<Checkbox checked={shared.displayOwnerName} onChange={(e) => setShared({ ...shared, displayOwnerName: e.target.checked })} />}
-                            label="Show my name publicly on these listings"
+                    <Grid size={12}>
+                        <ContactVisibilityCheckboxes
+                            showName={shared.displayOwnerName}
+                            showPhone={shared.displayOwnerNumber}
+                            showEmail={shared.displayOwnerEmail}
+                            onChange={(next) => setShared({
+                                ...shared,
+                                displayOwnerName: next.showName,
+                                displayOwnerNumber: next.showPhone,
+                                displayOwnerEmail: next.showEmail
+                            })}
+                            subjectLabel="my"
                         />
                     </Grid>
                 </Grid>
