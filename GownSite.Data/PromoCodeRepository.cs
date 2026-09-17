@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -49,14 +50,13 @@ namespace GownSite.Data
             context.SaveChanges();
         }
 
+        // A single atomic UPDATE rather than read-modify-write, so concurrent callers can't
+        // lose an increment to each other by both reading the same TimesUsed before either writes.
         public void IncrementUsage(int id)
         {
             using var context = new GownDataContext(_connectionString);
-            var existing = context.PromoCodes.FirstOrDefault(p => p.Id == id);
-            if (existing == null) return;
-
-            existing.TimesUsed++;
-            context.SaveChanges();
+            context.PromoCodes.Where(p => p.Id == id)
+                .ExecuteUpdate(s => s.SetProperty(p => p.TimesUsed, p => p.TimesUsed + 1));
         }
 
         public void SetActive(int id, bool isActive)

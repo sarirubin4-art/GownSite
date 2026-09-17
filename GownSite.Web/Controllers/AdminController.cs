@@ -438,6 +438,9 @@ namespace GownSite.Web.Controllers
             var posting = repo.Get(id);
             if (posting == null) return NotFound();
 
+            if (string.IsNullOrWhiteSpace(request.PromoCode))
+                return BadRequest(new { message = "Enter a promo code." });
+
             var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m);
 
             if (posting.IsActive && !string.IsNullOrEmpty(posting.StripeSubscriptionId))
@@ -456,8 +459,8 @@ namespace GownSite.Web.Controllers
                     return BadRequest(new { message = $"Could not apply promo: {ex.Message}" });
                 }
 
-                repo.ApplyPromo(id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
-                if (posting.PromoCodeId != promo.Id) promoRepo.IncrementUsage(promo.Id);
+                var isNewApplication = repo.ApplyPromo(id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
+                if (isNewApplication) promoRepo.IncrementUsage(promo.Id);
                 return Ok();
             }
 
@@ -525,6 +528,9 @@ namespace GownSite.Web.Controllers
             var ad = repo.Get(id);
             if (ad == null) return NotFound();
 
+            if (string.IsNullOrWhiteSpace(request.PromoCode))
+                return BadRequest(new { message = "Enter a promo code." });
+
             var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m);
 
             if (ad.IsActive && !string.IsNullOrEmpty(ad.StripeSubscriptionId))
@@ -543,8 +549,8 @@ namespace GownSite.Web.Controllers
                     return BadRequest(new { message = $"Could not apply promo: {ex.Message}" });
                 }
 
-                repo.ApplyPromo(id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
-                if (ad.PromoCodeId != promo.Id) promoRepo.IncrementUsage(promo.Id);
+                var isNewApplication = repo.ApplyPromo(id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
+                if (isNewApplication) promoRepo.IncrementUsage(promo.Id);
                 return Ok();
             }
 
@@ -568,6 +574,11 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "This ad is no longer pending review." });
             if (string.IsNullOrEmpty(ad.StripeCustomerId) || string.IsNullOrEmpty(ad.StripePaymentMethodId))
                 return BadRequest(new { message = "No payment method on file for this ad." });
+            // Ads created before ShowName/ShowPhone/ShowEmail existed were backfilled to false
+            // (unlike gowns' DisplayOwner* flags, which preserve the old always-shown behavior) —
+            // without this check one could go live with no way for a customer to contact the patron.
+            if (!ad.ShowName && !ad.ShowPhone && !ad.ShowEmail)
+                return BadRequest(new { message = "This ad has no contact method enabled — edit it to allow at least one before approving." });
 
             var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m);
 

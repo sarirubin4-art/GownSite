@@ -115,37 +115,6 @@ namespace GownSite.Web.Controllers
             return Ok();
         }
 
-        // Attaches a discount to the owner's ALREADY-RUNNING flat-rate subscription — mirrors
-        // PaymentController.ApplyPromoToSubscriptionAsync exactly (see that method's comment for
-        // why a Coupon, not a trial, is used here). Duplicated rather than shared because it's a
-        // small private helper scoped to each controller's own subscription-update call.
-        private static async Task ApplyPromoToSubscriptionAsync(string subscriptionId, decimal fullFeeUsd, decimal resolvedFee, int? durationMonths)
-        {
-            var percentOff = Math.Max(0m, (1 - (resolvedFee / fullFeeUsd)) * 100m);
-            if (percentOff <= 0)
-            {
-                await new SubscriptionService().UpdateAsync(subscriptionId, new SubscriptionUpdateOptions
-                {
-                    Discounts = new List<SubscriptionDiscountOptions>()
-                });
-                return;
-            }
-
-            var hasDuration = durationMonths.HasValue && durationMonths.Value > 0;
-            var couponOptions = new CouponCreateOptions
-            {
-                PercentOff = percentOff,
-                Duration = hasDuration ? "repeating" : "forever"
-            };
-            if (hasDuration) couponOptions.DurationInMonths = durationMonths!.Value;
-
-            var coupon = await new CouponService().CreateAsync(couponOptions);
-            await new SubscriptionService().UpdateAsync(subscriptionId, new SubscriptionUpdateOptions
-            {
-                Discounts = new List<SubscriptionDiscountOptions> { new() { Coupon = coupon.Id } }
-            });
-        }
-
         [HttpPost("apply-promo")]
         public async Task<IActionResult> ApplyPromo([FromBody] ApplyBusinessPromoRequest request)
         {
@@ -164,7 +133,7 @@ namespace GownSite.Web.Controllers
 
             try
             {
-                await ApplyPromoToSubscriptionAsync(owner.BusinessStripeSubscriptionId, feeUsd, resolved.ResolvedFee!.Value, resolved.DurationMonths);
+                await StripePromoHelper.ApplyPromoToSubscriptionAsync(owner.BusinessStripeSubscriptionId, feeUsd, resolved.ResolvedFee!.Value, resolved.DurationMonths);
             }
             catch (StripeException ex)
             {

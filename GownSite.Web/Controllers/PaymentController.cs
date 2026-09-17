@@ -109,10 +109,12 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = $"Could not apply promo: {ex.Message}" });
             }
 
-            gownRepo.ApplyPromo(request.Id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
-            // Re-applying the code already on this listing (e.g. a double-click) shouldn't
-            // count as a second redemption against the code's MaxUses.
-            if (posting.PromoCodeId != promo.Id) promoRepo.IncrementUsage(promo.Id);
+            // Re-applying the code already on this listing (e.g. a double-click) shouldn't count
+            // as a second redemption against the code's MaxUses — ApplyPromo checks this against
+            // a fresh read of the row rather than `posting`, which was fetched before the Stripe
+            // call above and can be stale by the time we get here.
+            var isNewApplication = gownRepo.ApplyPromo(request.Id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
+            if (isNewApplication) promoRepo.IncrementUsage(promo.Id);
 
             return Ok();
         }
@@ -143,8 +145,8 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = $"Could not apply promo: {ex.Message}" });
             }
 
-            adRepo.ApplyPromo(request.Id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
-            if (ad.PromoCodeId != promo.Id) promoRepo.IncrementUsage(promo.Id);
+            var isNewApplication = adRepo.ApplyPromo(request.Id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
+            if (isNewApplication) promoRepo.IncrementUsage(promo.Id);
 
             return Ok();
         }
@@ -196,16 +198,22 @@ namespace GownSite.Web.Controllers
 
             var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m);
 
+            // All ids must belong to the same batch (or all be batch-less) — otherwise sizing
+            // pricing off one posting's BatchId would apply that batch's tier to gowns outside it.
+            var distinctBatchIds = postings.Select(p => p.BatchId).Distinct().ToList();
+            if (distinctBatchIds.Count > 1)
+                return BadRequest(new { message = "These gowns don't all belong to the same batch." });
+
             // Resolve once, using the batch's real size (one lookup, not one per gown), so
             // a promo that fails to resolve (expired, MaxUses hit, wrong scope) is caught
-            // before any row is written — not partway through the loop below.
-            var batchIdForSizing = postings.FirstOrDefault(p => p.BatchId.HasValue)?.BatchId;
+            // before any row is written.
+            var batchIdForSizing = distinctBatchIds[0];
             var batchSize = batchIdForSizing.HasValue ? gownRepo.GetByBatchId(batchIdForSizing.Value).Count : postings.Count;
             var pricing = PromoCodeCalculator.ResolvePricing(_connectionString, request.PromoCode, feeUsd, batchIdForSizing.HasValue, batchSize);
             if (!pricing.Success) return BadRequest(new { message = pricing.Error });
 
-            foreach (var posting in postings)
-                gownRepo.ApplyPromo(posting.Id, pricing.PromoCodeId!.Value, pricing.MonthlyFeeOverride, pricing.PromoDurationMonths);
+            // One context/SaveChanges for the whole batch — see ApplyPromoToBatch's comment.
+            gownRepo.ApplyPromoToBatch(postings.Select(p => p.Id), pricing.PromoCodeId!.Value, pricing.MonthlyFeeOverride, pricing.PromoDurationMonths);
 
             return Ok(new { resolvedFee = pricing.MonthlyFeeOverride, fullFee = feeUsd, durationMonths = pricing.PromoDurationMonths });
         }
