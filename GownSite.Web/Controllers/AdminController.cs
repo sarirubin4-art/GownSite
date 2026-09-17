@@ -167,7 +167,10 @@ namespace GownSite.Web.Controllers
                 }
                 else
                 {
-                    var percentOff = (1 - (promoAmount / fullFeeUsd)) * 100m;
+                    // Stripe's percent_off rejects a decimal with too many digits, and plain
+                    // decimal division here can produce ~28 digits when promoAmount doesn't
+                    // divide evenly into fullFeeUsd (e.g. $7.50 off a $14.99 fee).
+                    var percentOff = Math.Round((1 - (promoAmount / fullFeeUsd)) * 100m, 2, MidpointRounding.AwayFromZero);
                     var coupon = await new CouponService().CreateAsync(new CouponCreateOptions
                     {
                         PercentOff = percentOff,

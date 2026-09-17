@@ -50,7 +50,7 @@ export const LISTING_TYPE_OPTIONS = [
 ];
 
 export const AD_CATEGORY_OPTIONS = [
-    { value: 'Makeup', label: 'Makeup Artist' },
+    { value: 'Makeup', label: 'Makeup' },
     { value: 'Hair', label: 'Hair Stylist' },
     { value: 'Sheitels', label: 'Sheitels' },
     { value: 'Alterations', label: 'Alterations' },
@@ -60,7 +60,6 @@ export const AD_CATEGORY_OPTIONS = [
     { value: 'Photography', label: 'Photography' },
     { value: 'PartyPlanners', label: 'Party Planners' },
     { value: 'Gemachs', label: 'Gemachs' },
-    { value: 'Cosmetics', label: 'Cosmetics' },
     { value: 'PartyRentals', label: 'Party Rentals' },
     { value: 'Catering', label: 'Catering' },
     { value: 'Other', label: 'Other' },

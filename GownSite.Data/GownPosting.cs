@@ -143,7 +143,6 @@ namespace GownSite.Data
         GirlsWomensApparel,
         Sheitels,
         Bridal,
-        Cosmetics,
         PartyRentals,
         Catering
     }
