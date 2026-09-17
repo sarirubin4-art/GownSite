@@ -12,7 +12,7 @@ import usePageTitle from '../hooks/usePageTitle';
 const ALL_LOCATIONS = 'All';
 
 const BrowseAds = () => {
-    usePageTitle('Ad Directory', 'Browse trusted simcha service providers — hair, makeup, alterations, gown rental/sales, apparel, and more.');
+    usePageTitle('Ad Directory', 'Browse trusted event service providers — hair, makeup, alterations, gown rental/sales, apparel, and more.');
     const navigate = useNavigate();
     const { laneSx } = useAdLane();
     const [ads, setAds] = useState([]);
@@ -124,7 +124,7 @@ const BrowseAds = () => {
 
             <Box sx={{ mt: 6, p: 3, textAlign: 'center', borderRadius: 3, bgcolor: 'secondary.light' }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                    Own a simcha-related business?
+                    Own an event-related business?
                 </Typography>
                 <Button component={Link} to="/advertise" variant="contained">
                     Advertise With Us
