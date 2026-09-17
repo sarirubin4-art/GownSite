@@ -1,17 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import { Box, Typography, Button, Chip, Stack } from '@mui/material';
+import {
+    Box, Typography, Button, Chip, Stack, Dialog, DialogTitle, DialogContent,
+    DialogActions, CircularProgress
+} from '@mui/material';
 import PlaceIcon from '@mui/icons-material/Place';
 import PublicIcon from '@mui/icons-material/Public';
 import { adCategoryLabels } from '../constants/gownOptions';
 import usePageTitle from '../hooks/usePageTitle';
+import { getCachedInterest, setCachedInterest } from '../utils/interestCache';
 
 const AdDetail = () => {
     const { id } = useParams();
     const [ad, setAd] = useState(null);
+    const [contactInfo, setContactInfo] = useState(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    usePageTitle(ad ? ad.title : 'Simcha Service', ad ? ad.description : undefined);
+    usePageTitle(ad ? ad.title : 'Event Service', ad ? ad.description : undefined);
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -22,7 +29,28 @@ const AdDetail = () => {
         load();
     }, [id]);
 
+    const onContactClick = async () => {
+        const cached = getCachedInterest('ad', id);
+        if (cached) {
+            setContactInfo(cached);
+            setDialogOpen(true);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const { data } = await axios.post('/api/ad/inquire', { id: Number(id) });
+            setContactInfo(data);
+            setDialogOpen(true);
+            setCachedInterest('ad', id, data);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (!ad) return null;
+
+    const hasContactInfo = ad.showName || ad.showPhone || ad.showEmail;
 
     return (
         <Box sx={{ maxWidth: { xs: 720, lg: 880 }, mx: 'auto', textAlign: 'center' }}>
@@ -43,14 +71,33 @@ const AdDetail = () => {
                 </Box>
             )}
             <Typography variant="body1" sx={{ mb: 4, whiteSpace: 'pre-line' }}>{ad.description}</Typography>
-            {ad.targetUrl && (
-                <Button variant="contained" size="large" href={ad.targetUrl} target="_blank" rel="noopener noreferrer">
-                    Learn More
-                </Button>
-            )}
+            <Stack direction="row" spacing={2} sx={{ justifyContent: 'center', flexWrap: 'wrap', rowGap: 2 }}>
+                {ad.targetUrl && (
+                    <Button variant="contained" size="large" href={ad.targetUrl} target="_blank" rel="noopener noreferrer">
+                        Learn More
+                    </Button>
+                )}
+                {hasContactInfo && (
+                    <Button variant="outlined" size="large" onClick={onContactClick} disabled={loading}>
+                        {loading ? <CircularProgress size={24} /> : 'Contact'}
+                    </Button>
+                )}
+            </Stack>
             <Box sx={{ mt: 4 }}>
                 <Button component={Link} to="/search">Back to Browsing</Button>
             </Box>
+
+            <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Contact Info</DialogTitle>
+                <DialogContent>
+                    {contactInfo?.ownerName && <Typography><strong>Name:</strong> {contactInfo.ownerName}</Typography>}
+                    {contactInfo?.ownerNumber && <Typography><strong>Phone:</strong> {contactInfo.ownerNumber}</Typography>}
+                    {contactInfo?.ownerEmail && <Typography><strong>Email:</strong> {contactInfo.ownerEmail}</Typography>}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDialogOpen(false)}>Close</Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

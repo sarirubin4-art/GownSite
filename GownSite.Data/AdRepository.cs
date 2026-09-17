@@ -13,16 +13,22 @@ namespace GownSite.Data
             _connectionString = connectionString;
         }
 
-        public void ApplyPromo(int id, int promoCodeId, decimal? monthlyFeeOverride, int? promoDurationMonths)
+        // Returns whether this call actually changed the row's PromoCodeId (vs. re-applying the
+        // code already on it) — callers use this, read fresh at write time, to decide whether to
+        // count a redemption, instead of comparing against a copy of the row fetched earlier in
+        // the request (which can go stale across an awaited Stripe call).
+        public bool ApplyPromo(int id, int promoCodeId, decimal? monthlyFeeOverride, int? promoDurationMonths)
         {
             using var context = new GownDataContext(_connectionString);
             var existing = context.Ads.FirstOrDefault(a => a.Id == id);
-            if (existing == null) return;
+            if (existing == null) return false;
 
+            var isNewApplication = existing.PromoCodeId != promoCodeId;
             existing.PromoCodeId = promoCodeId;
             existing.MonthlyFeeOverride = monthlyFeeOverride;
             existing.PromoDurationMonths = promoDurationMonths;
             context.SaveChanges();
+            return isNewApplication;
         }
 
         public List<Ad> GetActive()
@@ -39,6 +45,7 @@ namespace GownSite.Data
             using var context = new GownDataContext(_connectionString);
             return context.Ads
                 .Include(a => a.Owner)
+                .Include(a => a.PromoCode)
                 .Where(a => a.IsActive)
                 .OrderByDescending(a => a.CreatedDate)
                 .ToList();
@@ -62,10 +69,24 @@ namespace GownSite.Data
             return context.Ads.FirstOrDefault(a => a.Id == id);
         }
 
+        // Used only by the Inquire endpoint, which needs Owner.Name/Number/Email to build
+        // its gated response. Deliberately kept separate from Get(int id) — that method
+        // backs the public /api/ad/get response, and Owner has no [JsonIgnore] on those
+        // fields, so including it there would serialize them straight into that public
+        // payload regardless of ShowName/ShowPhone/ShowEmail.
+        public Ad GetWithOwner(int id)
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Ads
+                .Include(a => a.Owner)
+                .FirstOrDefault(a => a.Id == id);
+        }
+
         public List<Ad> GetByOwner(int ownerId)
         {
             using var context = new GownDataContext(_connectionString);
             return context.Ads
+                .Include(a => a.PromoCode)
                 .Where(a => a.OwnerId == ownerId)
                 .OrderByDescending(a => a.CreatedDate)
                 .ToList();
@@ -100,6 +121,19 @@ namespace GownSite.Data
             existing.Categories = ad.Categories;
             existing.Location = ad.Location;
             existing.ServesAllLocations = ad.ServesAllLocations;
+            existing.ShowName = ad.ShowName;
+            existing.ShowPhone = ad.ShowPhone;
+            existing.ShowEmail = ad.ShowEmail;
+            context.SaveChanges();
+        }
+
+        public void IncrementInquiry(int id)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var existing = context.Ads.FirstOrDefault(a => a.Id == id);
+            if (existing == null) return;
+
+            existing.InquiryCount++;
             context.SaveChanges();
         }
 
@@ -155,6 +189,7 @@ namespace GownSite.Data
             using var context = new GownDataContext(_connectionString);
             return context.Ads
                 .Include(a => a.Owner)
+                .Include(a => a.PromoCode)
                 .Where(a => a.ModerationStatus == ModerationStatus.PendingReview)
                 .OrderBy(a => a.CreatedDate)
                 .ToList();

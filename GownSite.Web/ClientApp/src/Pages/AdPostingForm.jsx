@@ -1,11 +1,81 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { Container, Typography, TextField, Button, Stack, Grid, Paper, Alert, Box, FormControlLabel, Checkbox } from '@mui/material';
-import { AD_CATEGORY_OPTIONS } from '../constants/gownOptions';
+import { Container, Typography, TextField, Button, Stack, Grid, Paper, Alert, Box, FormControlLabel, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Chip } from '@mui/material';
+import PlaceIcon from '@mui/icons-material/Place';
+import PublicIcon from '@mui/icons-material/Public';
+import { AD_CATEGORY_OPTIONS, adCategoryLabels } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import LocationField from '../components/LocationField';
 import FilterAutocomplete from '../components/FilterAutocomplete';
+import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
+
+// Renders the in-progress ad two ways — the full details page and the floating
+// ad card — from local form state only, so posters can see how it'll actually
+// look before paying and submitting for review. No backend call.
+const AdPreviewDialog = ({ open, onClose, form, imagePreview }) => (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+        <DialogTitle>Preview Your Ad</DialogTitle>
+        <DialogContent dividers>
+            <Typography variant="overline" color="text.secondary">Full Details Page</Typography>
+            <Box sx={{ maxWidth: 420, mx: 'auto', textAlign: 'center', mb: 4, mt: 1 }}>
+                <Stack direction="row" spacing={1} sx={{ justifyContent: 'center', mb: 2, flexWrap: 'wrap', rowGap: 1 }}>
+                    {adCategoryLabels(form.categories).map((label) => (
+                        <Chip key={label} label={label} color="primary" size="small" />
+                    ))}
+                    {form.servesAllLocations ? (
+                        <Chip icon={<PublicIcon />} label="Serves All Locations" variant="outlined" size="small" />
+                    ) : form.location ? (
+                        <Chip icon={<PlaceIcon />} label={form.location} variant="outlined" size="small" />
+                    ) : null}
+                </Stack>
+                <Typography variant="h5" gutterBottom>{form.title || 'Your Ad Title'}</Typography>
+                <Box sx={{
+                    width: '100%', aspectRatio: '1 / 1', borderRadius: 3, mb: 2, overflow: 'hidden',
+                    bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider'
+                }}>
+                    {imagePreview ? (
+                        <Box component="img" src={imagePreview} alt={form.title} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    ) : (
+                        <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Typography variant="caption" color="text.secondary">No image yet</Typography>
+                        </Box>
+                    )}
+                </Box>
+                <Typography variant="body1" sx={{ mb: 3, whiteSpace: 'pre-line' }}>
+                    {form.description || 'Your description will appear here.'}
+                </Typography>
+                {form.targetUrl && <Button variant="contained" size="large" disabled>Learn More</Button>}
+            </Box>
+
+            <Typography variant="overline" color="text.secondary">Floating Ad Card (as it appears site-wide)</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+                <Paper elevation={6} sx={{ width: 240, overflow: 'hidden', border: '1px solid', borderColor: 'secondary.light' }}>
+                    <Box sx={{ width: '100%', aspectRatio: '1 / 1', bgcolor: 'background.paper' }}>
+                        {imagePreview && (
+                            <Box component="img" src={imagePreview} alt={form.title} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        )}
+                    </Box>
+                    <Box sx={{ p: 1.25 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{form.title || 'Your Ad Title'}</Typography>
+                        {form.description && (
+                            <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                            >
+                                {form.description}
+                            </Typography>
+                        )}
+                    </Box>
+                </Paper>
+            </Box>
+        </DialogContent>
+        <DialogActions>
+            <Button onClick={onClose}>Close Preview</Button>
+        </DialogActions>
+    </Dialog>
+);
 
 const AdPostingForm = () => {
     const { owner, loading } = useAuth();
@@ -17,6 +87,7 @@ const AdPostingForm = () => {
     const [image, setImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
     const [hasExistingImage, setHasExistingImage] = useState(false);
+    const [previewOpen, setPreviewOpen] = useState(false);
 
     const [draftId, setDraftId] = useState(resumeId ? Number(resumeId) : null);
     const [saveState, setSaveState] = useState('idle'); // idle | saving | saved
@@ -30,7 +101,9 @@ const AdPostingForm = () => {
         targetUrl: '',
         location: '',
         servesAllLocations: false,
-        promoCode: ''
+        showName: false,
+        showPhone: false,
+        showEmail: false
     });
 
     useEffect(() => {
@@ -52,7 +125,9 @@ const AdPostingForm = () => {
                 targetUrl: data.targetUrl || '',
                 location: data.location || '',
                 servesAllLocations: !!data.servesAllLocations,
-                promoCode: ''
+                showName: !!data.showName,
+                showPhone: !!data.showPhone,
+                showEmail: !!data.showEmail
             });
             if (data.imageUrl) {
                 setHasExistingImage(true);
@@ -92,6 +167,9 @@ const AdPostingForm = () => {
                 data.append('Category', form.categories.join(','));
                 data.append('Location', form.location);
                 data.append('ServesAllLocations', form.servesAllLocations);
+                data.append('ShowName', form.showName);
+                data.append('ShowPhone', form.showPhone);
+                data.append('ShowEmail', form.showEmail);
                 if (image) data.append('Image', image);
 
                 const { data: result } = await axios.post('/api/ad/draft', data, {
@@ -125,6 +203,9 @@ const AdPostingForm = () => {
         if (!image && !hasExistingImage) {
             return 'Please add an image for your ad.';
         }
+        if (!form.showName && !form.showPhone && !form.showEmail) {
+            return 'Please allow at least one way for interested customers to contact you.';
+        }
         return '';
     };
 
@@ -145,7 +226,9 @@ const AdPostingForm = () => {
             data.append('TargetUrl', form.targetUrl);
             data.append('Location', form.location);
             data.append('ServesAllLocations', form.servesAllLocations);
-            data.append('PromoCode', form.promoCode);
+            data.append('ShowName', form.showName);
+            data.append('ShowPhone', form.showPhone);
+            data.append('ShowEmail', form.showEmail);
             if (image) data.append('Image', image);
 
             const { data: result } = await axios.post('/api/ad/create', data, {
@@ -201,10 +284,13 @@ const AdPostingForm = () => {
                             label="This business isn't tied to one location (e.g. online-only)"
                         />
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                        <TextField
-                            label="Promo Code (optional)" value={form.promoCode} onChange={onChange('promoCode')} fullWidth
-                            helperText="Add it here before checking out — it can't easily be applied after."
+                    <Grid size={12}>
+                        <ContactVisibilityCheckboxes
+                            showName={form.showName}
+                            showPhone={form.showPhone}
+                            showEmail={form.showEmail}
+                            onChange={(next) => { markDirty(); setForm({ ...form, ...next }); }}
+                            subjectLabel="my"
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
@@ -214,6 +300,8 @@ const AdPostingForm = () => {
                         </Button>
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
                             For best results, use a square image (1:1) — ads display in a square across the site.
+                            Must be an actual image file (JPEG, PNG, WEBP, or GIF) — PDFs and other documents
+                            can't be shown as an ad image.
                         </Typography>
                     </Grid>
                     {imagePreview && (
@@ -232,10 +320,15 @@ const AdPostingForm = () => {
             <Stack direction="row" sx={{ justifyContent: 'flex-end', alignItems: 'center' }} spacing={2}>
                 {saveState === 'saving' && <Typography variant="caption" color="text.secondary">Saving draft...</Typography>}
                 {saveState === 'saved' && <Typography variant="caption" color="text.secondary">Draft saved</Typography>}
+                <Button variant="outlined" size="large" onClick={() => setPreviewOpen(true)}>
+                    Preview Ad
+                </Button>
                 <Button variant="contained" size="large" disabled={submitting} onClick={onSubmit}>
                     {submitting ? 'Saving...' : 'Confirm & Continue to Payment'}
                 </Button>
             </Stack>
+
+            <AdPreviewDialog open={previewOpen} onClose={() => setPreviewOpen(false)} form={form} imagePreview={imagePreview} />
         </Container>
     );
 };

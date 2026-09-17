@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Container, Typography, Button, Paper, Alert, Stack, CircularProgress } from '@mui/material';
 import PriceSummary from '../components/PriceSummary';
+import PromoApplyBox from '../components/PromoApplyBox';
 
 const BulkPaymentSetupPage = () => {
     const [searchParams] = useSearchParams();
@@ -13,6 +14,9 @@ const BulkPaymentSetupPage = () => {
     const [perGownFee, setPerGownFee] = useState(null);
     const [fullFee, setFullFee] = useState(null);
     const [durationMonths, setDurationMonths] = useState(null);
+    const [currentPromoCode, setCurrentPromoCode] = useState(null);
+    const [promoApplying, setPromoApplying] = useState(false);
+    const [promoMessage, setPromoMessage] = useState(null);
 
     const ids = (searchParams.get('ids') || '').split(',').filter(Boolean).map(Number);
 
@@ -22,23 +26,40 @@ const BulkPaymentSetupPage = () => {
         }
     }, []);
 
+    const loadFee = async () => {
+        try {
+            const [{ data: pricing }, { data: listings }] = await Promise.all([
+                axios.get('/api/payment/pricing'),
+                axios.get('/api/gown/mylistings')
+            ]);
+            const firstPosting = listings.find((g) => g.id === ids[0]);
+            setPerGownFee(firstPosting?.monthlyFeeOverride ?? pricing.gownMonthlyFee);
+            setFullFee(pricing.gownMonthlyFee);
+            setDurationMonths(firstPosting?.promoDurationMonths ?? null);
+            setCurrentPromoCode(firstPosting?.promoCode?.code ?? null);
+        } catch {
+            // leave perGownFee null; the fallback copy still reads fine without a number
+        }
+    };
+
     useEffect(() => {
-        const loadFee = async () => {
-            try {
-                const [{ data: pricing }, { data: listings }] = await Promise.all([
-                    axios.get('/api/payment/pricing'),
-                    axios.get('/api/gown/mylistings')
-                ]);
-                const firstPosting = listings.find((g) => g.id === ids[0]);
-                setPerGownFee(firstPosting?.monthlyFeeOverride ?? pricing.gownMonthlyFee);
-                setFullFee(pricing.gownMonthlyFee);
-                setDurationMonths(firstPosting?.promoDurationMonths ?? null);
-            } catch {
-                // leave perGownFee null; the fallback copy still reads fine without a number
-            }
-        };
         if (ids.length > 0) loadFee();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const onApplyPromo = async (promoCode) => {
+        setPromoApplying(true);
+        setPromoMessage(null);
+        try {
+            await axios.post('/api/payment/apply-gown-promo-draft-batch', { ids, promoCode });
+            setPromoMessage({ type: 'success', text: 'Promo applied to all gowns in this batch!' });
+            await loadFee();
+        } catch (err) {
+            setPromoMessage({ type: 'error', text: err?.response?.data?.message || 'Could not apply promo code.' });
+        } finally {
+            setPromoApplying(false);
+        }
+    };
 
     const onContinueClick = async () => {
         setError('');
@@ -85,6 +106,15 @@ const BulkPaymentSetupPage = () => {
                     quantity={ids.length}
                     durationMonths={durationMonths}
                 />
+                <Stack sx={{ mb: 3, textAlign: 'left' }}>
+                    <PromoApplyBox
+                        currentPromoCode={currentPromoCode}
+                        onApply={onApplyPromo}
+                        applying={promoApplying}
+                        message={promoMessage}
+                        title="Apply a Promo Code (applies to the whole batch)"
+                    />
+                </Stack>
                 {error && <Alert severity="warning" sx={{ mb: 2, textAlign: 'left' }}>{error}</Alert>}
                 {stripeUnavailable ? (
                     <Stack spacing={2}>

@@ -17,6 +17,8 @@ namespace GownSite.Web.Controllers
         public string Location { get; set; }
         public string ListingType { get; set; }
         public bool DisplayOwnerName { get; set; }
+        public bool DisplayOwnerNumber { get; set; } = true;
+        public bool DisplayOwnerEmail { get; set; } = true;
         public string Brand { get; set; }
         public decimal? PricePaid { get; set; }
         public string Condition { get; set; }
@@ -47,6 +49,8 @@ namespace GownSite.Web.Controllers
         public string Location { get; set; }
         public string ListingType { get; set; }
         public bool DisplayOwnerName { get; set; }
+        public bool DisplayOwnerNumber { get; set; } = true;
+        public bool DisplayOwnerEmail { get; set; } = true;
         public string Brand { get; set; }
         public decimal? PricePaid { get; set; }
         public string Condition { get; set; }
@@ -67,6 +71,8 @@ namespace GownSite.Web.Controllers
         public string Location { get; set; }
         public string ListingType { get; set; }
         public bool DisplayOwnerName { get; set; }
+        public bool DisplayOwnerNumber { get; set; } = true;
+        public bool DisplayOwnerEmail { get; set; } = true;
         public string Brand { get; set; }
         public decimal? PricePaid { get; set; }
         public string Condition { get; set; }
@@ -96,6 +102,8 @@ namespace GownSite.Web.Controllers
         public string Location { get; set; }
         public string ListingType { get; set; }
         public bool DisplayOwnerName { get; set; }
+        public bool DisplayOwnerNumber { get; set; } = true;
+        public bool DisplayOwnerEmail { get; set; } = true;
         public string Brand { get; set; }
         public decimal? PricePaid { get; set; }
         public string Condition { get; set; }
@@ -190,10 +198,16 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "A primary picture is required." });
             if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType))
                 return BadRequest(new { message = "ListingType must be 'Rent' or 'Sale'." });
+            if (!request.DisplayOwnerName && !request.DisplayOwnerNumber && !request.DisplayOwnerEmail)
+                return BadRequest(new { message = "Please allow at least one way for interested buyers to contact you." });
             if (request.MorePictures?.Count > MaxMorePictures)
                 return BadRequest(new { message = $"You can upload up to {MaxMorePictures} additional photos." });
             if (request.PriceMax.HasValue && request.PriceMax.Value <= request.Price)
                 return BadRequest(new { message = "The high end of the price range must be more than the low end." });
+            if (request.PrimaryPicture != null && !ImageUploadValidator.IsValidImage(request.PrimaryPicture))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+            if (request.MorePictures != null && request.MorePictures.Any(f => !ImageUploadValidator.IsValidImage(f)))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
             var pricing = PromoCodeCalculator.ResolvePricing(
                 _connectionString, request.PromoCode, _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m),
@@ -223,6 +237,8 @@ namespace GownSite.Web.Controllers
                     Location = request.Location,
                     ListingType = listingType,
                     DisplayOwnerName = request.DisplayOwnerName,
+                    DisplayOwnerNumber = request.DisplayOwnerNumber,
+                    DisplayOwnerEmail = request.DisplayOwnerEmail,
                     Brand = request.Brand,
                     PricePaid = request.PricePaid,
                     Condition = request.Condition,
@@ -247,6 +263,8 @@ namespace GownSite.Web.Controllers
                     Location = request.Location,
                     ListingType = listingType,
                     DisplayOwnerName = request.DisplayOwnerName,
+                    DisplayOwnerNumber = request.DisplayOwnerNumber,
+                    DisplayOwnerEmail = request.DisplayOwnerEmail,
                     Brand = request.Brand,
                     PricePaid = request.PricePaid,
                     Condition = request.Condition,
@@ -279,6 +297,9 @@ namespace GownSite.Web.Controllers
         [RequestSizeLimit(100_000_000)]
         public async Task<IActionResult> SaveDraft([FromForm] SaveDraftGownRequest request)
         {
+            if (request.PrimaryPicture != null && !ImageUploadValidator.IsValidImage(request.PrimaryPicture))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+
             var repo = new GownRepository(_connectionString);
             Enum.TryParse<ListingType>(request.ListingType, out var listingType);
 
@@ -304,6 +325,8 @@ namespace GownSite.Web.Controllers
                     Location = request.Location,
                     ListingType = listingType,
                     DisplayOwnerName = request.DisplayOwnerName,
+                    DisplayOwnerNumber = request.DisplayOwnerNumber,
+                    DisplayOwnerEmail = request.DisplayOwnerEmail,
                     Brand = request.Brand,
                     PricePaid = request.PricePaid,
                     Condition = request.Condition,
@@ -328,6 +351,8 @@ namespace GownSite.Web.Controllers
                     Location = request.Location,
                     ListingType = listingType,
                     DisplayOwnerName = request.DisplayOwnerName,
+                    DisplayOwnerNumber = request.DisplayOwnerNumber,
+                    DisplayOwnerEmail = request.DisplayOwnerEmail,
                     Brand = request.Brand,
                     PricePaid = request.PricePaid,
                     Condition = request.Condition,
@@ -350,7 +375,7 @@ namespace GownSite.Web.Controllers
         public async Task<IActionResult> SubmitBusiness([FromBody] IdRequest request)
         {
             var repo = new GownRepository(_connectionString);
-            var posting = repo.Get(request.Id);
+            var posting = repo.GetWithOwner(request.Id);
             if (posting == null) return NotFound();
             if (posting.OwnerId != CurrentOwnerId()) return Forbid();
             if (posting.ModerationStatus != ModerationStatus.Draft)
@@ -389,12 +414,18 @@ namespace GownSite.Web.Controllers
             if (existing.OwnerId != CurrentOwnerId()) return Forbid();
             if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType))
                 return BadRequest(new { message = "ListingType must be 'Rent' or 'Sale'." });
+            if (!request.DisplayOwnerName && !request.DisplayOwnerNumber && !request.DisplayOwnerEmail)
+                return BadRequest(new { message = "Please allow at least one way for interested buyers to contact you." });
             var removeIds = existing.MorePictures.Select(p => p.Id).Intersect(request.RemovePictureIds ?? new List<int>()).ToList();
             var remainingCount = existing.MorePictures.Count - removeIds.Count + (request.MorePictures?.Count ?? 0);
             if (remainingCount > MaxMorePictures)
                 return BadRequest(new { message = $"You can have up to {MaxMorePictures} additional photos total." });
             if (request.PriceMax.HasValue && request.PriceMax.Value <= request.Price)
                 return BadRequest(new { message = "The high end of the price range must be more than the low end." });
+            if (request.PrimaryPicture != null && !ImageUploadValidator.IsValidImage(request.PrimaryPicture))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+            if (request.MorePictures != null && request.MorePictures.Any(f => !ImageUploadValidator.IsValidImage(f)))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
             repo.Update(new GownPosting
             {
@@ -407,6 +438,8 @@ namespace GownSite.Web.Controllers
                 Location = request.Location,
                 ListingType = listingType,
                 DisplayOwnerName = request.DisplayOwnerName,
+                DisplayOwnerNumber = request.DisplayOwnerNumber,
+                DisplayOwnerEmail = request.DisplayOwnerEmail,
                 Brand = request.Brand,
                 PricePaid = request.PricePaid,
                 Condition = request.Condition,
@@ -450,8 +483,14 @@ namespace GownSite.Web.Controllers
             if (string.IsNullOrWhiteSpace(request.Location)) return BadRequest(new { message = "Location is required." });
             if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType)) return BadRequest(new { message = "Rent or sale is required." });
             if (request.BatchId == Guid.Empty) return BadRequest(new { message = "Missing batch identifier." });
+            if (!request.DisplayOwnerName && !request.DisplayOwnerNumber && !request.DisplayOwnerEmail)
+                return BadRequest(new { message = "Please allow at least one way for interested buyers to contact you." });
             if (request.MorePictures?.Count > MaxMorePictures)
                 return BadRequest(new { message = $"You can upload up to {MaxMorePictures} additional photos." });
+            if (!ImageUploadValidator.IsValidImage(request.PrimaryPicture))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+            if (request.MorePictures != null && request.MorePictures.Any(f => !ImageUploadValidator.IsValidImage(f)))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
             var pricing = PromoCodeCalculator.ResolvePricing(
                 _connectionString, request.PromoCode, _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m),
@@ -472,6 +511,8 @@ namespace GownSite.Web.Controllers
                 Location = request.Location,
                 ListingType = listingType,
                 DisplayOwnerName = request.DisplayOwnerName,
+                DisplayOwnerNumber = request.DisplayOwnerNumber,
+                DisplayOwnerEmail = request.DisplayOwnerEmail,
                 Brand = request.Brand,
                 PricePaid = request.PricePaid,
                 Condition = request.Condition,
@@ -617,7 +658,7 @@ namespace GownSite.Web.Controllers
         public async Task<IActionResult> Resubmit([FromBody] IdRequest request)
         {
             var repo = new GownRepository(_connectionString);
-            var existing = repo.Get(request.Id);
+            var existing = repo.GetWithOwner(request.Id);
             if (existing == null) return NotFound();
             if (existing.OwnerId != CurrentOwnerId()) return Forbid();
             if (existing.ModerationStatus != ModerationStatus.Rejected)
@@ -644,7 +685,7 @@ namespace GownSite.Web.Controllers
         public IActionResult Inquire([FromBody] IdRequest request)
         {
             var repo = new GownRepository(_connectionString);
-            var posting = repo.Get(request.Id);
+            var posting = repo.GetWithOwner(request.Id);
             if (posting == null || !posting.IsActive) return NotFound();
             if (posting.IsSold) return BadRequest(new { message = "This gown has already been sold." });
 
@@ -654,8 +695,8 @@ namespace GownSite.Web.Controllers
             return Ok(new
             {
                 ownerName = posting.DisplayOwnerName ? posting.Owner.Name : null,
-                ownerNumber = posting.Owner.Number,
-                ownerEmail = posting.Owner.Email,
+                ownerNumber = posting.DisplayOwnerNumber ? posting.Owner.Number : null,
+                ownerEmail = posting.DisplayOwnerEmail ? posting.Owner.Email : null,
                 location = posting.Location,
                 inquiryCount = posting.InquiryCount
             });

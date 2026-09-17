@@ -20,6 +20,8 @@ import PriceField from '../components/PriceField';
 import MorePicturesInput from '../components/MorePicturesInput';
 import ImageZoomDialog from '../components/ImageZoomDialog';
 import FilterAutocomplete from '../components/FilterAutocomplete';
+import PromoApplyBox from '../components/PromoApplyBox';
+import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
 
 const MAX_POST_FOR_PATRON_GOWNS = 20;
 
@@ -50,7 +52,10 @@ const BUSINESS_PLAN_PRESETS = [
     { label: 'Pro — $75/150', monthlyFee: 75, gownAllowance: 150 }
 ];
 
-const emptyPostForPatronShared = { location: '', listingType: 'Rent', displayOwnerName: false, finalize: false, hourlyFeeUsd: '', promoCode: '' };
+const emptyPostForPatronShared = {
+    location: '', listingType: 'Rent', displayOwnerName: false, displayOwnerNumber: true, displayOwnerEmail: true,
+    finalize: false, hourlyFeeUsd: '', promoCode: ''
+};
 
 const makePostForPatronGown = () => ({
     localId: crypto.randomUUID(),
@@ -132,7 +137,7 @@ const ItemDetailDialog = ({ item, type, onClose, fullScreen, onEditClick }) => {
             </DialogContent>
         )}
         <DialogActions>
-            {type === 'gown' && onEditClick && (
+            {onEditClick && (
                 <Button onClick={() => onEditClick(item)}>Edit Details</Button>
             )}
             <Button onClick={onClose}>Close</Button>
@@ -267,6 +272,10 @@ const AdminDashboard = () => {
     const [editAdNewImage, setEditAdNewImage] = useState(null);
     const [editAdNewImagePreview, setEditAdNewImagePreview] = useState(null);
     const [editAdError, setEditAdError] = useState('');
+    const [editGownPromoApplying, setEditGownPromoApplying] = useState(false);
+    const [editGownPromoMessage, setEditGownPromoMessage] = useState(null);
+    const [editAdPromoApplying, setEditAdPromoApplying] = useState(false);
+    const [editAdPromoMessage, setEditAdPromoMessage] = useState(null);
     const [error, setError] = useState('');
     const [promoCodes, setPromoCodes] = useState([]);
     const [promoDialogOpen, setPromoDialogOpen] = useState(false);
@@ -556,10 +565,11 @@ const AdminDashboard = () => {
     const onEditGownClick = (g) => setEditGownTarget({
         id: g.id, description: g.description, colors: (g.color || '').split(',').filter(Boolean), sizes: sortSizes(g.size),
         price: g.price, priceMax: g.priceMax || '', location: g.location, listingType: g.listingType,
-        displayOwnerName: g.displayOwnerName, brand: g.brand || '', pricePaid: g.pricePaid || '',
+        displayOwnerName: g.displayOwnerName, displayOwnerNumber: g.displayOwnerNumber, displayOwnerEmail: g.displayOwnerEmail,
+        brand: g.brand || '', pricePaid: g.pricePaid || '',
         condition: g.condition || '', length: g.length || '',
         styleTags: (g.styleTags || '').split(',').filter(Boolean), notes: g.notes || '',
-        primaryPictureUrl: g.primaryPictureUrl,
+        primaryPictureUrl: g.primaryPictureUrl, promoCode: g.promoCode,
         morePictures: [...(g.morePictures || [])].sort((a, b) => a.sortOrder - b.sortOrder)
     });
 
@@ -570,6 +580,22 @@ const AdminDashboard = () => {
         setEditGownError('');
         setEditGownRemovePictureIds([]);
         setEditGownNewMorePictures([]);
+        setEditGownPromoMessage(null);
+    };
+
+    const onApplyEditGownPromo = async (promoCode) => {
+        setEditGownPromoApplying(true);
+        setEditGownPromoMessage(null);
+        try {
+            await axios.post(`/api/admin/gowns/${editGownTarget.id}/apply-promo`, { promoCode });
+            setEditGownPromoMessage({ type: 'success', text: 'Promo applied!' });
+            await loadActive();
+            await loadPending();
+        } catch (err) {
+            setEditGownPromoMessage({ type: 'error', text: err?.response?.data?.message || 'Could not apply promo code.' });
+        } finally {
+            setEditGownPromoApplying(false);
+        }
     };
 
     const onEditGownPictureChange = (e) => {
@@ -605,6 +631,8 @@ const AdminDashboard = () => {
         data.append('Location', editGownTarget.location);
         data.append('ListingType', editGownTarget.listingType);
         data.append('DisplayOwnerName', editGownTarget.displayOwnerName);
+        data.append('DisplayOwnerNumber', editGownTarget.displayOwnerNumber);
+        data.append('DisplayOwnerEmail', editGownTarget.displayOwnerEmail);
         data.append('Brand', editGownTarget.brand);
         if (editGownTarget.pricePaid !== '') data.append('PricePaid', Number(editGownTarget.pricePaid));
         data.append('Condition', editGownTarget.condition);
@@ -629,7 +657,8 @@ const AdminDashboard = () => {
     const onEditAdClick = (a) => setEditAdTarget({
         id: a.id, title: a.title, description: a.description, targetUrl: a.targetUrl || '',
         categories: (a.categories || '').split(',').filter(Boolean), location: a.location || '', servesAllLocations: !!a.servesAllLocations,
-        imageUrl: a.imageUrl
+        imageUrl: a.imageUrl, promoCode: a.promoCode,
+        showName: a.showName, showPhone: a.showPhone, showEmail: a.showEmail
     });
 
     const onCloseEditAdDialog = () => {
@@ -637,6 +666,22 @@ const AdminDashboard = () => {
         setEditAdNewImage(null);
         setEditAdNewImagePreview(null);
         setEditAdError('');
+        setEditAdPromoMessage(null);
+    };
+
+    const onApplyEditAdPromo = async (promoCode) => {
+        setEditAdPromoApplying(true);
+        setEditAdPromoMessage(null);
+        try {
+            await axios.post(`/api/admin/ads/${editAdTarget.id}/apply-promo`, { promoCode });
+            setEditAdPromoMessage({ type: 'success', text: 'Promo applied!' });
+            await loadActive();
+            await loadPending();
+        } catch (err) {
+            setEditAdPromoMessage({ type: 'error', text: err?.response?.data?.message || 'Could not apply promo code.' });
+        } finally {
+            setEditAdPromoApplying(false);
+        }
     };
 
     const onEditAdImageChange = (e) => {
@@ -655,12 +700,16 @@ const AdminDashboard = () => {
         data.append('Category', editAdTarget.categories.join(','));
         data.append('Location', editAdTarget.location);
         data.append('ServesAllLocations', editAdTarget.servesAllLocations);
+        data.append('ShowName', editAdTarget.showName);
+        data.append('ShowPhone', editAdTarget.showPhone);
+        data.append('ShowEmail', editAdTarget.showEmail);
         if (editAdNewImage) data.append('Image', editAdNewImage);
 
         try {
             await axios.post('/api/admin/ads/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
             onCloseEditAdDialog();
             await loadActive();
+            await loadPending();
         } catch (err) {
             setEditAdError(err?.response?.data?.message || 'Could not save changes.');
         }
@@ -776,6 +825,10 @@ const AdminDashboard = () => {
     const postForPatronGownLabel = (g, i) => g.description ? g.description.slice(0, 40) : `Gown ${i + 1}`;
 
     const onSubmitPostForPatron = async () => {
+        if (!postForPatronShared.displayOwnerName && !postForPatronShared.displayOwnerNumber && !postForPatronShared.displayOwnerEmail) {
+            setPostForPatronError('Please allow at least one way for interested buyers to contact this patron.');
+            return;
+        }
         for (let i = 0; i < postForPatronGowns.length; i++) {
             const g = postForPatronGowns[i];
             if (!g.description.trim()) {
@@ -817,6 +870,8 @@ const AdminDashboard = () => {
                 data.append('Location', postForPatronShared.location);
                 data.append('ListingType', postForPatronShared.listingType);
                 data.append('DisplayOwnerName', postForPatronShared.displayOwnerName);
+                data.append('DisplayOwnerNumber', postForPatronShared.displayOwnerNumber);
+                data.append('DisplayOwnerEmail', postForPatronShared.displayOwnerEmail);
                 data.append('Brand', g.brand);
                 if (g.pricePaid !== '') data.append('PricePaid', g.pricePaid);
                 data.append('Condition', g.condition);
@@ -889,6 +944,7 @@ const AdminDashboard = () => {
                     error={error}
                     onApprove={(id) => onApprove('ad', id)}
                     onRejectClick={(id) => setRejectTarget({ type: 'ad', id })}
+                    onEditClick={onEditAdClick}
                     fullScreen={fullScreen}
                 />
             )}
@@ -1292,6 +1348,12 @@ const AdminDashboard = () => {
                     <DialogContent>
                         <Stack spacing={2} sx={{ mt: 1 }}>
                             {editGownError && <Alert severity="error">{editGownError}</Alert>}
+                            <PromoApplyBox
+                                currentPromoCode={editGownTarget.promoCode?.code}
+                                onApply={onApplyEditGownPromo}
+                                applying={editGownPromoApplying}
+                                message={editGownPromoMessage}
+                            />
                             <Stack direction="row" spacing={2} alignItems="center">
                                 <Box
                                     component="img"
@@ -1381,12 +1443,29 @@ const AdminDashboard = () => {
                             </Box>
                             <TextField label="Notes" multiline rows={2} value={editGownTarget.notes}
                                 onChange={(e) => setEditGownTarget({ ...editGownTarget, notes: e.target.value })} />
+                            <ContactVisibilityCheckboxes
+                                showName={editGownTarget.displayOwnerName}
+                                showPhone={editGownTarget.displayOwnerNumber}
+                                showEmail={editGownTarget.displayOwnerEmail}
+                                onChange={(next) => setEditGownTarget({
+                                    ...editGownTarget,
+                                    displayOwnerName: next.showName,
+                                    displayOwnerNumber: next.showPhone,
+                                    displayOwnerEmail: next.showEmail
+                                })}
+                                subjectLabel="their"
+                            />
                         </Stack>
                     </DialogContent>
                 )}
                 <DialogActions>
                     <Button onClick={onCloseEditGownDialog}>Cancel</Button>
-                    <Button variant="contained" onClick={onSaveEditGown}>Save Changes</Button>
+                    <Button
+                        variant="contained" onClick={onSaveEditGown}
+                        disabled={editGownTarget && !editGownTarget.displayOwnerName && !editGownTarget.displayOwnerNumber && !editGownTarget.displayOwnerEmail}
+                    >
+                        Save Changes
+                    </Button>
                 </DialogActions>
             </Dialog>
 
@@ -1396,6 +1475,12 @@ const AdminDashboard = () => {
                     <DialogContent>
                         <Stack spacing={2} sx={{ mt: 1 }}>
                             {editAdError && <Alert severity="error">{editAdError}</Alert>}
+                            <PromoApplyBox
+                                currentPromoCode={editAdTarget.promoCode?.code}
+                                onApply={onApplyEditAdPromo}
+                                applying={editAdPromoApplying}
+                                message={editAdPromoMessage}
+                            />
                             <Stack direction="row" spacing={2} alignItems="center">
                                 <Box
                                     component="img"
@@ -1437,12 +1522,24 @@ const AdminDashboard = () => {
                                 }
                                 label="This business isn't tied to one location (e.g. online-only)"
                             />
+                            <ContactVisibilityCheckboxes
+                                showName={editAdTarget.showName}
+                                showPhone={editAdTarget.showPhone}
+                                showEmail={editAdTarget.showEmail}
+                                onChange={(next) => setEditAdTarget({ ...editAdTarget, ...next })}
+                                subjectLabel="their"
+                            />
                         </Stack>
                     </DialogContent>
                 )}
                 <DialogActions>
                     <Button onClick={onCloseEditAdDialog}>Cancel</Button>
-                    <Button variant="contained" onClick={onSaveEditAd}>Save Changes</Button>
+                    <Button
+                        variant="contained" onClick={onSaveEditAd}
+                        disabled={editAdTarget && !editAdTarget.showName && !editAdTarget.showPhone && !editAdTarget.showEmail}
+                    >
+                        Save Changes
+                    </Button>
                 </DialogActions>
             </Dialog>
 
@@ -1589,14 +1686,17 @@ const AdminDashboard = () => {
                                     Publishing immediately skips Stripe entirely — the hourly fee and promo code won't be applied. Uncheck "Finalize now" if you need either to take effect.
                                 </Alert>
                             )}
-                            <FormControlLabel
-                                control={
-                                    <Checkbox
-                                        checked={postForPatronShared.displayOwnerName}
-                                        onChange={(e) => setPostForPatronShared({ ...postForPatronShared, displayOwnerName: e.target.checked })}
-                                    />
-                                }
-                                label="Show their name publicly on these listings"
+                            <ContactVisibilityCheckboxes
+                                showName={postForPatronShared.displayOwnerName}
+                                showPhone={postForPatronShared.displayOwnerNumber}
+                                showEmail={postForPatronShared.displayOwnerEmail}
+                                onChange={(next) => setPostForPatronShared({
+                                    ...postForPatronShared,
+                                    displayOwnerName: next.showName,
+                                    displayOwnerNumber: next.showPhone,
+                                    displayOwnerEmail: next.showEmail
+                                })}
+                                subjectLabel="their"
                             />
 
                             {postForPatronGowns.map((g, i) => (

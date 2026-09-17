@@ -12,6 +12,11 @@ namespace GownSite.Web.Controllers
         public string Reason { get; set; }
     }
 
+    public class AdminApplyPromoRequest
+    {
+        public string PromoCode { get; set; }
+    }
+
     public class SendPromoEmailRequest
     {
         public string Subject { get; set; }
@@ -52,6 +57,8 @@ namespace GownSite.Web.Controllers
         public string Location { get; set; }
         public string ListingType { get; set; }
         public bool DisplayOwnerName { get; set; }
+        public bool DisplayOwnerNumber { get; set; } = true;
+        public bool DisplayOwnerEmail { get; set; } = true;
         public string Brand { get; set; }
         public decimal? PricePaid { get; set; }
         public string Condition { get; set; }
@@ -188,7 +195,7 @@ namespace GownSite.Web.Controllers
         public async Task<IActionResult> ApproveGown(int id)
         {
             var repo = new GownRepository(_connectionString);
-            var posting = repo.Get(id);
+            var posting = repo.GetWithOwner(id);
             if (posting == null) return NotFound();
             if (posting.ModerationStatus != ModerationStatus.PendingReview)
                 return BadRequest(new { message = "This listing is no longer pending review." });
@@ -295,7 +302,7 @@ namespace GownSite.Web.Controllers
         public async Task<IActionResult> RejectGown(int id, [FromBody] RejectRequest request)
         {
             var repo = new GownRepository(_connectionString);
-            var posting = repo.Get(id);
+            var posting = repo.GetWithOwner(id);
             if (posting == null) return NotFound();
             if (posting.ModerationStatus != ModerationStatus.PendingReview)
                 return BadRequest(new { message = "This listing is no longer pending review." });
@@ -322,7 +329,7 @@ namespace GownSite.Web.Controllers
         public async Task<IActionResult> TakeDownGown(int id, [FromBody] RejectRequest request)
         {
             var repo = new GownRepository(_connectionString);
-            var posting = repo.Get(id);
+            var posting = repo.GetWithOwner(id);
             if (posting == null) return NotFound();
             if (!posting.IsActive)
                 return BadRequest(new { message = "This listing isn't currently live." });
@@ -362,12 +369,18 @@ namespace GownSite.Web.Controllers
             if (existing == null) return NotFound();
             if (!Enum.TryParse<ListingType>(request.ListingType, out var listingType))
                 return BadRequest(new { message = "ListingType must be 'Rent' or 'Sale'." });
+            if (!request.DisplayOwnerName && !request.DisplayOwnerNumber && !request.DisplayOwnerEmail)
+                return BadRequest(new { message = "Please allow at least one way for interested buyers to contact this patron." });
             var removeIds = existing.MorePictures.Select(p => p.Id).Intersect(request.RemovePictureIds ?? new List<int>()).ToList();
             var remainingCount = existing.MorePictures.Count - removeIds.Count + (request.MorePictures?.Count ?? 0);
             if (remainingCount > GownController.MaxMorePictures)
                 return BadRequest(new { message = $"You can have up to {GownController.MaxMorePictures} additional photos total." });
             if (request.PriceMax.HasValue && request.PriceMax.Value <= request.Price)
                 return BadRequest(new { message = "The high end of the price range must be more than the low end." });
+            if (request.PrimaryPicture != null && !ImageUploadValidator.IsValidImage(request.PrimaryPicture))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+            if (request.MorePictures != null && request.MorePictures.Any(f => !ImageUploadValidator.IsValidImage(f)))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
             repo.Update(new GownPosting
             {
@@ -380,6 +393,8 @@ namespace GownSite.Web.Controllers
                 Location = request.Location,
                 ListingType = listingType,
                 DisplayOwnerName = request.DisplayOwnerName,
+                DisplayOwnerNumber = request.DisplayOwnerNumber,
+                DisplayOwnerEmail = request.DisplayOwnerEmail,
                 Brand = request.Brand,
                 PricePaid = request.PricePaid,
                 Condition = request.Condition,
@@ -411,6 +426,54 @@ namespace GownSite.Web.Controllers
             return Ok();
         }
 
+        // Lets an admin apply a promo to a gown on a patron's behalf, whether it's already
+        // live (needs a real Stripe coupon on the running subscription) or still pending/draft
+        // (just needs the row's pricing columns updated — no subscription exists yet). No
+        // ownership check: role-gating is the class-level [Authorize(Roles = "Admin")], matching
+        // every other admin "someone else's data" endpoint in this controller.
+        [HttpPost("gowns/{id}/apply-promo")]
+        public async Task<IActionResult> ApplyGownPromo(int id, [FromBody] AdminApplyPromoRequest request)
+        {
+            var repo = new GownRepository(_connectionString);
+            var posting = repo.Get(id);
+            if (posting == null) return NotFound();
+
+            if (string.IsNullOrWhiteSpace(request.PromoCode))
+                return BadRequest(new { message = "Enter a promo code." });
+
+            var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m);
+
+            if (posting.IsActive && !string.IsNullOrEmpty(posting.StripeSubscriptionId))
+            {
+                var promoRepo = new PromoCodeRepository(_connectionString);
+                var promo = promoRepo.GetByCode(request.PromoCode);
+                var resolved = PromoCodeCalculator.Resolve(promo, feeUsd, 1, PromoAppliesTo.Gown);
+                if (!resolved.Success) return BadRequest(new { message = resolved.Error });
+
+                try
+                {
+                    await StripePromoHelper.ApplyPromoToSubscriptionAsync(posting.StripeSubscriptionId, feeUsd, resolved.ResolvedFee!.Value, resolved.DurationMonths);
+                }
+                catch (StripeException ex)
+                {
+                    return BadRequest(new { message = $"Could not apply promo: {ex.Message}" });
+                }
+
+                var isNewApplication = repo.ApplyPromo(id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
+                if (isNewApplication) promoRepo.IncrementUsage(promo.Id);
+                return Ok();
+            }
+
+            if (posting.ModerationStatus == ModerationStatus.Draft || posting.ModerationStatus == ModerationStatus.PendingReview)
+            {
+                var result = DraftPromoApplier.ApplyToGown(_connectionString, feeUsd, posting, request.PromoCode);
+                if (!result.Success) return BadRequest(new { message = result.Error });
+                return Ok();
+            }
+
+            return BadRequest(new { message = "This listing isn't in a state a promo can be applied to." });
+        }
+
         [HttpGet("ads/pending")]
         public IActionResult GetPendingAds()
         {
@@ -432,6 +495,10 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "Please choose at least one valid category." });
             if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
                 return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
+            if (!request.ShowName && !request.ShowPhone && !request.ShowEmail)
+                return BadRequest(new { message = "Please allow at least one way for interested customers to contact this patron." });
+            if (request.Image != null && !ImageUploadValidator.IsValidImage(request.Image))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
             repo.Update(new Ad
             {
@@ -441,12 +508,60 @@ namespace GownSite.Web.Controllers
                 TargetUrl = request.TargetUrl,
                 Categories = normalizedCategories,
                 Location = request.ServesAllLocations ? null : request.Location,
-                ServesAllLocations = request.ServesAllLocations
+                ServesAllLocations = request.ServesAllLocations,
+                ShowName = request.ShowName,
+                ShowPhone = request.ShowPhone,
+                ShowEmail = request.ShowEmail
             });
             if (request.Image != null)
                 repo.SetImage(request.Id, await _storage.SaveAsync(request.Image, "ads"));
 
             return Ok();
+        }
+
+        // Ad equivalent of ApplyGownPromo above — same active-vs-pending branch, same
+        // no-ownership-check rationale.
+        [HttpPost("ads/{id}/apply-promo")]
+        public async Task<IActionResult> ApplyAdPromo(int id, [FromBody] AdminApplyPromoRequest request)
+        {
+            var repo = new AdRepository(_connectionString);
+            var ad = repo.Get(id);
+            if (ad == null) return NotFound();
+
+            if (string.IsNullOrWhiteSpace(request.PromoCode))
+                return BadRequest(new { message = "Enter a promo code." });
+
+            var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m);
+
+            if (ad.IsActive && !string.IsNullOrEmpty(ad.StripeSubscriptionId))
+            {
+                var promoRepo = new PromoCodeRepository(_connectionString);
+                var promo = promoRepo.GetByCode(request.PromoCode);
+                var resolved = PromoCodeCalculator.Resolve(promo, feeUsd, 1, PromoAppliesTo.Ad);
+                if (!resolved.Success) return BadRequest(new { message = resolved.Error });
+
+                try
+                {
+                    await StripePromoHelper.ApplyPromoToSubscriptionAsync(ad.StripeSubscriptionId, feeUsd, resolved.ResolvedFee!.Value, resolved.DurationMonths);
+                }
+                catch (StripeException ex)
+                {
+                    return BadRequest(new { message = $"Could not apply promo: {ex.Message}" });
+                }
+
+                var isNewApplication = repo.ApplyPromo(id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
+                if (isNewApplication) promoRepo.IncrementUsage(promo.Id);
+                return Ok();
+            }
+
+            if (ad.ModerationStatus == ModerationStatus.Draft || ad.ModerationStatus == ModerationStatus.PendingReview)
+            {
+                var result = DraftPromoApplier.ApplyToAd(_connectionString, feeUsd, ad, request.PromoCode);
+                if (!result.Success) return BadRequest(new { message = result.Error });
+                return Ok();
+            }
+
+            return BadRequest(new { message = "This ad isn't in a state a promo can be applied to." });
         }
 
         [HttpPost("ads/{id}/approve")]
@@ -459,6 +574,11 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "This ad is no longer pending review." });
             if (string.IsNullOrEmpty(ad.StripeCustomerId) || string.IsNullOrEmpty(ad.StripePaymentMethodId))
                 return BadRequest(new { message = "No payment method on file for this ad." });
+            // Ads created before ShowName/ShowPhone/ShowEmail existed were backfilled to false
+            // (unlike gowns' DisplayOwner* flags, which preserve the old always-shown behavior) —
+            // without this check one could go live with no way for a customer to contact the patron.
+            if (!ad.ShowName && !ad.ShowPhone && !ad.ShowEmail)
+                return BadRequest(new { message = "This ad has no contact method enabled — edit it to allow at least one before approving." });
 
             var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m);
 
@@ -646,6 +766,12 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = $"You can upload up to {GownController.MaxMorePictures} additional photos." });
             if (request.PriceMax.HasValue && request.Price.HasValue && request.PriceMax.Value <= request.Price.Value)
                 return BadRequest(new { message = "The high end of the price range must be more than the low end." });
+            if (request.PrimaryPicture != null && !ImageUploadValidator.IsValidImage(request.PrimaryPicture))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+            if (request.MorePictures != null && request.MorePictures.Any(f => !ImageUploadValidator.IsValidImage(f)))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+            if (!request.DisplayOwnerName && !request.DisplayOwnerNumber && !request.DisplayOwnerEmail)
+                return BadRequest(new { message = "Please allow at least one way for interested buyers to contact this patron." });
 
             if (request.Finalize)
             {
@@ -692,6 +818,8 @@ namespace GownSite.Web.Controllers
                 Location = request.Location,
                 ListingType = listingType,
                 DisplayOwnerName = request.DisplayOwnerName,
+                DisplayOwnerNumber = request.DisplayOwnerNumber,
+                DisplayOwnerEmail = request.DisplayOwnerEmail,
                 Brand = request.Brand,
                 PricePaid = request.PricePaid,
                 Condition = request.Condition,

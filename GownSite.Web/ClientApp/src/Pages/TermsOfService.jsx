@@ -24,8 +24,8 @@ const TermsOfService = () => {
 
             <Section title="1. What Regowned Is">
                 <Typography>
-                    Regowned is an online marketplace where people can buy, sell, and rent gowns for simchas —
-                    weddings, bar/bat mitzvahs, and other celebrations — and where simcha-related businesses
+                    Regowned is an online marketplace where people can buy, sell, and rent gowns for events —
+                    weddings, bar/bat mitzvahs, and other celebrations — and where event-related businesses
                     (hair, makeup, alterations, photography, party planning, and similar) can advertise their
                     services. Regowned is a platform that connects buyers, sellers, renters, and service
                     providers — <strong>we are not a party to any transaction, rental agreement, or service

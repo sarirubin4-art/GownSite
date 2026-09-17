@@ -55,14 +55,27 @@ const BrowseAds = () => {
                 ))}
             </Tabs>
 
-            <TextField
-                select size="small" label="Location" value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                sx={{ width: 220, mt: 2, mb: 4, mr: laneSx }}
-            >
-                <MenuItem value={ALL_LOCATIONS}>All Locations</MenuItem>
-                {locationOptions.map((loc) => <MenuItem key={loc} value={loc}>{loc}</MenuItem>)}
-            </TextField>
+            <Stack direction="row" spacing={2} sx={{ mt: 2, mb: 4, mr: laneSx, flexWrap: 'wrap', rowGap: 2 }}>
+                {/* Mirrors the tab strip above (same category state) — the tabs alone can look
+                    like a fixed, short list, so this dropdown makes the full category set
+                    discoverable without needing to scroll the tabs to find it. */}
+                <TextField
+                    select size="small" label="Category" value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    sx={{ width: 220 }}
+                >
+                    <MenuItem value="All">All Categories</MenuItem>
+                    {AD_CATEGORY_OPTIONS.map((c) => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
+                </TextField>
+                <TextField
+                    select size="small" label="Location" value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    sx={{ width: 220 }}
+                >
+                    <MenuItem value={ALL_LOCATIONS}>All Locations</MenuItem>
+                    {locationOptions.map((loc) => <MenuItem key={loc} value={loc}>{loc}</MenuItem>)}
+                </TextField>
+            </Stack>
 
             {visibleAds.length === 0 ? (
                 <Typography color="text.secondary">No advertisers in this category yet.</Typography>

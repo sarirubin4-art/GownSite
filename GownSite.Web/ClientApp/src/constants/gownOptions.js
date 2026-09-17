@@ -60,6 +60,9 @@ export const AD_CATEGORY_OPTIONS = [
     { value: 'Photography', label: 'Photography' },
     { value: 'PartyPlanners', label: 'Party Planners' },
     { value: 'Gemachs', label: 'Gemachs' },
+    { value: 'Cosmetics', label: 'Cosmetics' },
+    { value: 'PartyRentals', label: 'Party Rentals' },
+    { value: 'Catering', label: 'Catering' },
     { value: 'Other', label: 'Other' },
 ];
 

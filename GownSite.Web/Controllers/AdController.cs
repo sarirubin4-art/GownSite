@@ -16,6 +16,9 @@ namespace GownSite.Web.Controllers
         public string Location { get; set; }
         public bool ServesAllLocations { get; set; }
         public string PromoCode { get; set; }
+        public bool ShowName { get; set; }
+        public bool ShowPhone { get; set; }
+        public bool ShowEmail { get; set; }
         public IFormFile Image { get; set; }
         // Set when finalizing a draft that autosave already created, so this submit
         // updates that same row (and resolves any promo now) instead of making a new one.
@@ -31,6 +34,9 @@ namespace GownSite.Web.Controllers
         public string Category { get; set; }
         public string Location { get; set; }
         public bool ServesAllLocations { get; set; }
+        public bool ShowName { get; set; }
+        public bool ShowPhone { get; set; }
+        public bool ShowEmail { get; set; }
         public IFormFile Image { get; set; }
     }
 
@@ -45,6 +51,9 @@ namespace GownSite.Web.Controllers
         public string Category { get; set; }
         public string Location { get; set; }
         public bool ServesAllLocations { get; set; }
+        public bool ShowName { get; set; }
+        public bool ShowPhone { get; set; }
+        public bool ShowEmail { get; set; }
         public IFormFile Image { get; set; }
     }
 
@@ -102,6 +111,28 @@ namespace GownSite.Web.Controllers
             return repo.GetByOwner(CurrentOwnerId());
         }
 
+        // Anonymous, public — mirrors GownController.Inquire. Uses GetWithOwner rather than
+        // Get (which backs the public /api/ad/get response and deliberately doesn't include
+        // Owner) so name/phone/email only ever reach the client through this gated response.
+        [HttpPost("inquire")]
+        public IActionResult Inquire([FromBody] AdIdRequest request)
+        {
+            var repo = new AdRepository(_connectionString);
+            var ad = repo.GetWithOwner(request.Id);
+            if (ad == null || !ad.IsActive) return NotFound();
+
+            repo.IncrementInquiry(request.Id);
+            ad.InquiryCount++;
+
+            return Ok(new
+            {
+                ownerName = ad.ShowName ? ad.Owner?.Name : null,
+                ownerNumber = ad.ShowPhone ? ad.Owner?.Number : null,
+                ownerEmail = ad.ShowEmail ? ad.Owner?.Email : null,
+                inquiryCount = ad.InquiryCount
+            });
+        }
+
         [HttpPost("create")]
         [Authorize]
         [RequireVerifiedEmail]
@@ -120,10 +151,14 @@ namespace GownSite.Web.Controllers
 
             if (request.Image == null && existingDraft?.ImageUrl == null)
                 return BadRequest(new { message = "An ad image is required." });
+            if (request.Image != null && !ImageUploadValidator.IsValidImage(request.Image))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
             if (!AdCategoryHelper.TryNormalize(request.Category, out var normalizedCategories))
                 return BadRequest(new { message = "Please choose at least one valid category." });
             if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
                 return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
+            if (!request.ShowName && !request.ShowPhone && !request.ShowEmail)
+                return BadRequest(new { message = "Please allow at least one way for interested customers to contact you." });
 
             int? promoCodeId = null;
             decimal? monthlyFeeOverride = null;
@@ -157,7 +192,10 @@ namespace GownSite.Web.Controllers
                     TargetUrl = request.TargetUrl,
                     Categories = normalizedCategories,
                     Location = request.ServesAllLocations ? null : request.Location,
-                    ServesAllLocations = request.ServesAllLocations
+                    ServesAllLocations = request.ServesAllLocations,
+                    ShowName = request.ShowName,
+                    ShowPhone = request.ShowPhone,
+                    ShowEmail = request.ShowEmail
                 });
                 if (request.Image != null) repo.SetImage(existingDraft.Id, imageUrl);
                 if (promoCodeId.HasValue) repo.ApplyPromo(existingDraft.Id, promoCodeId.Value, monthlyFeeOverride, promoDurationMonths);
@@ -174,6 +212,9 @@ namespace GownSite.Web.Controllers
                     Categories = normalizedCategories,
                     Location = request.ServesAllLocations ? null : request.Location,
                     ServesAllLocations = request.ServesAllLocations,
+                    ShowName = request.ShowName,
+                    ShowPhone = request.ShowPhone,
+                    ShowEmail = request.ShowEmail,
                     ImageUrl = imageUrl,
                     PromoCodeId = promoCodeId,
                     MonthlyFeeOverride = monthlyFeeOverride,
@@ -198,6 +239,10 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "Please choose at least one valid category." });
             if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
                 return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
+            if (!request.ShowName && !request.ShowPhone && !request.ShowEmail)
+                return BadRequest(new { message = "Please allow at least one way for interested customers to contact you." });
+            if (request.Image != null && !ImageUploadValidator.IsValidImage(request.Image))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
             repo.Update(new Ad
             {
@@ -207,7 +252,10 @@ namespace GownSite.Web.Controllers
                 TargetUrl = request.TargetUrl,
                 Categories = normalizedCategories,
                 Location = request.ServesAllLocations ? null : request.Location,
-                ServesAllLocations = request.ServesAllLocations
+                ServesAllLocations = request.ServesAllLocations,
+                ShowName = request.ShowName,
+                ShowPhone = request.ShowPhone,
+                ShowEmail = request.ShowEmail
             });
             if (request.Image != null)
                 repo.SetImage(request.Id, await _storage.SaveAsync(request.Image, "ads"));
@@ -221,6 +269,9 @@ namespace GownSite.Web.Controllers
         [RequestSizeLimit(50_000_000)]
         public async Task<IActionResult> SaveDraft([FromForm] SaveDraftAdRequest request)
         {
+            if (request.Image != null && !ImageUploadValidator.IsValidImage(request.Image))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+
             var repo = new AdRepository(_connectionString);
             AdCategoryHelper.TryNormalize(request.Category, out var normalizedCategories);
 
@@ -243,7 +294,10 @@ namespace GownSite.Web.Controllers
                     TargetUrl = request.TargetUrl,
                     Categories = normalizedCategories,
                     Location = request.ServesAllLocations ? null : request.Location,
-                    ServesAllLocations = request.ServesAllLocations
+                    ServesAllLocations = request.ServesAllLocations,
+                    ShowName = request.ShowName,
+                    ShowPhone = request.ShowPhone,
+                    ShowEmail = request.ShowEmail
                 });
                 if (imageUrl != null) repo.SetImage(existing.Id, imageUrl);
 
@@ -260,6 +314,9 @@ namespace GownSite.Web.Controllers
                     Categories = normalizedCategories,
                     Location = request.ServesAllLocations ? null : request.Location,
                     ServesAllLocations = request.ServesAllLocations,
+                    ShowName = request.ShowName,
+                    ShowPhone = request.ShowPhone,
+                    ShowEmail = request.ShowEmail,
                     ImageUrl = imageUrl
                 };
                 var id = repo.Create(ad);

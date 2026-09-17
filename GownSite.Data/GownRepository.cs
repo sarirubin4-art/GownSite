@@ -32,11 +32,14 @@ namespace GownSite.Data
             _connectionString = connectionString;
         }
 
+        // No Owner include — this backs the public, unauthenticated /api/gown/search
+        // response (the main browse page), and nothing in the search results UI reads
+        // owner data. Including it here would serialize every matching listing's owner
+        // Name/Number/Email into one response, the same leak class as Get(int id) above.
         public GownSearchResult Search(GownSearchFilters filters)
         {
             using var context = new GownDataContext(_connectionString);
             var query = context.Gowns
-                .Include(g => g.Owner)
                 .Include(g => g.MorePictures)
                 .Where(g => g.IsActive)
                 .AsQueryable();
@@ -107,7 +110,21 @@ namespace GownSite.Data
                 .ToList();
         }
 
+        // Deliberately does NOT include Owner — this backs the public /api/gown/get response
+        // (and most other call sites, which only need the posting's own fields), and Owner
+        // has no [JsonIgnore] on Name/Number/Email, so including it here would serialize a
+        // patron's contact info into that public payload regardless of their
+        // DisplayOwnerName/Number/Email choices. Callers that genuinely need Owner (sending
+        // an email, building the gated Inquire response) should use GetWithOwner instead.
         public GownPosting Get(int id)
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Gowns
+                .Include(g => g.MorePictures)
+                .FirstOrDefault(g => g.Id == id);
+        }
+
+        public GownPosting GetWithOwner(int id)
         {
             using var context = new GownDataContext(_connectionString);
             return context.Gowns
@@ -121,6 +138,7 @@ namespace GownSite.Data
             using var context = new GownDataContext(_connectionString);
             return context.Gowns
                 .Include(g => g.MorePictures)
+                .Include(g => g.PromoCode)
                 .Where(g => g.OwnerId == ownerId)
                 .OrderByDescending(g => g.CreatedDate)
                 .ToList();
@@ -158,6 +176,8 @@ namespace GownSite.Data
             existing.Location = posting.Location;
             existing.ListingType = posting.ListingType;
             existing.DisplayOwnerName = posting.DisplayOwnerName;
+            existing.DisplayOwnerNumber = posting.DisplayOwnerNumber;
+            existing.DisplayOwnerEmail = posting.DisplayOwnerEmail;
             existing.Brand = posting.Brand;
             existing.PricePaid = posting.PricePaid;
             existing.Condition = posting.Condition;
@@ -231,15 +251,38 @@ namespace GownSite.Data
             context.SaveChanges();
         }
 
-        public void ApplyPromo(int id, int promoCodeId, decimal? monthlyFeeOverride, int? promoDurationMonths)
+        // Returns whether this call actually changed the row's PromoCodeId (vs. re-applying the
+        // code already on it) — callers use this, read fresh at write time, to decide whether to
+        // count a redemption, instead of comparing against a copy of the row fetched earlier in
+        // the request (which can go stale across an awaited Stripe call).
+        public bool ApplyPromo(int id, int promoCodeId, decimal? monthlyFeeOverride, int? promoDurationMonths)
         {
             using var context = new GownDataContext(_connectionString);
             var existing = context.Gowns.FirstOrDefault(g => g.Id == id);
-            if (existing == null) return;
+            if (existing == null) return false;
 
+            var isNewApplication = existing.PromoCodeId != promoCodeId;
             existing.PromoCodeId = promoCodeId;
             existing.MonthlyFeeOverride = monthlyFeeOverride;
             existing.PromoDurationMonths = promoDurationMonths;
+            context.SaveChanges();
+            return isNewApplication;
+        }
+
+        // Writes the same promo to every id in one context/SaveChanges, so a mid-write failure
+        // (a row deleted concurrently, a transient DB error) can't leave some gowns in the batch
+        // discounted and others not — unlike calling ApplyPromo per id, where each call is its
+        // own independent transaction.
+        public void ApplyPromoToBatch(IEnumerable<int> ids, int promoCodeId, decimal? monthlyFeeOverride, int? promoDurationMonths)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var existing = context.Gowns.Where(g => ids.Contains(g.Id)).ToList();
+            foreach (var posting in existing)
+            {
+                posting.PromoCodeId = promoCodeId;
+                posting.MonthlyFeeOverride = monthlyFeeOverride;
+                posting.PromoDurationMonths = promoDurationMonths;
+            }
             context.SaveChanges();
         }
 
@@ -249,6 +292,7 @@ namespace GownSite.Data
             return context.Gowns
                 .Include(g => g.Owner)
                 .Include(g => g.MorePictures)
+                .Include(g => g.PromoCode)
                 .Where(g => g.IsActive)
                 .OrderByDescending(g => g.CreatedDate)
                 .ToList();
@@ -272,6 +316,7 @@ namespace GownSite.Data
             return context.Gowns
                 .Include(g => g.Owner)
                 .Include(g => g.MorePictures)
+                .Include(g => g.PromoCode)
                 .Where(g => g.ModerationStatus == ModerationStatus.PendingReview)
                 .OrderBy(g => g.CreatedDate)
                 .ToList();

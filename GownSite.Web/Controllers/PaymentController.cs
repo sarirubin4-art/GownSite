@@ -42,6 +42,12 @@ namespace GownSite.Web.Controllers
         public string PromoCode { get; set; }
     }
 
+    public class ApplyPromoBatchRequest
+    {
+        public List<int> Ids { get; set; } = new();
+        public string PromoCode { get; set; }
+    }
+
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
@@ -77,39 +83,6 @@ namespace GownSite.Web.Controllers
             });
         }
 
-        // Attaches a discount to an ALREADY-RUNNING subscription. Unlike CreatePromoAwareSubscriptionAsync
-        // (used at initial approval, which can use a Stripe trial for a 100%-off period), a trial can only be
-        // set when a subscription is first created — so here we always use a Coupon, with "forever" duration
-        // for a lifetime discount or "repeating" for a limited number of months. Passing a single-item
-        // Discounts list REPLACES any discount already on the subscription rather than stacking with it, and
-        // Stripe applies the change starting with the next invoice — the current billing period is untouched.
-        private static async Task ApplyPromoToSubscriptionAsync(string subscriptionId, decimal fullFeeUsd, decimal resolvedFee, int? durationMonths)
-        {
-            var percentOff = Math.Max(0m, (1 - (resolvedFee / fullFeeUsd)) * 100m);
-            if (percentOff <= 0)
-            {
-                await new SubscriptionService().UpdateAsync(subscriptionId, new SubscriptionUpdateOptions
-                {
-                    Discounts = new List<SubscriptionDiscountOptions>()
-                });
-                return;
-            }
-
-            var hasDuration = durationMonths.HasValue && durationMonths.Value > 0;
-            var couponOptions = new CouponCreateOptions
-            {
-                PercentOff = percentOff,
-                Duration = hasDuration ? "repeating" : "forever"
-            };
-            if (hasDuration) couponOptions.DurationInMonths = durationMonths!.Value;
-
-            var coupon = await new CouponService().CreateAsync(couponOptions);
-            await new SubscriptionService().UpdateAsync(subscriptionId, new SubscriptionUpdateOptions
-            {
-                Discounts = new List<SubscriptionDiscountOptions> { new() { Coupon = coupon.Id } }
-            });
-        }
-
         [HttpPost("apply-gown-promo")]
         public async Task<IActionResult> ApplyGownPromo([FromBody] ApplyPromoRequest request)
         {
@@ -129,15 +102,19 @@ namespace GownSite.Web.Controllers
 
             try
             {
-                await ApplyPromoToSubscriptionAsync(posting.StripeSubscriptionId, feeUsd, resolved.ResolvedFee!.Value, resolved.DurationMonths);
+                await StripePromoHelper.ApplyPromoToSubscriptionAsync(posting.StripeSubscriptionId, feeUsd, resolved.ResolvedFee!.Value, resolved.DurationMonths);
             }
             catch (StripeException ex)
             {
                 return BadRequest(new { message = $"Could not apply promo: {ex.Message}" });
             }
 
-            gownRepo.ApplyPromo(request.Id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
-            promoRepo.IncrementUsage(promo.Id);
+            // Re-applying the code already on this listing (e.g. a double-click) shouldn't count
+            // as a second redemption against the code's MaxUses — ApplyPromo checks this against
+            // a fresh read of the row rather than `posting`, which was fetched before the Stripe
+            // call above and can be stale by the time we get here.
+            var isNewApplication = gownRepo.ApplyPromo(request.Id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
+            if (isNewApplication) promoRepo.IncrementUsage(promo.Id);
 
             return Ok();
         }
@@ -161,17 +138,101 @@ namespace GownSite.Web.Controllers
 
             try
             {
-                await ApplyPromoToSubscriptionAsync(ad.StripeSubscriptionId, feeUsd, resolved.ResolvedFee!.Value, resolved.DurationMonths);
+                await StripePromoHelper.ApplyPromoToSubscriptionAsync(ad.StripeSubscriptionId, feeUsd, resolved.ResolvedFee!.Value, resolved.DurationMonths);
             }
             catch (StripeException ex)
             {
                 return BadRequest(new { message = $"Could not apply promo: {ex.Message}" });
             }
 
-            adRepo.ApplyPromo(request.Id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
-            promoRepo.IncrementUsage(promo.Id);
+            var isNewApplication = adRepo.ApplyPromo(request.Id, promo.Id, resolved.ResolvedFee, resolved.DurationMonths);
+            if (isNewApplication) promoRepo.IncrementUsage(promo.Id);
 
             return Ok();
+        }
+
+        // Applies (or replaces) a promo code on a gown that hasn't started billing yet — the
+        // payment-setup screen's "one last step before checkout" promo box. No Stripe call:
+        // pricing is only committed to Stripe later, at approval, read fresh off the row.
+        [HttpPost("apply-gown-promo-draft")]
+        public IActionResult ApplyGownPromoDraft([FromBody] ApplyPromoRequest request)
+        {
+            var gownRepo = new GownRepository(_connectionString);
+            var posting = gownRepo.Get(request.Id);
+            if (posting == null) return NotFound();
+            if (posting.OwnerId != CurrentOwnerId()) return Forbid();
+            if (posting.ModerationStatus != ModerationStatus.Draft && posting.ModerationStatus != ModerationStatus.PendingReview)
+                return BadRequest(new { message = "This listing has already started billing — use the promo box on My Listings instead." });
+
+            var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m);
+            var result = DraftPromoApplier.ApplyToGown(_connectionString, feeUsd, posting, request.PromoCode);
+            if (!result.Success) return BadRequest(new { message = result.Error });
+
+            return Ok(new { resolvedFee = result.ResolvedFee, fullFee = result.FullFee, durationMonths = result.DurationMonths });
+        }
+
+        // Same as above, but for a whole gown batch at once — validates every id first and only
+        // then writes to all of them together, so a mid-batch failure can't leave some gowns in
+        // the purchase discounted and others not (matching CreateBatchSetupSession's
+        // validate-then-mutate shape rather than N independent per-gown calls).
+        [HttpPost("apply-gown-promo-draft-batch")]
+        public IActionResult ApplyGownPromoDraftBatch([FromBody] ApplyPromoBatchRequest request)
+        {
+            var ids = (request.Ids ?? new List<int>()).Distinct().ToList();
+            if (ids.Count == 0) return BadRequest(new { message = "No gowns to apply a promo to." });
+
+            var gownRepo = new GownRepository(_connectionString);
+            var postings = new List<GownPosting>();
+            foreach (var id in ids)
+            {
+                var posting = gownRepo.Get(id);
+                if (posting == null) return NotFound();
+                if (posting.OwnerId != CurrentOwnerId()) return Forbid();
+                if (posting.ModerationStatus != ModerationStatus.Draft && posting.ModerationStatus != ModerationStatus.PendingReview)
+                    return BadRequest(new { message = "This batch has already started billing — use the promo box on My Listings instead." });
+                postings.Add(posting);
+            }
+
+            if (string.IsNullOrWhiteSpace(request.PromoCode))
+                return BadRequest(new { message = "Enter a promo code." });
+
+            var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m);
+
+            // All ids must belong to the same batch (or all be batch-less) — otherwise sizing
+            // pricing off one posting's BatchId would apply that batch's tier to gowns outside it.
+            var distinctBatchIds = postings.Select(p => p.BatchId).Distinct().ToList();
+            if (distinctBatchIds.Count > 1)
+                return BadRequest(new { message = "These gowns don't all belong to the same batch." });
+
+            // Resolve once, using the batch's real size (one lookup, not one per gown), so
+            // a promo that fails to resolve (expired, MaxUses hit, wrong scope) is caught
+            // before any row is written.
+            var batchIdForSizing = distinctBatchIds[0];
+            var batchSize = batchIdForSizing.HasValue ? gownRepo.GetByBatchId(batchIdForSizing.Value).Count : postings.Count;
+            var pricing = PromoCodeCalculator.ResolvePricing(_connectionString, request.PromoCode, feeUsd, batchIdForSizing.HasValue, batchSize);
+            if (!pricing.Success) return BadRequest(new { message = pricing.Error });
+
+            // One context/SaveChanges for the whole batch — see ApplyPromoToBatch's comment.
+            gownRepo.ApplyPromoToBatch(postings.Select(p => p.Id), pricing.PromoCodeId!.Value, pricing.MonthlyFeeOverride, pricing.PromoDurationMonths);
+
+            return Ok(new { resolvedFee = pricing.MonthlyFeeOverride, fullFee = feeUsd, durationMonths = pricing.PromoDurationMonths });
+        }
+
+        [HttpPost("apply-ad-promo-draft")]
+        public IActionResult ApplyAdPromoDraft([FromBody] ApplyPromoRequest request)
+        {
+            var adRepo = new AdRepository(_connectionString);
+            var ad = adRepo.Get(request.Id);
+            if (ad == null) return NotFound();
+            if (ad.OwnerId != CurrentOwnerId()) return Forbid();
+            if (ad.ModerationStatus != ModerationStatus.Draft && ad.ModerationStatus != ModerationStatus.PendingReview)
+                return BadRequest(new { message = "This ad has already started billing — use the promo box on My Ads instead." });
+
+            var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m);
+            var result = DraftPromoApplier.ApplyToAd(_connectionString, feeUsd, ad, request.PromoCode);
+            if (!result.Success) return BadRequest(new { message = result.Error });
+
+            return Ok(new { resolvedFee = result.ResolvedFee, fullFee = result.FullFee, durationMonths = result.DurationMonths });
         }
 
         [HttpPost("create-checkout-session")]
@@ -304,7 +365,7 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "Could not identify the listing for this submission." });
 
             var gownRepo = new GownRepository(_connectionString);
-            var posting = gownRepo.Get(postingId);
+            var posting = gownRepo.GetWithOwner(postingId);
             if (posting == null) return NotFound();
             if (posting.OwnerId != CurrentOwnerId()) return Forbid();
 
@@ -396,7 +457,8 @@ namespace GownSite.Web.Controllers
             var postings = new List<GownPosting>();
             foreach (var id in ids)
             {
-                var posting = gownRepo.Get(id);
+                // GetWithOwner — postings[0].Owner.Name is needed for the admin notification below.
+                var posting = gownRepo.GetWithOwner(id);
                 if (posting == null) return NotFound();
                 if (posting.OwnerId != CurrentOwnerId()) return Forbid();
                 postings.Add(posting);
