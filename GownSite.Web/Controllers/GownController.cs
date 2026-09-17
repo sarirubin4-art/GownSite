@@ -194,6 +194,10 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = $"You can upload up to {MaxMorePictures} additional photos." });
             if (request.PriceMax.HasValue && request.PriceMax.Value <= request.Price)
                 return BadRequest(new { message = "The high end of the price range must be more than the low end." });
+            if (request.PrimaryPicture != null && !ImageUploadValidator.IsValidImage(request.PrimaryPicture))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+            if (request.MorePictures != null && request.MorePictures.Any(f => !ImageUploadValidator.IsValidImage(f)))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
             var pricing = PromoCodeCalculator.ResolvePricing(
                 _connectionString, request.PromoCode, _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m),
@@ -279,6 +283,9 @@ namespace GownSite.Web.Controllers
         [RequestSizeLimit(100_000_000)]
         public async Task<IActionResult> SaveDraft([FromForm] SaveDraftGownRequest request)
         {
+            if (request.PrimaryPicture != null && !ImageUploadValidator.IsValidImage(request.PrimaryPicture))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+
             var repo = new GownRepository(_connectionString);
             Enum.TryParse<ListingType>(request.ListingType, out var listingType);
 
@@ -395,6 +402,10 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = $"You can have up to {MaxMorePictures} additional photos total." });
             if (request.PriceMax.HasValue && request.PriceMax.Value <= request.Price)
                 return BadRequest(new { message = "The high end of the price range must be more than the low end." });
+            if (request.PrimaryPicture != null && !ImageUploadValidator.IsValidImage(request.PrimaryPicture))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+            if (request.MorePictures != null && request.MorePictures.Any(f => !ImageUploadValidator.IsValidImage(f)))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
             repo.Update(new GownPosting
             {
@@ -452,6 +463,10 @@ namespace GownSite.Web.Controllers
             if (request.BatchId == Guid.Empty) return BadRequest(new { message = "Missing batch identifier." });
             if (request.MorePictures?.Count > MaxMorePictures)
                 return BadRequest(new { message = $"You can upload up to {MaxMorePictures} additional photos." });
+            if (!ImageUploadValidator.IsValidImage(request.PrimaryPicture))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+            if (request.MorePictures != null && request.MorePictures.Any(f => !ImageUploadValidator.IsValidImage(f)))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
             var pricing = PromoCodeCalculator.ResolvePricing(
                 _connectionString, request.PromoCode, _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m),

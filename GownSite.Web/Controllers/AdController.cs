@@ -120,6 +120,8 @@ namespace GownSite.Web.Controllers
 
             if (request.Image == null && existingDraft?.ImageUrl == null)
                 return BadRequest(new { message = "An ad image is required." });
+            if (request.Image != null && !ImageUploadValidator.IsValidImage(request.Image))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
             if (!AdCategoryHelper.TryNormalize(request.Category, out var normalizedCategories))
                 return BadRequest(new { message = "Please choose at least one valid category." });
             if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
@@ -198,6 +200,8 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "Please choose at least one valid category." });
             if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
                 return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
+            if (request.Image != null && !ImageUploadValidator.IsValidImage(request.Image))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
             repo.Update(new Ad
             {
@@ -221,6 +225,9 @@ namespace GownSite.Web.Controllers
         [RequestSizeLimit(50_000_000)]
         public async Task<IActionResult> SaveDraft([FromForm] SaveDraftAdRequest request)
         {
+            if (request.Image != null && !ImageUploadValidator.IsValidImage(request.Image))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+
             var repo = new AdRepository(_connectionString);
             AdCategoryHelper.TryNormalize(request.Category, out var normalizedCategories);
 

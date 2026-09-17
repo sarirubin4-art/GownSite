@@ -214,6 +214,8 @@ const AdPostingForm = () => {
                         </Button>
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
                             For best results, use a square image (1:1) — ads display in a square across the site.
+                            Must be an actual image file (JPEG, PNG, WEBP, or GIF) — PDFs and other documents
+                            can't be shown as an ad image.
                         </Typography>
                     </Grid>
                     {imagePreview && (

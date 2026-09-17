@@ -368,6 +368,10 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = $"You can have up to {GownController.MaxMorePictures} additional photos total." });
             if (request.PriceMax.HasValue && request.PriceMax.Value <= request.Price)
                 return BadRequest(new { message = "The high end of the price range must be more than the low end." });
+            if (request.PrimaryPicture != null && !ImageUploadValidator.IsValidImage(request.PrimaryPicture))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+            if (request.MorePictures != null && request.MorePictures.Any(f => !ImageUploadValidator.IsValidImage(f)))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
             repo.Update(new GownPosting
             {
@@ -432,6 +436,8 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "Please choose at least one valid category." });
             if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
                 return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
+            if (request.Image != null && !ImageUploadValidator.IsValidImage(request.Image))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
             repo.Update(new Ad
             {
@@ -646,6 +652,10 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = $"You can upload up to {GownController.MaxMorePictures} additional photos." });
             if (request.PriceMax.HasValue && request.Price.HasValue && request.PriceMax.Value <= request.Price.Value)
                 return BadRequest(new { message = "The high end of the price range must be more than the low end." });
+            if (request.PrimaryPicture != null && !ImageUploadValidator.IsValidImage(request.PrimaryPicture))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+            if (request.MorePictures != null && request.MorePictures.Any(f => !ImageUploadValidator.IsValidImage(f)))
+                return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
             if (request.Finalize)
             {
