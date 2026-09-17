@@ -142,7 +142,9 @@ namespace GownSite.Data
         Gemachs,
         GirlsWomensApparel,
         Sheitels,
-        Bridal
+        Bridal,
+        Cosmetics,
+        PartyRentals
     }
 
     public static class AdCategoryHelper

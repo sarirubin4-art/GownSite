@@ -139,7 +139,7 @@ const GownCard = ({ gown, navigate }) => {
 };
 
 const SearchGowns = () => {
-    usePageTitle('Browse Gowns for Rent & Sale', 'Search gowns for rent or sale by color, size, style, and location — find the perfect dress for your simcha.');
+    usePageTitle('Browse Gowns for Rent & Sale', 'Search gowns for rent or sale by color, size, style, and location — find the perfect dress for your event.');
     const navigate = useNavigate();
     const routerLocation = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();

@@ -18,7 +18,7 @@ const AdDetail = () => {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    usePageTitle(ad ? ad.title : 'Simcha Service', ad ? ad.description : undefined);
+    usePageTitle(ad ? ad.title : 'Event Service', ad ? ad.description : undefined);
 
     useEffect(() => {
         window.scrollTo(0, 0);
