@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Paper, Box, Typography, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { orderAdsForDisplay } from '../utils/shuffle';
 
 export const AD_TOP = 84;
 const STACK_GAP = 16;
@@ -18,7 +19,7 @@ const FloatingAds = ({ onVisibilityChange, onStackTopChange }) => {
         const load = async () => {
             try {
                 const { data } = await axios.get('/api/ad/getactive');
-                setAds(data);
+                setAds(orderAdsForDisplay(data));
             } catch {
                 setAds([]);
             }

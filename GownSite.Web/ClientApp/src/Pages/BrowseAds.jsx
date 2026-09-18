@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { Box, Typography, Tabs, Tab, Card, CardActionArea, Chip, Stack, Button, TextField, MenuItem } from '@mui/material';
@@ -9,6 +9,7 @@ import { AD_CATEGORY_OPTIONS, adCategoryLabels } from '../constants/gownOptions'
 import { useAdLane } from '../context/AdLaneContext';
 import usePageTitle from '../hooks/usePageTitle';
 import useDragSelectGuard from '../hooks/useDragSelectGuard';
+import { orderAdsForDisplay } from '../utils/shuffle';
 
 const ALL_LOCATIONS = 'All';
 
@@ -31,7 +32,13 @@ const BrowseAds = () => {
         axios.get('/api/ad/locations').then(({ data }) => setLocationOptions(data));
     }, []);
 
-    const visibleAds = ads
+    // "All" stays in the backend's plain most-recently-posted order; a specific category
+    // tab is a smaller pool, so it gets the recent-first/shuffle-the-rest treatment to
+    // keep any one advertiser from permanently owning top placement in that category.
+    // Memoized so it doesn't reshuffle on every render — only when the ad list itself changes.
+    const shuffledAds = useMemo(() => orderAdsForDisplay(ads), [ads]);
+
+    const visibleAds = (category === 'All' ? ads : shuffledAds)
         .filter(a => category === 'All' || (a.categories || '').split(',').includes(category))
         // An ad marked "serves all locations" is relevant no matter which location is
         // selected, so it isn't filtered out the way a location mismatch normally would.
