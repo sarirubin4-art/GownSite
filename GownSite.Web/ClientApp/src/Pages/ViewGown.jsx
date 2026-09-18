@@ -153,6 +153,11 @@ const ViewGown = () => {
                         <Chip label={gown.listingType === 'Rent' ? 'For Rent' : 'For Sale'} color="primary" />
                         {gown.isSold && <Chip label="SOLD" color="secondary" sx={{ fontWeight: 700, letterSpacing: 1 }} />}
                     </Stack>
+                    {gown.brand && (
+                        <Typography variant="subtitle1" color="text.secondary" sx={{ fontWeight: 600 }}>
+                            {gown.brand}
+                        </Typography>
+                    )}
                     <Typography variant="h4" gutterBottom>{formatPriceRange(gown.price, gown.priceMax)}</Typography>
                     <Typography variant="body1" sx={{ mb: 2 }}>{gown.description}</Typography>
 
@@ -160,7 +165,6 @@ const ViewGown = () => {
                         <Typography><strong>Color{(gown.color || '').includes(',') ? 's' : ''}:</strong> {(gown.color || '').split(',').join(', ')}</Typography>
                         <Typography><strong>Size{(gown.size || '').includes(',') ? 's' : ''}:</strong> {sortSizes(gown.size).join('-')}</Typography>
                         <Typography><strong>Location:</strong> {gown.location}</Typography>
-                        {gown.brand && <Typography><strong>Brand:</strong> {gown.brand}</Typography>}
                         {gown.condition && <Typography><strong>Condition:</strong> {gown.condition}</Typography>}
                         {gown.length && <Typography><strong>Height/Length:</strong> {gown.length}</Typography>}
                         {gown.pricePaid && <Typography><strong>Original Gown Value:</strong> ${gown.pricePaid}</Typography>}

@@ -103,6 +103,11 @@ const GownCard = ({ gown, navigate }) => {
                     }}
                 />
                 <CardContent>
+                    {gown.brand && (
+                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
+                            {gown.brand}
+                        </Typography>
+                    )}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
                         <Typography variant="h6">{formatPriceRange(gown.price, gown.priceMax)}</Typography>
                         <Chip size="small" label={gown.listingType === 'Rent' ? 'For Rent' : 'For Sale'} color="primary" variant="outlined" />

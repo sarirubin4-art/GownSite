@@ -51,7 +51,7 @@ export const LISTING_TYPE_OPTIONS = [
 
 export const AD_CATEGORY_OPTIONS = [
     { value: 'Makeup', label: 'Makeup' },
-    { value: 'Hair', label: 'Hair Stylist' },
+    { value: 'Hair', label: 'Hair' },
     { value: 'Sheitels', label: 'Sheitels' },
     { value: 'Alterations', label: 'Alterations' },
     { value: 'GownRental', label: 'Gown Rental/Sales' },
