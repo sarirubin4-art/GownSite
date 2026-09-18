@@ -13,6 +13,8 @@ import LocationField from '../components/LocationField';
 import FilterAutocomplete from '../components/FilterAutocomplete';
 import PromoApplyBox from '../components/PromoApplyBox';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
+import ImagePositionEditor from '../components/ImagePositionEditor';
+import { focalObjectPosition } from '../utils/imageFocal';
 
 const MyAds = () => {
     const { owner, loading } = useAuth();
@@ -76,6 +78,8 @@ const MyAds = () => {
         data.append('ShowPhone', editTarget.showPhone);
         data.append('ShowEmail', editTarget.showEmail);
         if (newImage) data.append('Image', newImage);
+        data.append('ImageFocalX', editTarget.imageFocalX);
+        data.append('ImageFocalY', editTarget.imageFocalY);
 
         try {
             await axios.post('/api/ad/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
@@ -92,6 +96,7 @@ const MyAds = () => {
         const file = e.target.files[0];
         setNewImage(file || null);
         setNewImagePreview(file ? URL.createObjectURL(file) : null);
+        setEditTarget((prev) => ({ ...prev, imageFocalX: 0.5, imageFocalY: 0.5 }));
     };
 
     const onCloseEditDialog = () => {
@@ -135,7 +140,7 @@ const MyAds = () => {
                 {ads.map((a) => (
                     <Grid key={a.id} size={{ xs: 12, sm: 6, md: 4 }}>
                         <Card>
-                            <CardMedia component="img" image={a.imageUrl} sx={{ aspectRatio: '1 / 1', objectFit: 'cover' }} />
+                            <CardMedia component="img" image={a.imageUrl} sx={{ aspectRatio: '1 / 1', objectFit: 'cover', objectPosition: focalObjectPosition(a.imageFocalX, a.imageFocalY) }} />
                             <CardContent>
                                 <Stack direction="row" sx={{ mb: 1, justifyContent: 'space-between', alignItems: 'center' }}>
                                     <Chip
@@ -170,6 +175,7 @@ const MyAds = () => {
                                         targetUrl: a.targetUrl || '', categories: (a.categories || '').split(',').filter(Boolean),
                                         location: a.location || '', servesAllLocations: !!a.servesAllLocations,
                                         isActive: a.isActive, imageUrl: a.imageUrl, promoCode: a.promoCode,
+                                        imageFocalX: a.imageFocalX ?? 0.5, imageFocalY: a.imageFocalY ?? 0.5,
                                         showName: a.showName, showPhone: a.showPhone, showEmail: a.showEmail
                                     })}>
                                         Edit
@@ -224,6 +230,7 @@ const MyAds = () => {
                                     alt="Ad"
                                     sx={{
                                         width: 100, height: 100, borderRadius: 2, objectFit: 'cover',
+                                        objectPosition: focalObjectPosition(editTarget.imageFocalX, editTarget.imageFocalY),
                                         border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper'
                                     }}
                                 />
@@ -232,6 +239,12 @@ const MyAds = () => {
                                     <input type="file" accept="image/*" hidden onChange={onEditImageChange} />
                                 </Button>
                             </Stack>
+                            <ImagePositionEditor
+                                src={newImagePreview || editTarget.imageUrl}
+                                focal={{ x: editTarget.imageFocalX, y: editTarget.imageFocalY }}
+                                onChange={(f) => setEditTarget({ ...editTarget, imageFocalX: f.x, imageFocalY: f.y })}
+                                size={200}
+                            />
                             <TextField label="Title" value={editTarget.title}
                                 onChange={(e) => setEditTarget({ ...editTarget, title: e.target.value })} />
                             <TextField label="Description" multiline rows={2} value={editTarget.description}

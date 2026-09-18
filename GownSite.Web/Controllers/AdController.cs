@@ -20,6 +20,10 @@ namespace GownSite.Web.Controllers
         public bool ShowPhone { get; set; }
         public bool ShowEmail { get; set; }
         public IFormFile Image { get; set; }
+        // 0-1 fraction; only meaningful when Image is non-square. Defaults to centered
+        // (0.5, 0.5) when omitted — see Ad.ImageFocalX/Y.
+        public double? ImageFocalX { get; set; }
+        public double? ImageFocalY { get; set; }
         // Set when finalizing a draft that autosave already created, so this submit
         // updates that same row (and resolves any promo now) instead of making a new one.
         public int? Id { get; set; }
@@ -38,6 +42,8 @@ namespace GownSite.Web.Controllers
         public bool ShowPhone { get; set; }
         public bool ShowEmail { get; set; }
         public IFormFile Image { get; set; }
+        public double? ImageFocalX { get; set; }
+        public double? ImageFocalY { get; set; }
     }
 
     // No required fields — saved silently in the background while the owner is still
@@ -55,6 +61,8 @@ namespace GownSite.Web.Controllers
         public bool ShowPhone { get; set; }
         public bool ShowEmail { get; set; }
         public IFormFile Image { get; set; }
+        public double? ImageFocalX { get; set; }
+        public double? ImageFocalY { get; set; }
     }
 
     public class AdIdRequest
@@ -180,6 +188,8 @@ namespace GownSite.Web.Controllers
             var imageUrl = request.Image != null
                 ? await _storage.SaveAsync(request.Image, "ads")
                 : existingDraft.ImageUrl;
+            var focalX = request.ImageFocalX ?? 0.5;
+            var focalY = request.ImageFocalY ?? 0.5;
 
             int id;
             if (existingDraft != null)
@@ -197,7 +207,8 @@ namespace GownSite.Web.Controllers
                     ShowPhone = request.ShowPhone,
                     ShowEmail = request.ShowEmail
                 });
-                if (request.Image != null) repo.SetImage(existingDraft.Id, imageUrl);
+                if (request.Image != null) repo.SetImage(existingDraft.Id, imageUrl, focalX, focalY);
+                else if (request.ImageFocalX.HasValue || request.ImageFocalY.HasValue) repo.SetImageFocal(existingDraft.Id, focalX, focalY);
                 if (promoCodeId.HasValue) repo.ApplyPromo(existingDraft.Id, promoCodeId.Value, monthlyFeeOverride, promoDurationMonths);
                 id = existingDraft.Id;
             }
@@ -216,6 +227,8 @@ namespace GownSite.Web.Controllers
                     ShowPhone = request.ShowPhone,
                     ShowEmail = request.ShowEmail,
                     ImageUrl = imageUrl,
+                    ImageFocalX = focalX,
+                    ImageFocalY = focalY,
                     PromoCodeId = promoCodeId,
                     MonthlyFeeOverride = monthlyFeeOverride,
                     PromoDurationMonths = promoDurationMonths
@@ -258,7 +271,9 @@ namespace GownSite.Web.Controllers
                 ShowEmail = request.ShowEmail
             });
             if (request.Image != null)
-                repo.SetImage(request.Id, await _storage.SaveAsync(request.Image, "ads"));
+                repo.SetImage(request.Id, await _storage.SaveAsync(request.Image, "ads"), request.ImageFocalX ?? 0.5, request.ImageFocalY ?? 0.5);
+            else if (request.ImageFocalX.HasValue || request.ImageFocalY.HasValue)
+                repo.SetImageFocal(request.Id, request.ImageFocalX ?? 0.5, request.ImageFocalY ?? 0.5);
 
             return Ok();
         }
@@ -278,6 +293,8 @@ namespace GownSite.Web.Controllers
             string imageUrl = null;
             if (request.Image != null)
                 imageUrl = await _storage.SaveAsync(request.Image, "ads");
+            var focalX = request.ImageFocalX ?? 0.5;
+            var focalY = request.ImageFocalY ?? 0.5;
 
             if (request.Id.HasValue)
             {
@@ -299,7 +316,8 @@ namespace GownSite.Web.Controllers
                     ShowPhone = request.ShowPhone,
                     ShowEmail = request.ShowEmail
                 });
-                if (imageUrl != null) repo.SetImage(existing.Id, imageUrl);
+                if (imageUrl != null) repo.SetImage(existing.Id, imageUrl, focalX, focalY);
+                else if (request.ImageFocalX.HasValue || request.ImageFocalY.HasValue) repo.SetImageFocal(existing.Id, focalX, focalY);
 
                 return Ok(new { id = existing.Id });
             }
@@ -317,7 +335,9 @@ namespace GownSite.Web.Controllers
                     ShowName = request.ShowName,
                     ShowPhone = request.ShowPhone,
                     ShowEmail = request.ShowEmail,
-                    ImageUrl = imageUrl
+                    ImageUrl = imageUrl,
+                    ImageFocalX = focalX,
+                    ImageFocalY = focalY
                 };
                 var id = repo.Create(ad);
                 return Ok(new { id });

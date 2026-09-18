@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Paper, Box, Typography, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { orderAdsForDisplay } from '../utils/shuffle';
+import { focalObjectPosition } from '../utils/imageFocal';
 
 export const AD_TOP = 84;
 const STACK_GAP = 16;
@@ -91,7 +92,7 @@ const FloatingAds = ({ onVisibilityChange, onStackTopChange }) => {
                         <CloseIcon fontSize="small" />
                     </IconButton>
                     {ad.imageUrl && (
-                        <Box component="img" src={ad.imageUrl} alt={ad.title} sx={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block' }} />
+                        <Box component="img" src={ad.imageUrl} alt={ad.title} sx={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', objectPosition: focalObjectPosition(ad.imageFocalX, ad.imageFocalY), display: 'block' }} />
                     )}
                     <Box sx={{ p: { md: 1.25, xl: 1.75 } }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: { xl: '1.05rem' } }}>{ad.title}</Typography>
@@ -137,7 +138,7 @@ const FloatingAds = ({ onVisibilityChange, onStackTopChange }) => {
                 }}
             >
                 {ad.imageUrl && (
-                    <Box component="img" src={ad.imageUrl} alt={ad.title} sx={{ width: 56, height: 56, borderRadius: 1, objectFit: 'cover', flexShrink: 0 }} />
+                    <Box component="img" src={ad.imageUrl} alt={ad.title} sx={{ width: 56, height: 56, borderRadius: 1, objectFit: 'cover', objectPosition: focalObjectPosition(ad.imageFocalX, ad.imageFocalY), flexShrink: 0 }} />
                 )}
                 <Box sx={{ minWidth: 0, flexGrow: 1 }}>
                     <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>{ad.title}</Typography>

@@ -10,6 +10,7 @@ import { useAdLane } from '../context/AdLaneContext';
 import usePageTitle from '../hooks/usePageTitle';
 import useDragSelectGuard from '../hooks/useDragSelectGuard';
 import { orderAdsForDisplay } from '../utils/shuffle';
+import { focalObjectPosition } from '../utils/imageFocal';
 
 const ALL_LOCATIONS = 'All';
 
@@ -108,6 +109,7 @@ const BrowseAds = () => {
                                             width: { xs: '100%', sm: 240, lg: 300 },
                                             aspectRatio: '1 / 1',
                                             objectFit: 'cover',
+                                            objectPosition: focalObjectPosition(ad.imageFocalX, ad.imageFocalY),
                                             flexShrink: 0
                                         }}
                                     />

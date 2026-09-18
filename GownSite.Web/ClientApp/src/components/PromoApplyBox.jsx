@@ -18,13 +18,13 @@ const PromoApplyBox = ({ currentPromoCode, onApply, applying, message, title = '
     return (
         <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2 }}>
             <Typography variant="subtitle2">{title}</Typography>
-            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                 {currentPromoCode
                     ? 'A promo is already applied — entering a different code replaces it.'
                     : 'Have a code? Enter it here.'}
             </Typography>
             {message && (
-                <Typography variant="caption" color={message.type === 'error' ? 'error' : 'success.main'} display="block" sx={{ mb: 1 }}>
+                <Typography variant="caption" color={message.type === 'error' ? 'error' : 'primary.main'} sx={{ display: 'block', mb: 1 }}>
                     {message.text}
                 </Typography>
             )}

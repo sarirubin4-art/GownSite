@@ -22,6 +22,8 @@ import ImageZoomDialog from '../components/ImageZoomDialog';
 import FilterAutocomplete from '../components/FilterAutocomplete';
 import PromoApplyBox from '../components/PromoApplyBox';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
+import ImagePositionEditor from '../components/ImagePositionEditor';
+import { focalObjectPosition } from '../utils/imageFocal';
 
 const MAX_POST_FOR_PATRON_GOWNS = 20;
 
@@ -178,7 +180,10 @@ const PendingList = ({ items, type, onApprove, onRejectClick, error, fullScreen,
                                     component="img"
                                     height={type === 'gown' ? '180' : undefined}
                                     image={type === 'gown' ? item.primaryPictureUrl : item.imageUrl}
-                                    sx={{ objectFit: 'cover', ...(type === 'ad' ? { aspectRatio: '1 / 1' } : {}) }}
+                                    sx={{
+                                        objectFit: 'cover',
+                                        ...(type === 'ad' ? { aspectRatio: '1 / 1', objectPosition: focalObjectPosition(item.imageFocalX, item.imageFocalY) } : {})
+                                    }}
                                 />
                                 <CardContent>
                                     <Typography variant="subtitle2" color="text.secondary">
@@ -245,7 +250,10 @@ const ActiveList = ({ items, type, onTakeDownClick, onEditClick, error, laneSx }
                                 component="img"
                                 height={type === 'gown' ? '180' : undefined}
                                 image={type === 'gown' ? item.primaryPictureUrl : item.imageUrl}
-                                sx={{ objectFit: 'cover', ...(type === 'ad' ? { aspectRatio: '1 / 1' } : {}) }}
+                                sx={{
+                                    objectFit: 'cover',
+                                    ...(type === 'ad' ? { aspectRatio: '1 / 1', objectPosition: focalObjectPosition(item.imageFocalX, item.imageFocalY) } : {})
+                                }}
                             />
                             <CardContent>
                                 <Typography variant="subtitle2" color="text.secondary">
@@ -686,6 +694,7 @@ const AdminDashboard = () => {
         id: a.id, title: a.title, description: a.description, targetUrl: a.targetUrl || '',
         categories: (a.categories || '').split(',').filter(Boolean), location: a.location || '', servesAllLocations: !!a.servesAllLocations,
         imageUrl: a.imageUrl, promoCode: a.promoCode,
+        imageFocalX: a.imageFocalX ?? 0.5, imageFocalY: a.imageFocalY ?? 0.5,
         showName: a.showName, showPhone: a.showPhone, showEmail: a.showEmail
     });
 
@@ -716,6 +725,7 @@ const AdminDashboard = () => {
         const file = e.target.files[0];
         setEditAdNewImage(file || null);
         setEditAdNewImagePreview(file ? URL.createObjectURL(file) : null);
+        setEditAdTarget((prev) => ({ ...prev, imageFocalX: 0.5, imageFocalY: 0.5 }));
     };
 
     const onSaveEditAd = async () => {
@@ -732,6 +742,8 @@ const AdminDashboard = () => {
         data.append('ShowPhone', editAdTarget.showPhone);
         data.append('ShowEmail', editAdTarget.showEmail);
         if (editAdNewImage) data.append('Image', editAdNewImage);
+        data.append('ImageFocalX', editAdTarget.imageFocalX);
+        data.append('ImageFocalY', editAdTarget.imageFocalY);
 
         try {
             await axios.post('/api/admin/ads/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
@@ -1542,6 +1554,7 @@ const AdminDashboard = () => {
                                     alt="Ad"
                                     sx={{
                                         width: 100, height: 100, borderRadius: 2, objectFit: 'cover',
+                                        objectPosition: focalObjectPosition(editAdTarget.imageFocalX, editAdTarget.imageFocalY),
                                         border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper'
                                     }}
                                 />
@@ -1550,6 +1563,12 @@ const AdminDashboard = () => {
                                     <input type="file" accept="image/*" hidden onChange={onEditAdImageChange} />
                                 </Button>
                             </Stack>
+                            <ImagePositionEditor
+                                src={editAdNewImagePreview || editAdTarget.imageUrl}
+                                focal={{ x: editAdTarget.imageFocalX, y: editAdTarget.imageFocalY }}
+                                onChange={(f) => setEditAdTarget({ ...editAdTarget, imageFocalX: f.x, imageFocalY: f.y })}
+                                size={200}
+                            />
                             <TextField label="Title" value={editAdTarget.title}
                                 onChange={(e) => setEditAdTarget({ ...editAdTarget, title: e.target.value })} />
                             <TextField label="Description" multiline rows={2} value={editAdTarget.description}

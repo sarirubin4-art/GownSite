@@ -184,6 +184,13 @@ namespace GownSite.Data
         public Owner Owner { get; set; }
         public string Title { get; set; }
         public string ImageUrl { get; set; }
+        // Where the square crop (details page, floating ad card, browse grid, etc.) is
+        // centered within the uploaded image, as a 0-1 fraction of its width/height —
+        // same semantics as CSS object-position ("50% 50%" == centered == the default).
+        // Only matters when the image isn't already square; set via the drag-to-reposition
+        // editor on the ad posting/edit forms.
+        public double ImageFocalX { get; set; } = 0.5;
+        public double ImageFocalY { get; set; } = 0.5;
         public string TargetUrl { get; set; }
         public string Description { get; set; }
         public string Location { get; set; }

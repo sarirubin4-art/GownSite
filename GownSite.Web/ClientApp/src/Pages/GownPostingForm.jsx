@@ -1,11 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import {
     Container, Typography, TextField, Button, Stack, MenuItem, Grid,
-    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box
+    FormControlLabel, Checkbox, FormGroup, Paper, Alert, Box, Chip, Divider,
+    Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
-import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, sortSizes } from '../constants/gownOptions';
+import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, sortSizes, formatPriceRange, styleLabel } from '../constants/gownOptions';
 import { useAuth } from '../context/AuthContext';
 import LocationField from '../components/LocationField';
 import PriceField from '../components/PriceField';
@@ -13,6 +14,132 @@ import ContactAdminDialog from '../components/ContactAdminDialog';
 import MorePicturesInput from '../components/MorePicturesInput';
 import FilterAutocomplete from '../components/FilterAutocomplete';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
+
+// Renders the in-progress listing two ways — the card it'll show up as in Browse Gowns
+// search results, and the full gown details page — from local form state only, so
+// posters can see how it'll actually look before paying and submitting. No backend call.
+// Mirrors AdPreviewDialog in AdPostingForm.jsx.
+const GownPreviewDialog = ({ open, onClose, form, primaryPreview, morePicturePreviews }) => {
+    const images = [primaryPreview, ...morePicturePreviews].filter(Boolean);
+    const [activeImage, setActiveImage] = useState(primaryPreview);
+    const shownImage = images.includes(activeImage) ? activeImage : primaryPreview;
+    const styleTags = form.styleTags;
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+            <DialogTitle>Preview Your Listing</DialogTitle>
+            <DialogContent dividers>
+                <Typography variant="overline" color="text.secondary">Browse Gowns Card</Typography>
+                <Box sx={{ maxWidth: 280, mb: 4, mt: 1 }}>
+                    <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+                        <Box sx={{ width: '100%', height: 220, bgcolor: 'background.default', overflow: 'hidden' }}>
+                            {primaryPreview ? (
+                                <Box component="img" src={primaryPreview} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            ) : (
+                                <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Typography variant="caption" color="text.secondary">No photo yet</Typography>
+                                </Box>
+                            )}
+                        </Box>
+                        <Box sx={{ p: 2 }}>
+                            {form.brand && (
+                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
+                                    {form.brand}
+                                </Typography>
+                            )}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+                                <Typography variant="h6">{form.price ? formatPriceRange(form.price, form.priceMax) : 'Price'}</Typography>
+                                <Chip size="small" label={form.listingType === 'Rent' ? 'For Rent' : 'For Sale'} color="primary" variant="outlined" />
+                            </Box>
+                            <Typography
+                                variant="body2" color="text.secondary"
+                                sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            >
+                                {form.description && `${form.description} · `}Size {form.sizes.length ? sortSizes(form.sizes).join(', ') : '—'}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">{form.location || 'Location'}</Typography>
+                        </Box>
+                    </Paper>
+                </Box>
+
+                <Typography variant="overline" color="text.secondary">Gown Details Page</Typography>
+                <Grid container spacing={4} sx={{ mt: 0.5 }}>
+                    <Grid size={{ xs: 12, md: 7 }}>
+                        <Box sx={{ display: 'flex', gap: 2 }}>
+                            {images.length > 1 && (
+                                <Stack spacing={1} sx={{ width: 72 }}>
+                                    {images.map((url) => (
+                                        <Box
+                                            key={url}
+                                            component="img"
+                                            src={url}
+                                            onClick={() => setActiveImage(url)}
+                                            sx={{
+                                                width: 72, height: 72, objectFit: 'cover', borderRadius: 2, cursor: 'pointer',
+                                                border: '2px solid', borderColor: shownImage === url ? 'primary.main' : 'transparent'
+                                            }}
+                                        />
+                                    ))}
+                                </Stack>
+                            )}
+                            <Box sx={{
+                                flex: 1, aspectRatio: '4 / 5', maxHeight: 560, borderRadius: 3, overflow: 'hidden',
+                                bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}>
+                                {shownImage ? (
+                                    <Box component="img" src={shownImage} alt="" sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                                ) : (
+                                    <Typography variant="caption" color="text.secondary">No photo yet</Typography>
+                                )}
+                            </Box>
+                        </Box>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 5 }}>
+                        <Chip label={form.listingType === 'Rent' ? 'For Rent' : 'For Sale'} color="primary" sx={{ mb: 1 }} />
+                        {form.brand && (
+                            <Typography variant="subtitle1" color="text.secondary" sx={{ fontWeight: 600 }}>
+                                {form.brand}
+                            </Typography>
+                        )}
+                        <Typography variant="h4" gutterBottom>{form.price ? formatPriceRange(form.price, form.priceMax) : 'Price'}</Typography>
+                        <Typography variant="body1" sx={{ mb: 2 }}>{form.description || 'Your description will appear here.'}</Typography>
+
+                        <Stack spacing={0.75} sx={{ mb: 2 }}>
+                            <Typography><strong>Color{form.colors.length > 1 ? 's' : ''}:</strong> {form.colors.join(', ') || '—'}</Typography>
+                            <Typography><strong>Size{form.sizes.length > 1 ? 's' : ''}:</strong> {form.sizes.length ? sortSizes(form.sizes).join('-') : '—'}</Typography>
+                            <Typography><strong>Location:</strong> {form.location || '—'}</Typography>
+                            {form.condition && <Typography><strong>Condition:</strong> {form.condition}</Typography>}
+                            {form.length && <Typography><strong>Height/Length:</strong> {form.length}</Typography>}
+                            {form.pricePaid && <Typography><strong>Original Gown Value:</strong> ${form.pricePaid}</Typography>}
+                        </Stack>
+
+                        {styleTags.length > 0 && (
+                            <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', rowGap: 1 }}>
+                                {styleTags.map(t => <Chip key={t} label={styleLabel(t)} size="small" variant="outlined" />)}
+                            </Stack>
+                        )}
+
+                        {form.notes && (
+                            <>
+                                <Divider sx={{ my: 2 }} />
+                                <Typography variant="subtitle2" gutterBottom>Notes from the seller</Typography>
+                                <Typography variant="body2" color="text.secondary">{form.notes}</Typography>
+                            </>
+                        )}
+
+                        <Button variant="contained" size="large" fullWidth sx={{ mt: 3 }} disabled>
+                            I'm Interested
+                        </Button>
+                    </Grid>
+                </Grid>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Close Preview</Button>
+            </DialogActions>
+        </Dialog>
+    );
+};
 
 const GownPostingForm = () => {
     const { owner, loading } = useAuth();
@@ -26,6 +153,13 @@ const GownPostingForm = () => {
     const [hasExistingPhoto, setHasExistingPhoto] = useState(false);
     const [morePictures, setMorePictures] = useState([]);
     const [inquiryOpen, setInquiryOpen] = useState(false);
+    const [previewOpen, setPreviewOpen] = useState(false);
+
+    // Object URLs for the "additional photos" the owner has staged locally, so the
+    // preview dialog's thumbnail strip can show them alongside the primary picture
+    // without uploading anything — revoked whenever the staged file list changes.
+    const morePicturePreviews = useMemo(() => morePictures.map((f) => URL.createObjectURL(f)), [morePictures]);
+    useEffect(() => () => morePicturePreviews.forEach((url) => URL.revokeObjectURL(url)), [morePicturePreviews]);
 
     const [draftId, setDraftId] = useState(resumeId ? Number(resumeId) : null);
     const [saveState, setSaveState] = useState('idle'); // idle | saving | saved
@@ -352,10 +486,18 @@ const GownPostingForm = () => {
             <Stack direction="row" sx={{ mt: 2, justifyContent: 'flex-end', alignItems: 'center' }} spacing={2}>
                 {saveState === 'saving' && <Typography variant="caption" color="text.secondary">Saving draft...</Typography>}
                 {saveState === 'saved' && <Typography variant="caption" color="text.secondary">Draft saved</Typography>}
+                <Button variant="outlined" size="large" onClick={() => setPreviewOpen(true)}>
+                    Preview Listing
+                </Button>
                 <Button variant="contained" size="large" disabled={submitting} onClick={onSubmit}>
                     {submitting ? 'Saving...' : 'Confirm & Continue to Payment'}
                 </Button>
             </Stack>
+
+            <GownPreviewDialog
+                open={previewOpen} onClose={() => setPreviewOpen(false)}
+                form={form} primaryPreview={primaryPreview} morePicturePreviews={morePicturePreviews}
+            />
 
             <Box sx={{ mt: 6, textAlign: 'center' }}>
                 <Button variant="text" onClick={() => setInquiryOpen(true)}>

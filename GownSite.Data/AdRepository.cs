@@ -106,6 +106,8 @@ namespace GownSite.Data
             ad.CreatedDate = DateTime.UtcNow;
             ad.IsActive = false;
             ad.ModerationStatus = ModerationStatus.Draft;
+            ad.ImageFocalX = Math.Clamp(ad.ImageFocalX, 0, 1);
+            ad.ImageFocalY = Math.Clamp(ad.ImageFocalY, 0, 1);
             context.Ads.Add(ad);
             context.SaveChanges();
             return ad.Id;
@@ -151,13 +153,28 @@ namespace GownSite.Data
                 .ToList();
         }
 
-        public void SetImage(int id, string url)
+        public void SetImage(int id, string url, double focalX = 0.5, double focalY = 0.5)
         {
             using var context = new GownDataContext(_connectionString);
             var existing = context.Ads.FirstOrDefault(a => a.Id == id);
             if (existing == null) return;
 
             existing.ImageUrl = url;
+            existing.ImageFocalX = Math.Clamp(focalX, 0, 1);
+            existing.ImageFocalY = Math.Clamp(focalY, 0, 1);
+            context.SaveChanges();
+        }
+
+        // Repositions the crop on the image already uploaded — used when an owner just
+        // drags the existing photo without swapping in a new one.
+        public void SetImageFocal(int id, double focalX, double focalY)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var existing = context.Ads.FirstOrDefault(a => a.Id == id);
+            if (existing == null) return;
+
+            existing.ImageFocalX = Math.Clamp(focalX, 0, 1);
+            existing.ImageFocalY = Math.Clamp(focalY, 0, 1);
             context.SaveChanges();
         }
 

@@ -10,6 +10,7 @@ import PublicIcon from '@mui/icons-material/Public';
 import { adCategoryLabels } from '../constants/gownOptions';
 import usePageTitle from '../hooks/usePageTitle';
 import { getCachedInterest, setCachedInterest } from '../utils/interestCache';
+import { focalObjectPosition } from '../utils/imageFocal';
 
 const AdDetail = () => {
     const { id } = useParams();
@@ -67,7 +68,7 @@ const AdDetail = () => {
             <Typography variant="h3" gutterBottom>{ad.title}</Typography>
             {ad.imageUrl && (
                 <Box sx={{ width: '100%', maxWidth: { xs: 420, lg: 520 }, aspectRatio: '1 / 1', mx: 'auto', borderRadius: 3, mb: 3, bgcolor: 'background.paper', overflow: 'hidden' }}>
-                    <Box component="img" src={ad.imageUrl} alt={ad.title} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    <Box component="img" src={ad.imageUrl} alt={ad.title} sx={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: focalObjectPosition(ad.imageFocalX, ad.imageFocalY), display: 'block' }} />
                 </Box>
             )}
             <Typography variant="body1" sx={{ mb: 4, whiteSpace: 'pre-line' }}>{ad.description}</Typography>

@@ -9,14 +9,25 @@ import { useAuth } from '../context/AuthContext';
 import LocationField from '../components/LocationField';
 import FilterAutocomplete from '../components/FilterAutocomplete';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
+import ImagePositionEditor from '../components/ImagePositionEditor';
+import { focalObjectPosition } from '../utils/imageFocal';
 
 // Renders the in-progress ad two ways — the full details page and the floating
 // ad card — from local form state only, so posters can see how it'll actually
-// look before paying and submitting for review. No backend call.
-const AdPreviewDialog = ({ open, onClose, form, imagePreview }) => (
+// look before paying and submitting for review. No backend call. Also where the
+// drag-to-reposition crop editor lives, since this is the one place the owner sees
+// the image at full square size before it goes live.
+const AdPreviewDialog = ({ open, onClose, form, imagePreview, imageFocal, onImageFocalChange }) => {
+    const objectPosition = focalObjectPosition(imageFocal.x, imageFocal.y);
+    return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
         <DialogTitle>Preview Your Ad</DialogTitle>
         <DialogContent dividers>
+            {imagePreview && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+                    <ImagePositionEditor src={imagePreview} focal={imageFocal} onChange={onImageFocalChange} />
+                </Box>
+            )}
             <Typography variant="overline" color="text.secondary">Full Details Page</Typography>
             <Box sx={{ maxWidth: 420, mx: 'auto', textAlign: 'center', mb: 4, mt: 1 }}>
                 <Stack direction="row" spacing={1} sx={{ justifyContent: 'center', mb: 2, flexWrap: 'wrap', rowGap: 1 }}>
@@ -35,7 +46,7 @@ const AdPreviewDialog = ({ open, onClose, form, imagePreview }) => (
                     bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider'
                 }}>
                     {imagePreview ? (
-                        <Box component="img" src={imagePreview} alt={form.title} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        <Box component="img" src={imagePreview} alt={form.title} sx={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition, display: 'block' }} />
                     ) : (
                         <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Typography variant="caption" color="text.secondary">No image yet</Typography>
@@ -53,7 +64,7 @@ const AdPreviewDialog = ({ open, onClose, form, imagePreview }) => (
                 <Paper elevation={6} sx={{ width: 240, overflow: 'hidden', border: '1px solid', borderColor: 'secondary.light' }}>
                     <Box sx={{ width: '100%', aspectRatio: '1 / 1', bgcolor: 'background.paper' }}>
                         {imagePreview && (
-                            <Box component="img" src={imagePreview} alt={form.title} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            <Box component="img" src={imagePreview} alt={form.title} sx={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition, display: 'block' }} />
                         )}
                     </Box>
                     <Box sx={{ p: 1.25 }}>
@@ -75,7 +86,8 @@ const AdPreviewDialog = ({ open, onClose, form, imagePreview }) => (
             <Button onClick={onClose}>Close Preview</Button>
         </DialogActions>
     </Dialog>
-);
+    );
+};
 
 const AdPostingForm = () => {
     const { owner, loading } = useAuth();
@@ -86,6 +98,7 @@ const AdPostingForm = () => {
     const [submitting, setSubmitting] = useState(false);
     const [image, setImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
+    const [imageFocal, setImageFocal] = useState({ x: 0.5, y: 0.5 });
     const [hasExistingImage, setHasExistingImage] = useState(false);
     const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -132,6 +145,7 @@ const AdPostingForm = () => {
             if (data.imageUrl) {
                 setHasExistingImage(true);
                 setImagePreview(data.imageUrl);
+                setImageFocal({ x: data.imageFocalX ?? 0.5, y: data.imageFocalY ?? 0.5 });
             }
         }).catch(() => {
             setError('Could not load your saved draft. Starting fresh instead.');
@@ -171,6 +185,8 @@ const AdPostingForm = () => {
                 data.append('ShowPhone', form.showPhone);
                 data.append('ShowEmail', form.showEmail);
                 if (image) data.append('Image', image);
+                data.append('ImageFocalX', imageFocal.x);
+                data.append('ImageFocalY', imageFocal.y);
 
                 const { data: result } = await axios.post('/api/ad/draft', data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
@@ -184,13 +200,14 @@ const AdPostingForm = () => {
 
         return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [form, image]);
+    }, [form, image, imageFocal]);
 
     const onImageChange = (e) => {
         markDirty();
         const file = e.target.files[0];
         setImage(file || null);
         setImagePreview(file ? URL.createObjectURL(file) : null);
+        setImageFocal({ x: 0.5, y: 0.5 });
     };
 
     const validate = () => {
@@ -230,6 +247,8 @@ const AdPostingForm = () => {
             data.append('ShowPhone', form.showPhone);
             data.append('ShowEmail', form.showEmail);
             if (image) data.append('Image', image);
+            data.append('ImageFocalX', imageFocal.x);
+            data.append('ImageFocalY', imageFocal.y);
 
             const { data: result } = await axios.post('/api/ad/create', data, {
                 headers: { 'Content-Type': 'multipart/form-data' }
@@ -311,7 +330,7 @@ const AdPostingForm = () => {
                                 width: 120, height: 120, borderRadius: 2, overflow: 'hidden',
                                 bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider'
                             }}>
-                                <Box component="img" src={imagePreview} alt="Ad preview" sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                <Box component="img" src={imagePreview} alt="Ad preview" sx={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: focalObjectPosition(imageFocal.x, imageFocal.y), display: 'block' }} />
                             </Box>
                         </Grid>
                     )}
@@ -329,7 +348,11 @@ const AdPostingForm = () => {
                 </Button>
             </Stack>
 
-            <AdPreviewDialog open={previewOpen} onClose={() => setPreviewOpen(false)} form={form} imagePreview={imagePreview} />
+            <AdPreviewDialog
+                open={previewOpen} onClose={() => setPreviewOpen(false)}
+                form={form} imagePreview={imagePreview}
+                imageFocal={imageFocal} onImageFocalChange={(f) => { markDirty(); setImageFocal(f); }}
+            />
         </Container>
     );
 };

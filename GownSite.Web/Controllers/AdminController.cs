@@ -517,7 +517,9 @@ namespace GownSite.Web.Controllers
                 ShowEmail = request.ShowEmail
             });
             if (request.Image != null)
-                repo.SetImage(request.Id, await _storage.SaveAsync(request.Image, "ads"));
+                repo.SetImage(request.Id, await _storage.SaveAsync(request.Image, "ads"), request.ImageFocalX ?? 0.5, request.ImageFocalY ?? 0.5);
+            else if (request.ImageFocalX.HasValue || request.ImageFocalY.HasValue)
+                repo.SetImageFocal(request.Id, request.ImageFocalX ?? 0.5, request.ImageFocalY ?? 0.5);
 
             return Ok();
         }

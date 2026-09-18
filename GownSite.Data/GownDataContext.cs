@@ -36,6 +36,21 @@ public class GownDataContext : DbContext
             .HasOne(a => a.PromoCode).WithMany()
             .HasForeignKey(a => a.PromoCodeId).IsRequired(false);
 
+        // EF only applies a C# property initializer (`= 0.5`) to rows inserted through
+        // this context — it doesn't know to use it as the *column's* default, so without
+        // this, the migration that adds these columns would backfill every existing ad
+        // with 0.0 (top-left corner) instead of 0.5 (centered, matching how every ad
+        // displayed before this column existed).
+        // HasDefaultValue alone also implicitly marks the property ValueGeneratedOnAdd,
+        // which makes EF treat an explicit 0.0 (a legitimate crop dragged to the far
+        // left/top edge) as "not set" and silently substitute the DB default of 0.5
+        // instead — ValueGeneratedNever forces EF to always send whatever value the app
+        // set, while the column keeps its DB-level default for anything inserted outside EF.
+        modelBuilder.Entity<Ad>()
+            .Property(a => a.ImageFocalX).HasDefaultValue(0.5).ValueGeneratedNever();
+        modelBuilder.Entity<Ad>()
+            .Property(a => a.ImageFocalY).HasDefaultValue(0.5).ValueGeneratedNever();
+
         modelBuilder.Entity<ContactMessage>()
             .HasIndex(c => c.IsResolved);
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import {
     Typography, Paper, Grid, TextField, Card, CardActionArea,
@@ -341,25 +341,39 @@ const SearchGowns = () => {
                 floats below it as a scroll-persistent reminder — the one above (which stays
                 put) is still the primary, guaranteed-visible call to action. */}
             {showFixedNotify && (
-                <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<NotificationsActiveIcon />}
-                    onClick={onOpenNotify}
+                <Stack
+                    spacing={1}
                     sx={{
-                        display: { xs: 'none', md: 'inline-flex' },
-                        justifyContent: 'center',
+                        display: { xs: 'none', md: 'flex' },
                         position: 'fixed',
                         top: adStackTop,
                         right: 20,
                         zIndex: 1300,
-                        width: { md: 200, lg: 240, xl: 280 },
-                        boxShadow: '0 4px 16px rgba(198, 113, 122, 0.4)',
-                        '&:hover': { boxShadow: '0 6px 20px rgba(198, 113, 122, 0.55)' }
+                        width: { md: 200, lg: 240, xl: 280 }
                     }}
                 >
-                    Notify Me
-                </Button>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<NotificationsActiveIcon />}
+                        onClick={onOpenNotify}
+                        sx={{
+                            justifyContent: 'center',
+                            boxShadow: '0 4px 16px rgba(198, 113, 122, 0.4)',
+                            '&:hover': { boxShadow: '0 6px 20px rgba(198, 113, 122, 0.55)' }
+                        }}
+                    >
+                        Notify Me
+                    </Button>
+                    <Button
+                        component={Link}
+                        to="/ads"
+                        size="small"
+                        sx={{ justifyContent: 'center', color: 'text.secondary', fontSize: '0.8rem' }}
+                    >
+                        Explore our Ad Directory &rarr;
+                    </Button>
+                </Stack>
             )}
 
             <Paper variant="outlined" sx={{ p: 2.5, mb: 4, mr: laneSx }}>
