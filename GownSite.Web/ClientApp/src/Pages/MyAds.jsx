@@ -264,6 +264,7 @@ const MyAds = () => {
                                 showEmail={editTarget.showEmail}
                                 onChange={(next) => setEditTarget({ ...editTarget, ...next })}
                                 subjectLabel="my"
+                                requireReachableChannel
                             />
                         </Stack>
                     </DialogContent>
@@ -272,7 +273,7 @@ const MyAds = () => {
                     <Button onClick={onCloseEditDialog}>Cancel</Button>
                     <Button
                         variant="contained" onClick={onSaveEdit}
-                        disabled={editTarget && !editTarget.showName && !editTarget.showPhone && !editTarget.showEmail}
+                        disabled={editTarget && !editTarget.showPhone && !editTarget.showEmail}
                     >
                         Save Changes
                     </Button>

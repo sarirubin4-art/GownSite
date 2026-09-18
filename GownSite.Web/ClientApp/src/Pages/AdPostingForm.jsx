@@ -203,8 +203,8 @@ const AdPostingForm = () => {
         if (!image && !hasExistingImage) {
             return 'Please add an image for your ad.';
         }
-        if (!form.showName && !form.showPhone && !form.showEmail) {
-            return 'Please allow at least one way for interested customers to contact you.';
+        if (!form.showPhone && !form.showEmail) {
+            return 'Please allow a phone number or email so interested customers can actually contact you.';
         }
         return '';
     };
@@ -291,6 +291,7 @@ const AdPostingForm = () => {
                             showEmail={form.showEmail}
                             onChange={(next) => { markDirty(); setForm({ ...form, ...next }); }}
                             subjectLabel="my"
+                            requireReachableChannel
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>

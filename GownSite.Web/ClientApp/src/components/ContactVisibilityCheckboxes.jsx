@@ -3,9 +3,12 @@ import { FormControlLabel, Checkbox, FormGroup, Typography, Stack } from '@mui/m
 
 // Lets a gown/ad poster choose which contact channels show to someone who reaches out —
 // reused across every posting form and edit dialog on the site so the control looks and
-// behaves identically everywhere. At least one must stay checked; this only renders the
-// inline warning — callers still need their own submit-time "at least one" guard.
-const ContactVisibilityCheckboxes = ({ showName, showPhone, showEmail, onChange, subjectLabel = 'my' }) => {
+// behaves identically everywhere. Name alone isn't a way to actually reach someone, so
+// requireReachableChannel (ads only — gowns keep the original "any of the three" rule)
+// requires phone or email specifically; Name can still be checked alongside them, it just
+// doesn't satisfy the requirement by itself. This only renders the inline warning —
+// callers still need their own submit-time guard using the same condition.
+const ContactVisibilityCheckboxes = ({ showName, showPhone, showEmail, onChange, subjectLabel = 'my', requireReachableChannel = false }) => {
     const toggle = (key) => (e) => {
         onChange({
             showName: key === 'showName' ? e.target.checked : !!showName,
@@ -13,7 +16,7 @@ const ContactVisibilityCheckboxes = ({ showName, showPhone, showEmail, onChange,
             showEmail: key === 'showEmail' ? e.target.checked : !!showEmail
         });
     };
-    const noneSelected = !showName && !showPhone && !showEmail;
+    const noneSelected = requireReachableChannel ? (!showPhone && !showEmail) : (!showName && !showPhone && !showEmail);
 
     return (
         <Stack spacing={0.5}>
@@ -27,7 +30,9 @@ const ContactVisibilityCheckboxes = ({ showName, showPhone, showEmail, onChange,
             </FormGroup>
             {noneSelected && (
                 <Typography variant="caption" color="error">
-                    Choose at least one way for people to contact you.
+                    {requireReachableChannel
+                        ? 'Choose a phone number or email so people can actually reach you.'
+                        : 'Choose at least one way for people to contact you.'}
                 </Typography>
             )}
         </Stack>

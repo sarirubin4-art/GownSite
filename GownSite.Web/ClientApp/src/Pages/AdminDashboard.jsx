@@ -1528,6 +1528,7 @@ const AdminDashboard = () => {
                                 showEmail={editAdTarget.showEmail}
                                 onChange={(next) => setEditAdTarget({ ...editAdTarget, ...next })}
                                 subjectLabel="their"
+                                requireReachableChannel
                             />
                         </Stack>
                     </DialogContent>
@@ -1536,7 +1537,7 @@ const AdminDashboard = () => {
                     <Button onClick={onCloseEditAdDialog}>Cancel</Button>
                     <Button
                         variant="contained" onClick={onSaveEditAd}
-                        disabled={editAdTarget && !editAdTarget.showName && !editAdTarget.showPhone && !editAdTarget.showEmail}
+                        disabled={editAdTarget && !editAdTarget.showPhone && !editAdTarget.showEmail}
                     >
                         Save Changes
                     </Button>

@@ -498,8 +498,8 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "Please choose at least one valid category." });
             if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
                 return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
-            if (!request.ShowName && !request.ShowPhone && !request.ShowEmail)
-                return BadRequest(new { message = "Please allow at least one way for interested customers to contact this patron." });
+            if (!request.ShowPhone && !request.ShowEmail)
+                return BadRequest(new { message = "Please allow a phone number or email so interested customers can actually contact this patron." });
             if (request.Image != null && !ImageUploadValidator.IsValidImage(request.Image))
                 return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
@@ -580,8 +580,9 @@ namespace GownSite.Web.Controllers
             // Ads created before ShowName/ShowPhone/ShowEmail existed were backfilled to false
             // (unlike gowns' DisplayOwner* flags, which preserve the old always-shown behavior) —
             // without this check one could go live with no way for a customer to contact the patron.
-            if (!ad.ShowName && !ad.ShowPhone && !ad.ShowEmail)
-                return BadRequest(new { message = "This ad has no contact method enabled — edit it to allow at least one before approving." });
+            // Name alone doesn't let anyone actually reach out, so phone or email is required.
+            if (!ad.ShowPhone && !ad.ShowEmail)
+                return BadRequest(new { message = "This ad has no phone or email enabled — edit it to allow one before approving." });
 
             var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m);
 

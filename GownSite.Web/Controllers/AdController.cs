@@ -157,8 +157,8 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "Please choose at least one valid category." });
             if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
                 return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
-            if (!request.ShowName && !request.ShowPhone && !request.ShowEmail)
-                return BadRequest(new { message = "Please allow at least one way for interested customers to contact you." });
+            if (!request.ShowPhone && !request.ShowEmail)
+                return BadRequest(new { message = "Please allow a phone number or email so interested customers can actually contact you." });
 
             int? promoCodeId = null;
             decimal? monthlyFeeOverride = null;
@@ -239,8 +239,8 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "Please choose at least one valid category." });
             if (!request.ServesAllLocations && string.IsNullOrWhiteSpace(request.Location))
                 return BadRequest(new { message = "Please choose a location, or mark this ad as not tied to one location." });
-            if (!request.ShowName && !request.ShowPhone && !request.ShowEmail)
-                return BadRequest(new { message = "Please allow at least one way for interested customers to contact you." });
+            if (!request.ShowPhone && !request.ShowEmail)
+                return BadRequest(new { message = "Please allow a phone number or email so interested customers can actually contact you." });
             if (request.Image != null && !ImageUploadValidator.IsValidImage(request.Image))
                 return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
 
