@@ -146,7 +146,17 @@ const ItemDetailDialog = ({ item, type, onClose, fullScreen, onEditClick }) => {
     );
 };
 
-const PendingList = ({ items, type, onApprove, onRejectClick, error, fullScreen, onEditClick }) => {
+// Same fields a Ctrl+F on the rendered card would find — owner identity plus whatever
+// text the item itself shows (gown description/price aren't searched by number, just text).
+const itemSearchText = (item, type) => [
+    item.owner?.name, item.owner?.email,
+    type === 'gown' ? item.description : item.title,
+    type === 'gown' ? item.location : (item.servesAllLocations ? 'all locations' : item.location),
+    type === 'ad' ? item.description : null,
+    type === 'ad' ? adCategoryLabels(item.categories).join(' ') : null
+].filter(Boolean).join(' ').toLowerCase();
+
+const PendingList = ({ items, type, onApprove, onRejectClick, error, fullScreen, onEditClick, laneSx }) => {
     const batchCounts = items.reduce((acc, i) => {
         if (i.batchId) acc[i.batchId] = (acc[i.batchId] || 0) + 1;
         return acc;
@@ -159,7 +169,7 @@ const PendingList = ({ items, type, onApprove, onRejectClick, error, fullScreen,
         {items.length === 0 ? (
             <Typography color="text.secondary">Nothing pending review right now.</Typography>
         ) : (
-            <Grid container spacing={3}>
+            <Grid container spacing={3} sx={{ mr: laneSx }}>
                 {items.map((item) => (
                     <Grid key={item.id} size={{ xs: 12, sm: 6, md: 4 }}>
                         <Card>
@@ -206,14 +216,29 @@ const PendingList = ({ items, type, onApprove, onRejectClick, error, fullScreen,
     );
 };
 
-const ActiveList = ({ items, type, onTakeDownClick, onEditClick, error }) => (
+const ActiveList = ({ items, type, onTakeDownClick, onEditClick, error, laneSx }) => {
+    const [search, setSearch] = useState('');
+    const visibleItems = search.trim()
+        ? items.filter((item) => itemSearchText(item, type).includes(search.trim().toLowerCase()))
+        : items;
+
+    return (
     <Box sx={{ mt: 3 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {items.length > 0 && (
+            <TextField
+                size="small" placeholder={`Search ${type === 'gown' ? 'gowns' : 'ads'}...`}
+                value={search} onChange={(e) => setSearch(e.target.value)}
+                sx={{ mb: 2, mr: laneSx, width: { xs: '100%', sm: 320 } }}
+            />
+        )}
         {items.length === 0 ? (
             <Typography color="text.secondary">Nothing live right now.</Typography>
+        ) : visibleItems.length === 0 ? (
+            <Typography color="text.secondary">No matches for "{search}".</Typography>
         ) : (
-            <Grid container spacing={3}>
-                {items.map((item) => (
+            <Grid container spacing={3} sx={{ mr: laneSx }}>
+                {visibleItems.map((item) => (
                     <Grid key={item.id} size={{ xs: 12, sm: 6, md: 4 }}>
                         <Card>
                             <CardMedia
@@ -245,7 +270,8 @@ const ActiveList = ({ items, type, onTakeDownClick, onEditClick, error }) => (
             </Grid>
         )}
     </Box>
-);
+    );
+};
 
 const AdminDashboard = () => {
     const { owner, loading } = useAuth();
@@ -282,7 +308,9 @@ const AdminDashboard = () => {
     const [promoForm, setPromoForm] = useState(emptyPromoForm);
     const [promoError, setPromoError] = useState('');
     const [editingPromoId, setEditingPromoId] = useState(null);
+    const [promoSearch, setPromoSearch] = useState('');
     const [owners, setOwners] = useState([]);
+    const [patronSearch, setPatronSearch] = useState('');
     const [promoEmailSubject, setPromoEmailSubject] = useState('');
     const [promoEmailMessage, setPromoEmailMessage] = useState('');
     const [promoEmailSending, setPromoEmailSending] = useState(false);
@@ -910,11 +938,17 @@ const AdminDashboard = () => {
 
     const openContactCount = contactMessages.length;
     const visibleContactMessages = showResolvedMessages ? [...contactMessages, ...resolvedMessages] : contactMessages;
+    const visiblePromoCodes = promoSearch.trim()
+        ? promoCodes.filter((p) => p.code.toLowerCase().includes(promoSearch.trim().toLowerCase()))
+        : promoCodes;
+    const visibleOwners = patronSearch.trim()
+        ? owners.filter((o) => [o.name, o.email, o.number].filter(Boolean).join(' ').toLowerCase().includes(patronSearch.trim().toLowerCase()))
+        : owners;
 
     return (
         <Box>
             <Typography variant="h4" gutterBottom>Admin</Typography>
-            <Tabs value={tab} onChange={(e, v) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ mb: 1 }}>
+            <Tabs value={tab} onChange={(e, v) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ mb: 1, mr: laneSx }}>
                 <Tab label={`Pending Gowns${pendingGowns.length ? ` (${pendingGowns.length})` : ''}`} />
                 <Tab label={`Pending Ads${pendingAds.length ? ` (${pendingAds.length})` : ''}`} />
                 <Tab label={`Live Gowns${activeGowns.length ? ` (${activeGowns.length})` : ''}`} />
@@ -935,6 +969,7 @@ const AdminDashboard = () => {
                     onRejectClick={(id) => setRejectTarget({ type: 'gown', id })}
                     onEditClick={onEditGownClick}
                     fullScreen={fullScreen}
+                    laneSx={laneSx}
                 />
             )}
             {tab === 1 && (
@@ -946,6 +981,7 @@ const AdminDashboard = () => {
                     onRejectClick={(id) => setRejectTarget({ type: 'ad', id })}
                     onEditClick={onEditAdClick}
                     fullScreen={fullScreen}
+                    laneSx={laneSx}
                 />
             )}
             {tab === 2 && (
@@ -955,6 +991,7 @@ const AdminDashboard = () => {
                     error={error}
                     onTakeDownClick={(id) => setTakeDownTarget({ type: 'gown', id })}
                     onEditClick={onEditGownClick}
+                    laneSx={laneSx}
                 />
             )}
             {tab === 3 && (
@@ -964,19 +1001,27 @@ const AdminDashboard = () => {
                     error={error}
                     onTakeDownClick={(id) => setTakeDownTarget({ type: 'ad', id })}
                     onEditClick={onEditAdClick}
+                    laneSx={laneSx}
                 />
             )}
             {tab === 4 && (
                 <Box sx={{ mt: 3 }}>
-                    <Stack direction="row" sx={{ justifyContent: 'flex-end', mb: 2, mr: laneSx }}>
+                    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2, mr: laneSx, flexWrap: 'wrap', rowGap: 1 }}>
+                        <TextField
+                            size="small" placeholder="Search promo codes..."
+                            value={promoSearch} onChange={(e) => setPromoSearch(e.target.value)}
+                            sx={{ width: { xs: '100%', sm: 320 } }}
+                        />
                         <Button variant="contained" onClick={() => { setPromoForm(emptyPromoForm); setEditingPromoId(null); setPromoError(''); setPromoDialogOpen(true); }}>
                             Create Promo Code
                         </Button>
                     </Stack>
                     {promoCodes.length === 0 ? (
                         <Typography color="text.secondary">No promo codes yet.</Typography>
+                    ) : visiblePromoCodes.length === 0 ? (
+                        <Typography color="text.secondary">No matches for "{promoSearch}".</Typography>
                     ) : (
-                        <Box sx={{ overflowX: 'auto' }}>
+                        <Box sx={{ overflowX: 'auto', mr: laneSx }}>
                         <Table size="small">
                             <TableHead>
                                 <TableRow>
@@ -990,7 +1035,7 @@ const AdminDashboard = () => {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {promoCodes.map((p) => (
+                                {visiblePromoCodes.map((p) => (
                                     <TableRow key={p.id}>
                                         <TableCell>{p.code}</TableCell>
                                         <TableCell>
@@ -1019,10 +1064,19 @@ const AdminDashboard = () => {
             )}
             {tab === 5 && (
                 <Box sx={{ mt: 3 }}>
+                    {owners.length > 0 && (
+                        <TextField
+                            size="small" placeholder="Search patrons..."
+                            value={patronSearch} onChange={(e) => setPatronSearch(e.target.value)}
+                            sx={{ mb: 2, mr: laneSx, width: { xs: '100%', sm: 320 } }}
+                        />
+                    )}
                     {owners.length === 0 ? (
                         <Typography color="text.secondary">No patrons yet.</Typography>
+                    ) : visibleOwners.length === 0 ? (
+                        <Typography color="text.secondary">No matches for "{patronSearch}".</Typography>
                     ) : (
-                        <Box sx={{ overflowX: 'auto' }}>
+                        <Box sx={{ overflowX: 'auto', mr: laneSx }}>
                             <Table size="small">
                                 <TableHead>
                                     <TableRow>
@@ -1035,7 +1089,7 @@ const AdminDashboard = () => {
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {owners.map((o) => (
+                                    {visibleOwners.map((o) => (
                                         <TableRow key={o.id}>
                                             <TableCell>{o.name}</TableCell>
                                             <TableCell>{o.email}</TableCell>
