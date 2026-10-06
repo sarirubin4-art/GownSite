@@ -2,6 +2,7 @@ import React from 'react';
 import { Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
+import ReloadOnNewDeploy from './components/ReloadOnNewDeploy';
 import { AuthProvider } from './context/AuthContext';
 import Home from './Pages/Home';
 import Login from './Pages/Login';
@@ -41,6 +42,7 @@ const App = () => {
     return (
         <AuthProvider>
             <ScrollToTop />
+            <ReloadOnNewDeploy />
             <Layout>
                 <Routes>
                     <Route path='/' element={<Home />} />

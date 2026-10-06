@@ -12,6 +12,7 @@ import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import usePageTitle from '../hooks/usePageTitle';
 import { useAdLane } from '../context/AdLaneContext';
 import ImageZoomDialog from '../components/ImageZoomDialog';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { getCachedInterest, setCachedInterest } from '../utils/interestCache';
 
 const MIN_INTERESTED_TO_SHOW = 3;
@@ -22,6 +23,7 @@ const ViewGown = () => {
     const fullScreen = useFullScreenDialog();
     const { laneSx } = useAdLane();
     const [gown, setGown] = useState(null);
+    const [loadFailed, setLoadFailed] = useState(false);
     const [activeImage, setActiveImage] = useState(null);
     const [contactInfo, setContactInfo] = useState(null);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -35,10 +37,15 @@ const ViewGown = () => {
 
     useEffect(() => {
         window.scrollTo(0, 0);
+        setLoadFailed(false);
         const load = async () => {
-            const { data } = await axios.get(`/api/gown/get?id=${id}`);
-            setGown(data);
-            setActiveImage(data.primaryPictureUrl);
+            try {
+                const { data } = await axios.get(`/api/gown/get?id=${id}`);
+                setGown(data);
+                setActiveImage(data.primaryPictureUrl);
+            } catch {
+                setLoadFailed(true);
+            }
         };
         load();
     }, [id]);
@@ -63,7 +70,8 @@ const ViewGown = () => {
         }
     };
 
-    if (!gown) return null;
+    if (loadFailed) return <Typography color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>This gown isn't available anymore.</Typography>;
+    if (!gown) return <LoadingSpinner />;
 
     const thumbnails = [gown.primaryPictureUrl, ...(gown.morePictures || []).map(p => p.url)];
     const styleTags = (gown.styleTags || '').split(',').filter(Boolean);
@@ -159,7 +167,7 @@ const ViewGown = () => {
                         </Typography>
                     )}
                     <Typography variant="h4" gutterBottom>{formatPriceRange(gown.price, gown.priceMax)}</Typography>
-                    <Typography variant="body1" sx={{ mb: 2 }}>{gown.description}</Typography>
+                    <Typography variant="body1" sx={{ mb: 2, whiteSpace: 'pre-line' }}>{gown.description}</Typography>
 
                     <Stack spacing={0.75} sx={{ mb: 2 }}>
                         <Typography><strong>Color{(gown.color || '').includes(',') ? 's' : ''}:</strong> {(gown.color || '').split(',').join(', ')}</Typography>
@@ -180,7 +188,7 @@ const ViewGown = () => {
                         <>
                             <Divider sx={{ my: 2 }} />
                             <Typography variant="subtitle2" gutterBottom>Notes from the seller</Typography>
-                            <Typography variant="body2" color="text.secondary">{gown.notes}</Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>{gown.notes}</Typography>
                         </>
                     )}
 

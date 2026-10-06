@@ -16,6 +16,7 @@ import PriceField from '../components/PriceField';
 import MorePicturesInput from '../components/MorePicturesInput';
 import FilterAutocomplete from '../components/FilterAutocomplete';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
+import useFormError from '../hooks/useFormError';
 
 const MAX_BATCH_GOWNS = 20;
 const DRAFT_KEY = 'regowned_bulk_posting_draft';
@@ -52,7 +53,7 @@ const BulkGownPostingForm = () => {
     const { owner, loading } = useAuth();
     const navigate = useNavigate();
     const [batchId] = useState(() => crypto.randomUUID());
-    const [error, setError] = useState('');
+    const [error, setError, errorRef] = useFormError();
     const [submitting, setSubmitting] = useState(false);
     const [progressIndex, setProgressIndex] = useState(0);
     // Keyed by gown.localId (not array position) so a row removed mid-batch
@@ -286,7 +287,7 @@ const BulkGownPostingForm = () => {
                 </Alert>
             )}
             {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
+                <Alert ref={errorRef} severity="error" sx={{ mb: 2 }}>
                     {error}
                     {savedGowns.length > 0 && (
                         <Box sx={{ mt: 1.5 }}>

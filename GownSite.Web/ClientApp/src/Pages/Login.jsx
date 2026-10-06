@@ -4,12 +4,13 @@ import { Container, TextField, Button, Typography, Alert, Stack, IconButton, Inp
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useAuth } from '../context/AuthContext';
+import useFormError from '../hooks/useFormError';
 
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState('');
+    const [error, setError, errorRef] = useFormError();
     const { login } = useAuth();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -27,8 +28,9 @@ const Login = () => {
     return (
         <Container maxWidth="xs" sx={{ py: 6 }}>
             <Typography variant="h4" gutterBottom>Log In</Typography>
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-            <Stack spacing={2}>
+            {error && <Alert ref={errorRef} severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+            {/* A real <form> so pressing Enter in either field logs in, like most sites. */}
+            <Stack component="form" noValidate spacing={2} onSubmit={(e) => { e.preventDefault(); onLoginClick(); }}>
                 <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth />
                 <TextField
                     label="Password" type={showPassword ? 'text' : 'password'} value={password}
@@ -45,7 +47,7 @@ const Login = () => {
                         }
                     }}
                 />
-                <Button variant="contained" size="large" onClick={onLoginClick}>Log In</Button>
+                <Button type="submit" variant="contained" size="large">Log In</Button>
                 <Typography variant="body2" color="text.secondary">
                     <Link to="/forgot-password">Forgot password?</Link>
                 </Typography>

@@ -13,8 +13,10 @@ import LocationField from '../components/LocationField';
 import FilterAutocomplete from '../components/FilterAutocomplete';
 import PromoApplyBox from '../components/PromoApplyBox';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
+import LoadingSpinner from '../components/LoadingSpinner';
 import ImagePositionEditor from '../components/ImagePositionEditor';
 import { focalObjectPosition } from '../utils/imageFocal';
+import useFormError from '../hooks/useFormError';
 
 const MyAds = () => {
     const { owner, loading } = useAuth();
@@ -22,17 +24,19 @@ const MyAds = () => {
     const navigate = useNavigate();
     const routerLocation = useLocation();
     const [ads, setAds] = useState([]);
+    const [adsLoaded, setAdsLoaded] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
     const [showPostedNotice, setShowPostedNotice] = useState(!!routerLocation.state?.posted);
     const [promoApplying, setPromoApplying] = useState(false);
     const [promoMessage, setPromoMessage] = useState(null); // { type: 'success'|'error', text }
     const [newImage, setNewImage] = useState(null);
     const [newImagePreview, setNewImagePreview] = useState(null);
-    const [editError, setEditError] = useState('');
+    const [editError, setEditError, editErrorRef] = useFormError();
 
     const load = async () => {
         const { data } = await axios.get('/api/ad/myads');
         setAds(data);
+        setAdsLoaded(true);
     };
 
     useEffect(() => {
@@ -122,6 +126,7 @@ const MyAds = () => {
     };
 
     if (loading || !owner) return null;
+    if (!adsLoaded) return <LoadingSpinner />;
 
     const activeCount = ads.filter((a) => a.isActive).length;
 
@@ -214,7 +219,7 @@ const MyAds = () => {
                 {editTarget && (
                     <DialogContent>
                         <Stack spacing={2} sx={{ mt: 1 }}>
-                            {editError && <Alert severity="error">{editError}</Alert>}
+                            {editError && <Alert ref={editErrorRef} severity="error">{editError}</Alert>}
                             {editTarget.isActive && (
                                 <PromoApplyBox
                                     currentPromoCode={editTarget.promoCode?.code}

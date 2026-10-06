@@ -11,6 +11,7 @@ import FilterAutocomplete from '../components/FilterAutocomplete';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
 import ImagePositionEditor from '../components/ImagePositionEditor';
 import { focalObjectPosition } from '../utils/imageFocal';
+import useFormError from '../hooks/useFormError';
 
 // Renders the in-progress ad two ways — the full details page and the floating
 // ad card — from local form state only, so posters can see how it'll actually
@@ -94,7 +95,7 @@ const AdPostingForm = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const resumeId = searchParams.get('resume');
-    const [error, setError] = useState('');
+    const [error, setError, errorRef] = useFormError();
     const [submitting, setSubmitting] = useState(false);
     const [image, setImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
@@ -266,7 +267,7 @@ const AdPostingForm = () => {
     return (
         <Container maxWidth="sm" sx={{ py: 4 }}>
             <Typography variant="h4" gutterBottom>Advertise With Us</Typography>
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+            {error && <Alert ref={errorRef} severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
             <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
                 <Grid container spacing={2}>

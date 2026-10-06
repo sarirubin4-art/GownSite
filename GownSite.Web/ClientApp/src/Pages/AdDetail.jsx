@@ -11,10 +11,12 @@ import { adCategoryLabels } from '../constants/gownOptions';
 import usePageTitle from '../hooks/usePageTitle';
 import { getCachedInterest, setCachedInterest } from '../utils/interestCache';
 import { focalObjectPosition } from '../utils/imageFocal';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const AdDetail = () => {
     const { id } = useParams();
     const [ad, setAd] = useState(null);
+    const [loadFailed, setLoadFailed] = useState(false);
     const [contactInfo, setContactInfo] = useState(null);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -23,9 +25,14 @@ const AdDetail = () => {
 
     useEffect(() => {
         window.scrollTo(0, 0);
+        setLoadFailed(false);
         const load = async () => {
-            const { data } = await axios.get(`/api/ad/get?id=${id}`);
-            setAd(data);
+            try {
+                const { data } = await axios.get(`/api/ad/get?id=${id}`);
+                setAd(data);
+            } catch {
+                setLoadFailed(true);
+            }
         };
         load();
     }, [id]);
@@ -49,7 +56,8 @@ const AdDetail = () => {
         }
     };
 
-    if (!ad) return null;
+    if (loadFailed) return <Typography color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>This ad isn't available anymore.</Typography>;
+    if (!ad) return <LoadingSpinner />;
 
     const hasContactInfo = ad.showName || ad.showPhone || ad.showEmail;
 

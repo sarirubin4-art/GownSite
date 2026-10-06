@@ -36,9 +36,9 @@ const ForgotPassword = () => {
                         Enter your account email and we'll send you a link to reset your password.
                     </Typography>
                     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-                    <Stack spacing={2}>
+                    <Stack component="form" noValidate spacing={2} onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
                         <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth />
-                        <Button variant="contained" size="large" disabled={submitting || !email.trim()} onClick={onSubmit}>
+                        <Button type="submit" variant="contained" size="large" disabled={submitting || !email.trim()}>
                             {submitting ? 'Sending...' : 'Send Reset Link'}
                         </Button>
                     </Stack>
