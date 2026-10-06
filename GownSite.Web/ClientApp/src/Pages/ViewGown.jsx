@@ -23,7 +23,8 @@ const ViewGown = () => {
     const fullScreen = useFullScreenDialog();
     const { laneSx } = useAdLane();
     const [gown, setGown] = useState(null);
-    const [loadFailed, setLoadFailed] = useState(false);
+    const [loadError, setLoadError] = useState(null); // null | 'notFound' | 'failed'
+    const [retryCount, setRetryCount] = useState(0);
     const [activeImage, setActiveImage] = useState(null);
     const [contactInfo, setContactInfo] = useState(null);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -37,18 +38,24 @@ const ViewGown = () => {
 
     useEffect(() => {
         window.scrollTo(0, 0);
-        setLoadFailed(false);
+        setLoadError(null);
+        setGown(null);
+        // Ignores a response that arrives after the user has already moved on to a different
+        // gown — otherwise a slow earlier request could overwrite (or "fail") the new page.
+        let stale = false;
         const load = async () => {
             try {
                 const { data } = await axios.get(`/api/gown/get?id=${id}`);
+                if (stale) return;
                 setGown(data);
                 setActiveImage(data.primaryPictureUrl);
-            } catch {
-                setLoadFailed(true);
+            } catch (err) {
+                if (!stale) setLoadError(err?.response?.status === 404 ? 'notFound' : 'failed');
             }
         };
         load();
-    }, [id]);
+        return () => { stale = true; };
+    }, [id, retryCount]);
 
     const onInterestedClick = async () => {
         const cached = getCachedInterest('gown', id);
@@ -70,7 +77,15 @@ const ViewGown = () => {
         }
     };
 
-    if (loadFailed) return <Typography color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>This gown isn't available anymore.</Typography>;
+    if (loadError === 'notFound') return <Typography color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>This gown isn't available anymore.</Typography>;
+    if (loadError) {
+        return (
+            <Box sx={{ py: 6, textAlign: 'center' }}>
+                <Typography color="text.secondary" sx={{ mb: 2 }}>We couldn't load this gown. Please check your connection and try again.</Typography>
+                <Button variant="outlined" onClick={() => setRetryCount((n) => n + 1)}>Try Again</Button>
+            </Box>
+        );
+    }
     if (!gown) return <LoadingSpinner />;
 
     const thumbnails = [gown.primaryPictureUrl, ...(gown.morePictures || []).map(p => p.url)];

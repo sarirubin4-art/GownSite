@@ -34,9 +34,12 @@ const MyAds = () => {
     const [editError, setEditError, editErrorRef] = useFormError();
 
     const load = async () => {
-        const { data } = await axios.get('/api/ad/myads');
-        setAds(data);
-        setAdsLoaded(true);
+        try {
+            const { data } = await axios.get('/api/ad/myads');
+            setAds(data);
+        } finally {
+            setAdsLoaded(true);
+        }
     };
 
     useEffect(() => {

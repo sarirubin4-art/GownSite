@@ -299,7 +299,8 @@ const AdminDashboard = () => {
     const [activeAds, setActiveAds] = useState([]);
     // Which sections' first load has finished (pending, active, promoCodes, owners,
     // contactMessages, conciergeQueue) — each tab shows a spinner until then instead of
-    // flashing its "nothing here" message while the data is still on its way.
+    // flashing its "nothing here" message while the data is still on its way. Marked in a
+    // finally so a failed request falls back to the empty state rather than spinning forever.
     const [loaded, setLoaded] = useState({});
     const markLoaded = (section) => setLoaded((prev) => (prev[section] ? prev : { ...prev, [section]: true }));
     const [rejectTarget, setRejectTarget] = useState(null); // { type: 'gown'|'ad', id }
@@ -371,47 +372,65 @@ const AdminDashboard = () => {
     const [conciergeMarkingBatchId, setConciergeMarkingBatchId] = useState(null);
 
     const loadPending = async () => {
-        const [gowns, ads] = await Promise.all([
-            axios.get('/api/admin/gowns/pending'),
-            axios.get('/api/admin/ads/pending')
-        ]);
-        setPendingGowns(gowns.data);
-        setPendingAds(ads.data);
-        markLoaded('pending');
+        try {
+            const [gowns, ads] = await Promise.all([
+                axios.get('/api/admin/gowns/pending'),
+                axios.get('/api/admin/ads/pending')
+            ]);
+            setPendingGowns(gowns.data);
+            setPendingAds(ads.data);
+        } finally {
+            markLoaded('pending');
+        }
     };
 
     const loadActive = async () => {
-        const [gowns, ads] = await Promise.all([
-            axios.get('/api/admin/gowns/active'),
-            axios.get('/api/admin/ads/active')
-        ]);
-        setActiveGowns(gowns.data);
-        setActiveAds(ads.data);
-        markLoaded('active');
+        try {
+            const [gowns, ads] = await Promise.all([
+                axios.get('/api/admin/gowns/active'),
+                axios.get('/api/admin/ads/active')
+            ]);
+            setActiveGowns(gowns.data);
+            setActiveAds(ads.data);
+        } finally {
+            markLoaded('active');
+        }
     };
 
     const loadPromoCodes = async () => {
-        const { data } = await axios.get('/api/admin/promocodes');
-        setPromoCodes(data);
-        markLoaded('promoCodes');
+        try {
+            const { data } = await axios.get('/api/admin/promocodes');
+            setPromoCodes(data);
+        } finally {
+            markLoaded('promoCodes');
+        }
     };
 
     const loadOwners = async () => {
-        const { data } = await axios.get('/api/admin/owners');
-        setOwners(data);
-        markLoaded('owners');
+        try {
+            const { data } = await axios.get('/api/admin/owners');
+            setOwners(data);
+        } finally {
+            markLoaded('owners');
+        }
     };
 
     const loadContactMessages = async () => {
-        const { data } = await axios.get('/api/admin/contact-messages');
-        setContactMessages(data);
-        markLoaded('contactMessages');
+        try {
+            const { data } = await axios.get('/api/admin/contact-messages');
+            setContactMessages(data);
+        } finally {
+            markLoaded('contactMessages');
+        }
     };
 
     const loadConciergeQueue = async () => {
-        const { data } = await axios.get('/api/admin/concierge/queue');
-        setConciergeQueue(data);
-        markLoaded('conciergeQueue');
+        try {
+            const { data } = await axios.get('/api/admin/concierge/queue');
+            setConciergeQueue(data);
+        } finally {
+            markLoaded('conciergeQueue');
+        }
     };
 
     // $12/gown for 1-3 gowns, $9/gown once a batch has 4+ — a pre-filled starting

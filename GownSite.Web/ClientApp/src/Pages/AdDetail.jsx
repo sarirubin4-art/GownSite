@@ -16,7 +16,8 @@ import LoadingSpinner from '../components/LoadingSpinner';
 const AdDetail = () => {
     const { id } = useParams();
     const [ad, setAd] = useState(null);
-    const [loadFailed, setLoadFailed] = useState(false);
+    const [loadError, setLoadError] = useState(null); // null | 'notFound' | 'failed'
+    const [retryCount, setRetryCount] = useState(0);
     const [contactInfo, setContactInfo] = useState(null);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -25,17 +26,23 @@ const AdDetail = () => {
 
     useEffect(() => {
         window.scrollTo(0, 0);
-        setLoadFailed(false);
+        setLoadError(null);
+        setAd(null);
+        // Ignores a response that arrives after the user has already moved on to a different
+        // ad — otherwise a slow earlier request could overwrite (or "fail") the new page.
+        let stale = false;
         const load = async () => {
             try {
                 const { data } = await axios.get(`/api/ad/get?id=${id}`);
+                if (stale) return;
                 setAd(data);
-            } catch {
-                setLoadFailed(true);
+            } catch (err) {
+                if (!stale) setLoadError(err?.response?.status === 404 ? 'notFound' : 'failed');
             }
         };
         load();
-    }, [id]);
+        return () => { stale = true; };
+    }, [id, retryCount]);
 
     const onContactClick = async () => {
         const cached = getCachedInterest('ad', id);
@@ -56,7 +63,15 @@ const AdDetail = () => {
         }
     };
 
-    if (loadFailed) return <Typography color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>This ad isn't available anymore.</Typography>;
+    if (loadError === 'notFound') return <Typography color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>This ad isn't available anymore.</Typography>;
+    if (loadError) {
+        return (
+            <Box sx={{ py: 6, textAlign: 'center' }}>
+                <Typography color="text.secondary" sx={{ mb: 2 }}>We couldn't load this ad. Please check your connection and try again.</Typography>
+                <Button variant="outlined" onClick={() => setRetryCount((n) => n + 1)}>Try Again</Button>
+            </Box>
+        );
+    }
     if (!ad) return <LoadingSpinner />;
 
     const hasContactInfo = ad.showName || ad.showPhone || ad.showEmail;

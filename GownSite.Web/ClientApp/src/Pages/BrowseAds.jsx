@@ -32,9 +32,12 @@ const BrowseAds = () => {
 
     useEffect(() => {
         const load = async () => {
-            const { data } = await axios.get('/api/ad/getactive');
-            setAds(data);
-            setAdsLoaded(true);
+            try {
+                const { data } = await axios.get('/api/ad/getactive');
+                setAds(data);
+            } finally {
+                setAdsLoaded(true);
+            }
         };
         load();
         axios.get('/api/ad/locations').then(({ data }) => setLocationOptions(data));

@@ -42,9 +42,12 @@ const MyListings = () => {
     const [editError, setEditError, editErrorRef] = useFormError();
 
     const load = async () => {
-        const { data } = await axios.get('/api/gown/mylistings');
-        setListings(data);
-        setListingsLoaded(true);
+        try {
+            const { data } = await axios.get('/api/gown/mylistings');
+            setListings(data);
+        } finally {
+            setListingsLoaded(true);
+        }
     };
 
     const batchCounts = listings.reduce((acc, g) => {

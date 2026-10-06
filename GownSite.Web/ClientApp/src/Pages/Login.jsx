@@ -11,17 +11,21 @@ const Login = () => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError, errorRef] = useFormError();
+    const [submitting, setSubmitting] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
 
     const onLoginClick = async () => {
         setError('');
+        setSubmitting(true);
         try {
             await login(email, password);
             navigate(searchParams.get('redirect') || '/');
         } catch (err) {
             setError(err?.response?.data?.message || 'Login failed. Please check your email and password.');
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -47,7 +51,9 @@ const Login = () => {
                         }
                     }}
                 />
-                <Button type="submit" variant="contained" size="large">Log In</Button>
+                <Button type="submit" variant="contained" size="large" disabled={submitting}>
+                    {submitting ? 'Logging In...' : 'Log In'}
+                </Button>
                 <Typography variant="body2" color="text.secondary">
                     <Link to="/forgot-password">Forgot password?</Link>
                 </Typography>

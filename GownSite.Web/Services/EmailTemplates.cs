@@ -39,7 +39,7 @@ namespace GownSite.Web.Services
             EmailLayout.Wrap(
                 EmailLayout.Heading("A Reply From Regowned") +
                 $"<p>{EmailLayout.UserText(reply)}</p>" +
-                $"<p style=\"font-size:13px;color:#8A6D72;margin-top:24px;\">In response to your message ({topic}):<br><em>{EmailLayout.UserText(originalMessage)}</em></p>",
+                $"<p style=\"font-size:13px;color:#8A6D72;margin-top:24px;\">In response to your message ({EmailLayout.UserText(topic)}):<br><em>{EmailLayout.UserText(originalMessage)}</em></p>",
                 frontendBaseUrl);
 
         public static string ConciergeDraftReady(string ownerName, int gownCount, string myListingsUrl, string frontendBaseUrl) =>
