@@ -14,6 +14,7 @@ import ContactAdminDialog from '../components/ContactAdminDialog';
 import MorePicturesInput from '../components/MorePicturesInput';
 import FilterAutocomplete from '../components/FilterAutocomplete';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
+import useFormError from '../hooks/useFormError';
 
 // Renders the in-progress listing two ways — the card it'll show up as in Browse Gowns
 // search results, and the full gown details page — from local form state only, so
@@ -103,7 +104,7 @@ const GownPreviewDialog = ({ open, onClose, form, primaryPreview, morePicturePre
                             </Typography>
                         )}
                         <Typography variant="h4" gutterBottom>{form.price ? formatPriceRange(form.price, form.priceMax) : 'Price'}</Typography>
-                        <Typography variant="body1" sx={{ mb: 2 }}>{form.description || 'Your description will appear here.'}</Typography>
+                        <Typography variant="body1" sx={{ mb: 2, whiteSpace: 'pre-line' }}>{form.description || 'Your description will appear here.'}</Typography>
 
                         <Stack spacing={0.75} sx={{ mb: 2 }}>
                             <Typography><strong>Color{form.colors.length > 1 ? 's' : ''}:</strong> {form.colors.join(', ') || '—'}</Typography>
@@ -124,7 +125,7 @@ const GownPreviewDialog = ({ open, onClose, form, primaryPreview, morePicturePre
                             <>
                                 <Divider sx={{ my: 2 }} />
                                 <Typography variant="subtitle2" gutterBottom>Notes from the seller</Typography>
-                                <Typography variant="body2" color="text.secondary">{form.notes}</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>{form.notes}</Typography>
                             </>
                         )}
 
@@ -146,7 +147,7 @@ const GownPostingForm = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const resumeId = searchParams.get('resume');
-    const [error, setError] = useState('');
+    const [error, setError, errorRef] = useFormError();
     const [submitting, setSubmitting] = useState(false);
     const [primaryPicture, setPrimaryPicture] = useState(null);
     const [primaryPreview, setPrimaryPreview] = useState(null);
@@ -362,7 +363,7 @@ const GownPostingForm = () => {
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
             <Typography variant="h4" gutterBottom>Post a Gown</Typography>
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+            {error && <Alert ref={errorRef} severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
             <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
                 <Typography variant="h6" gutterBottom>Required Details</Typography>

@@ -88,7 +88,18 @@ public class Program
         }
 
         //app.UseHttpsRedirection();
-        app.UseStaticFiles();
+        // index.html must never be served from a browser cache: it's the one file that points
+        // at the current build's hashed JS bundle, so a stale copy keeps a visitor on old
+        // front-end code after a deploy. The hashed bundles themselves are safe to cache.
+        var staticFileOptions = new StaticFileOptions
+        {
+            OnPrepareResponse = ctx =>
+            {
+                if (ctx.File.Name == "index.html")
+                    ctx.Context.Response.Headers.CacheControl = "no-cache";
+            }
+        };
+        app.UseStaticFiles(staticFileOptions);
         if (app.Environment.IsDevelopment())
         {
             var psi = new System.Diagnostics.ProcessStartInfo
@@ -117,7 +128,7 @@ public class Program
             name: "default",
             pattern: "{controller}/{action=Index}/{id?}");
 
-        app.MapFallbackToFile("index.html");
+        app.MapFallbackToFile("index.html", staticFileOptions);
 
         app.Run();
     }

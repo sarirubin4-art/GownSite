@@ -42,6 +42,14 @@ namespace GownSite.Web.Services
         <a href=""{url}"" style=""display:inline-block;background-color:{Rose};color:#ffffff;text-decoration:none;font-weight:600;padding:13px 30px;border-radius:999px;font-family:'Segoe UI',Arial,sans-serif;font-size:15px;"">{text}</a>
       </div>";
 
+        // For text a person typed (a description, a message, a rejection reason): HTML-encodes
+        // it so it shows exactly as typed, and turns its line breaks into <br> so paragraphs
+        // don't run together into one line the way raw newlines do in HTML.
+        public static string UserText(string text) =>
+            System.Net.WebUtility.HtmlEncode(text ?? "")
+                .Replace("\r\n", "\n")
+                .Replace("\n", "<br>");
+
         public static string Heading(string text) =>
             $@"<h1 style=""margin:0 0 16px;font-family:Georgia,'Times New Roman',serif;font-weight:700;font-size:24px;color:{RoseDark};"">{text}</h1>";
     }

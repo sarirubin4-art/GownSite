@@ -12,6 +12,7 @@ import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import usePageTitle from '../hooks/usePageTitle';
 import { useAdLane } from '../context/AdLaneContext';
 import ImageZoomDialog from '../components/ImageZoomDialog';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { getCachedInterest, setCachedInterest } from '../utils/interestCache';
 
 const MIN_INTERESTED_TO_SHOW = 3;
@@ -22,6 +23,8 @@ const ViewGown = () => {
     const fullScreen = useFullScreenDialog();
     const { laneSx } = useAdLane();
     const [gown, setGown] = useState(null);
+    const [loadError, setLoadError] = useState(null); // null | 'notFound' | 'failed'
+    const [retryCount, setRetryCount] = useState(0);
     const [activeImage, setActiveImage] = useState(null);
     const [contactInfo, setContactInfo] = useState(null);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -35,13 +38,24 @@ const ViewGown = () => {
 
     useEffect(() => {
         window.scrollTo(0, 0);
+        setLoadError(null);
+        setGown(null);
+        // Ignores a response that arrives after the user has already moved on to a different
+        // gown — otherwise a slow earlier request could overwrite (or "fail") the new page.
+        let stale = false;
         const load = async () => {
-            const { data } = await axios.get(`/api/gown/get?id=${id}`);
-            setGown(data);
-            setActiveImage(data.primaryPictureUrl);
+            try {
+                const { data } = await axios.get(`/api/gown/get?id=${id}`);
+                if (stale) return;
+                setGown(data);
+                setActiveImage(data.primaryPictureUrl);
+            } catch (err) {
+                if (!stale) setLoadError(err?.response?.status === 404 ? 'notFound' : 'failed');
+            }
         };
         load();
-    }, [id]);
+        return () => { stale = true; };
+    }, [id, retryCount]);
 
     const onInterestedClick = async () => {
         const cached = getCachedInterest('gown', id);
@@ -63,7 +77,16 @@ const ViewGown = () => {
         }
     };
 
-    if (!gown) return null;
+    if (loadError === 'notFound') return <Typography color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>This gown isn't available anymore.</Typography>;
+    if (loadError) {
+        return (
+            <Box sx={{ py: 6, textAlign: 'center' }}>
+                <Typography color="text.secondary" sx={{ mb: 2 }}>We couldn't load this gown. Please check your connection and try again.</Typography>
+                <Button variant="outlined" onClick={() => setRetryCount((n) => n + 1)}>Try Again</Button>
+            </Box>
+        );
+    }
+    if (!gown) return <LoadingSpinner />;
 
     const thumbnails = [gown.primaryPictureUrl, ...(gown.morePictures || []).map(p => p.url)];
     const styleTags = (gown.styleTags || '').split(',').filter(Boolean);
@@ -159,7 +182,7 @@ const ViewGown = () => {
                         </Typography>
                     )}
                     <Typography variant="h4" gutterBottom>{formatPriceRange(gown.price, gown.priceMax)}</Typography>
-                    <Typography variant="body1" sx={{ mb: 2 }}>{gown.description}</Typography>
+                    <Typography variant="body1" sx={{ mb: 2, whiteSpace: 'pre-line' }}>{gown.description}</Typography>
 
                     <Stack spacing={0.75} sx={{ mb: 2 }}>
                         <Typography><strong>Color{(gown.color || '').includes(',') ? 's' : ''}:</strong> {(gown.color || '').split(',').join(', ')}</Typography>
@@ -180,7 +203,7 @@ const ViewGown = () => {
                         <>
                             <Divider sx={{ my: 2 }} />
                             <Typography variant="subtitle2" gutterBottom>Notes from the seller</Typography>
-                            <Typography variant="body2" color="text.secondary">{gown.notes}</Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>{gown.notes}</Typography>
                         </>
                     )}
 

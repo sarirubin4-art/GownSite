@@ -17,6 +17,8 @@ import ImageZoomDialog from '../components/ImageZoomDialog';
 import FilterAutocomplete from '../components/FilterAutocomplete';
 import PromoApplyBox from '../components/PromoApplyBox';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
+import LoadingSpinner from '../components/LoadingSpinner';
+import useFormError from '../hooks/useFormError';
 
 const MyListings = () => {
     const { owner, loading } = useAuth();
@@ -24,6 +26,7 @@ const MyListings = () => {
     const { laneSx } = useAdLane();
     const fullScreen = useFullScreenDialog();
     const [listings, setListings] = useState([]);
+    const [listingsLoaded, setListingsLoaded] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
     const [promoApplying, setPromoApplying] = useState(false);
     const [promoMessage, setPromoMessage] = useState(null); // { type: 'success'|'error', text }
@@ -36,10 +39,15 @@ const MyListings = () => {
     const [newMorePictures, setNewMorePictures] = useState([]);
     const [resubmitting, setResubmitting] = useState(false);
     const [zoomPrimaryOpen, setZoomPrimaryOpen] = useState(false);
+    const [editError, setEditError, editErrorRef] = useFormError();
 
     const load = async () => {
-        const { data } = await axios.get('/api/gown/mylistings');
-        setListings(data);
+        try {
+            const { data } = await axios.get('/api/gown/mylistings');
+            setListings(data);
+        } finally {
+            setListingsLoaded(true);
+        }
     };
 
     const batchCounts = listings.reduce((acc, g) => {
@@ -87,6 +95,7 @@ const MyListings = () => {
     };
 
     const onSaveEdit = async () => {
+        setEditError('');
         const data = new FormData();
         data.append('Id', editTarget.id);
         data.append('Description', editTarget.description);
@@ -109,7 +118,13 @@ const MyListings = () => {
         removePictureIds.forEach((id) => data.append('RemovePictureIds', id));
         newMorePictures.forEach((file) => data.append('MorePictures', file));
 
-        await axios.post('/api/gown/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+        // Previously a failed save did nothing visible at all — the dialog just stayed open.
+        try {
+            await axios.post('/api/gown/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+        } catch (err) {
+            setEditError(err?.response?.data?.message || 'Could not save changes.');
+            return;
+        }
         setEditTarget(null);
         setNewPrimaryPicture(null);
         setNewPrimaryPreview(null);
@@ -142,6 +157,7 @@ const MyListings = () => {
         setNewPrimaryPreview(null);
         setRemovePictureIds([]);
         setNewMorePictures([]);
+        setEditError('');
     };
 
     const onApplyPromo = async (promoCode) => {
@@ -174,6 +190,7 @@ const MyListings = () => {
     };
 
     if (loading || !owner) return null;
+    if (!listingsLoaded) return <LoadingSpinner />;
 
     const activeCount = listings.filter((g) => g.isActive).length;
     const hasActiveUnsoldListing = listings.some((g) => g.isActive && !g.isSold);
@@ -334,6 +351,7 @@ const MyListings = () => {
                 {editTarget && (
                     <DialogContent>
                         <Stack spacing={2} sx={{ mt: 1 }}>
+                            {editError && <Alert ref={editErrorRef} severity="error">{editError}</Alert>}
                             {editTarget.isActive && (
                                 <PromoApplyBox
                                     currentPromoCode={editTarget.promoCode?.code}
