@@ -144,7 +144,8 @@ namespace GownSite.Data
         Sheitels,
         Bridal,
         PartyRentals,
-        Catering
+        Catering,
+        Gifts
     }
 
     public static class AdCategoryHelper

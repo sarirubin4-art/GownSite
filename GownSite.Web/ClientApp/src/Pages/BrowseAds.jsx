@@ -15,6 +15,9 @@ import LoadingSpinner from '../components/LoadingSpinner';
 
 const ALL_LOCATIONS = 'All';
 
+// Always at the end of the tab strip, in this order, whether or not they have ads.
+const PINNED_LAST_CATEGORIES = ['Gemachs', 'Other'];
+
 // Dropdown: plain A-Z so a specific category is easy to find, with "Other" pinned last.
 const ALPHABETICAL_CATEGORIES = [...AD_CATEGORY_OPTIONS].sort((a, b) =>
     a.value === 'Other' ? 1 : b.value === 'Other' ? -1 : a.label.localeCompare(b.label));
@@ -49,6 +52,19 @@ const BrowseAds = () => {
     // Memoized so it doesn't reshuffle on every render — only when the ad list itself changes.
     const shuffledAds = useMemo(() => orderAdsForDisplay(ads), [ads]);
 
+    // Tabs follow AD_CATEGORY_OPTIONS' hand-picked order, except that categories with no
+    // live ads move behind the ones that have some (keeping their relative order), so
+    // visitors don't land on empty tabs first. Gemachs and Other always stay at the end.
+    const tabCategories = useMemo(() => {
+        const withAds = new Set(ads.flatMap((a) => (a.categories || '').split(',').filter(Boolean)));
+        const regular = AD_CATEGORY_OPTIONS.filter((c) => !PINNED_LAST_CATEGORIES.includes(c.value));
+        return [
+            ...regular.filter((c) => withAds.has(c.value)),
+            ...regular.filter((c) => !withAds.has(c.value)),
+            ...PINNED_LAST_CATEGORIES.map((value) => AD_CATEGORY_OPTIONS.find((c) => c.value === value))
+        ];
+    }, [ads]);
+
     const visibleAds = (category === 'All' ? ads : shuffledAds)
         .filter(a => category === 'All' || (a.categories || '').split(',').includes(category))
         // An ad marked "serves all locations" is relevant no matter which location is
@@ -70,7 +86,7 @@ const BrowseAds = () => {
                 sx={{ mr: laneSx, borderBottom: 1, borderColor: 'divider' }}
             >
                 <Tab label="All" value="All" />
-                {AD_CATEGORY_OPTIONS.map(c => (
+                {tabCategories.map(c => (
                     <Tab key={c.value} label={c.label} value={c.value} />
                 ))}
             </Tabs>
