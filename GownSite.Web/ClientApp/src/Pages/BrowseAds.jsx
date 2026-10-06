@@ -46,19 +46,6 @@ const BrowseAds = () => {
     // Memoized so it doesn't reshuffle on every render — only when the ad list itself changes.
     const shuffledAds = useMemo(() => orderAdsForDisplay(ads), [ads]);
 
-    // Tabs: most relevant first — categories with the most live ads lead, so a visitor sees
-    // the busiest categories without scrolling the tab strip. Ties (including all the empty
-    // ones) keep AD_CATEGORY_OPTIONS' curated order, and "Other" always stays last.
-    const tabCategories = useMemo(() => {
-        const counts = {};
-        ads.forEach((a) => (a.categories || '').split(',').filter(Boolean).forEach((c) => { counts[c] = (counts[c] || 0) + 1; }));
-        return [...AD_CATEGORY_OPTIONS].sort((a, b) => {
-            if (a.value === 'Other') return 1;
-            if (b.value === 'Other') return -1;
-            return (counts[b.value] || 0) - (counts[a.value] || 0);
-        });
-    }, [ads]);
-
     const visibleAds = (category === 'All' ? ads : shuffledAds)
         .filter(a => category === 'All' || (a.categories || '').split(',').includes(category))
         // An ad marked "serves all locations" is relevant no matter which location is
@@ -80,7 +67,7 @@ const BrowseAds = () => {
                 sx={{ mr: laneSx, borderBottom: 1, borderColor: 'divider' }}
             >
                 <Tab label="All" value="All" />
-                {tabCategories.map(c => (
+                {AD_CATEGORY_OPTIONS.map(c => (
                     <Tab key={c.value} label={c.label} value={c.value} />
                 ))}
             </Tabs>
