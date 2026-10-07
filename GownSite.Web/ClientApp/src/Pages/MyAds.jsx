@@ -30,9 +30,13 @@ const MyAds = () => {
     const [newImagePreview, setNewImagePreview] = useState(null);
     const [editError, setEditError] = useState('');
 
+    const [adStats, setAdStats] = useState({}); // { [adId]: { impressions, cardClicks, views, viewsLast30Days, websiteClicks } }
+
     const load = async () => {
         const { data } = await axios.get('/api/ad/myads');
         setAds(data);
+        // Secondary info — the ads themselves shouldn't wait on (or fail with) this.
+        axios.get('/api/ad/myads/stats').then(({ data: stats }) => setAdStats(stats)).catch(() => {});
     };
 
     useEffect(() => {
@@ -164,6 +168,25 @@ const MyAds = () => {
                                 </Stack>
                                 <Typography variant="h6">{a.title}</Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>{a.description}</Typography>
+                                {adStats[a.id] && a.moderationStatus === 'Approved' && (
+                                    <Box sx={{ mt: 1.5, p: 1.25, borderRadius: 1, bgcolor: 'background.default' }}>
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 600, mb: 0.5 }}>
+                                            Your ad's reach
+                                        </Typography>
+                                        {[
+                                            ['Shown to visitors', adStats[a.id].impressions],
+                                            ['Ad clicks', adStats[a.id].cardClicks],
+                                            ['Page views', adStats[a.id].views],
+                                            ['Website clicks', adStats[a.id].websiteClicks],
+                                            ['Contact info requests', a.inquiryCount]
+                                        ].map(([label, value]) => (
+                                            <Stack key={label} direction="row" sx={{ justifyContent: 'space-between' }}>
+                                                <Typography variant="body2">{label}</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>{(value ?? 0).toLocaleString()}</Typography>
+                                            </Stack>
+                                        ))}
+                                    </Box>
+                                )}
                                 {(a.moderationStatus === 'Rejected' || a.moderationStatus === 'Removed') && a.rejectionReason && (
                                     <Typography variant="body2" color="error.main" sx={{ mt: 1 }}>
                                         Reason: {a.rejectionReason}

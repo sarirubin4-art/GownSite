@@ -12,7 +12,9 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { useAuth } from '../context/AuthContext';
-import { useAdLane } from '../context/AdLaneContext';
+import { LANE_SX } from '../context/AdLaneContext';
+import { TrafficBubble } from '../components/TrafficWidgets';
+import TrafficTab from '../components/TrafficTab';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, AD_CATEGORY_OPTIONS, formatPriceRange, sortSizes, adCategoryLabels } from '../constants/gownOptions';
 import LocationField from '../components/LocationField';
@@ -26,6 +28,7 @@ import ImagePositionEditor from '../components/ImagePositionEditor';
 import { focalObjectPosition } from '../utils/imageFocal';
 
 const MAX_POST_FOR_PATRON_GOWNS = 20;
+const TRAFFIC_TAB = 9;
 
 const DISCOUNT_TYPE_OPTIONS = [
     { value: 'PercentOff', label: 'Percent off' },
@@ -283,10 +286,19 @@ const ActiveList = ({ items, type, onTakeDownClick, onEditClick, error, laneSx }
 
 const AdminDashboard = () => {
     const { owner, loading } = useAuth();
-    const { laneSx } = useAdLane();
+    // The traffic bubble always occupies the right lane here on desktop (under the ad, or
+    // in its spot when no ad is showing), so reserve it regardless of whether an ad is up.
+    const laneSx = LANE_SX;
     const fullScreen = useFullScreenDialog();
     const navigate = useNavigate();
     const [tab, setTab] = useState(0);
+    // Set by the traffic bubble: jump to the Traffic tab, optionally pre-filtered.
+    // Wrapped in a fresh object each time so clicking the same location twice re-applies.
+    const [trafficFilterRequest, setTrafficFilterRequest] = useState(null);
+    const openTraffic = (filter) => {
+        setTab(TRAFFIC_TAB);
+        setTrafficFilterRequest({ filter });
+    };
     const [pendingGowns, setPendingGowns] = useState([]);
     const [pendingAds, setPendingAds] = useState([]);
     const [activeGowns, setActiveGowns] = useState([]);
@@ -960,6 +972,7 @@ const AdminDashboard = () => {
     return (
         <Box>
             <Typography variant="h4" gutterBottom>Admin</Typography>
+            <TrafficBubble onOpenTraffic={openTraffic} />
             <Tabs value={tab} onChange={(e, v) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ mb: 1, mr: laneSx }}>
                 <Tab label={`Pending Gowns${pendingGowns.length ? ` (${pendingGowns.length})` : ''}`} />
                 <Tab label={`Pending Ads${pendingAds.length ? ` (${pendingAds.length})` : ''}`} />
@@ -970,7 +983,10 @@ const AdminDashboard = () => {
                 <Tab label="Send Emails" />
                 <Tab label={`Inbox${openContactCount ? ` (${openContactCount})` : ''}`} />
                 <Tab label={`Concierge Requests${conciergeQueue.length ? ` (${conciergeQueue.length})` : ''}`} />
+                <Tab label="Traffic" />
             </Tabs>
+
+            {tab === TRAFFIC_TAB && <TrafficTab filterRequest={trafficFilterRequest} onFilterRequestHandled={() => setTrafficFilterRequest(null)} laneSx={laneSx} />}
 
             {tab === 0 && (
                 <PendingList

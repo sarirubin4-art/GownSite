@@ -37,9 +37,13 @@ const MyListings = () => {
     const [resubmitting, setResubmitting] = useState(false);
     const [zoomPrimaryOpen, setZoomPrimaryOpen] = useState(false);
 
+    const [viewStats, setViewStats] = useState({}); // { [gownId]: { total, last30Days } }
+
     const load = async () => {
         const { data } = await axios.get('/api/gown/mylistings');
         setListings(data);
+        // Secondary info — the listings themselves shouldn't wait on (or fail with) this.
+        axios.get('/api/gown/mylistings/stats').then(({ data: stats }) => setViewStats(stats)).catch(() => {});
     };
 
     const batchCounts = listings.reduce((acc, g) => {
@@ -255,7 +259,12 @@ const MyListings = () => {
                                             g.isSold ? 'secondary' : (g.isActive ? 'success' : 'default')
                                         }
                                     />
-                                    <Typography variant="body2" color="text.secondary">
+                                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'right' }}>
+                                        {viewStats[g.id] && (
+                                            <span title={`${viewStats[g.id].last30Days} in the last 30 days`}>
+                                                {viewStats[g.id].total} {viewStats[g.id].total === 1 ? 'view' : 'views'} &middot;{' '}
+                                            </span>
+                                        )}
                                         {g.inquiryCount} {g.inquiryCount === 1 ? 'inquiry' : 'inquiries'}
                                     </Typography>
                                 </Stack>

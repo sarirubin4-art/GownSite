@@ -78,13 +78,15 @@ namespace GownSite.Web.Controllers
         private readonly IWebHostEnvironment _env;
         private readonly IFileStorageService _storage;
         private readonly IConfiguration _configuration;
+        private readonly AnalyticsRecorder _analytics;
 
-        public AdController(IConfiguration configuration, IWebHostEnvironment env, IFileStorageService storage)
+        public AdController(IConfiguration configuration, IWebHostEnvironment env, IFileStorageService storage, AnalyticsRecorder analytics)
         {
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("ConStr");
             _env = env;
             _storage = storage;
+            _analytics = analytics;
         }
 
         [HttpGet("getactive")]
@@ -119,6 +121,32 @@ namespace GownSite.Web.Controllers
             return repo.GetByOwner(CurrentOwnerId());
         }
 
+        // Proof-of-value numbers for My Ads, keyed by ad id: how often the floating card was
+        // shown and clicked, detail-page views, and "Learn More" clicks out to their site.
+        // Contact reveals already ride along on the ad itself (InquiryCount).
+        [HttpGet("myads/stats")]
+        [Authorize]
+        public IActionResult MyAdStats()
+        {
+            var ids = new AdRepository(_connectionString).GetByOwner(CurrentOwnerId()).Select(a => a.Id).ToList();
+            if (ids.Count == 0) return Ok(new Dictionary<int, object>());
+
+            var analytics = new AnalyticsRepository(_connectionString);
+            var views = analytics.GetEntityViewCounts("Ad", ids, DateTime.UtcNow.AddDays(-30));
+            var impressions = analytics.GetEventCounts(SiteEventTypes.AdImpression, ids);
+            var cardClicks = analytics.GetEventCounts(SiteEventTypes.AdClick, ids);
+            var websiteClicks = analytics.GetEventCounts(SiteEventTypes.AdLinkClick, ids);
+
+            return Ok(ids.ToDictionary(id => id, id => new
+            {
+                views = views.GetValueOrDefault(id)?.Total ?? 0,
+                viewsLast30Days = views.GetValueOrDefault(id)?.Last30Days ?? 0,
+                impressions = impressions.GetValueOrDefault(id),
+                cardClicks = cardClicks.GetValueOrDefault(id),
+                websiteClicks = websiteClicks.GetValueOrDefault(id)
+            }));
+        }
+
         // Anonymous, public — mirrors GownController.Inquire. Uses GetWithOwner rather than
         // Get (which backs the public /api/ad/get response and deliberately doesn't include
         // Owner) so name/phone/email only ever reach the client through this gated response.
@@ -131,6 +159,7 @@ namespace GownSite.Web.Controllers
 
             repo.IncrementInquiry(request.Id);
             ad.InquiryCount++;
+            _analytics.RecordEvent(HttpContext, SiteEventTypes.AdContact, request.Id);
 
             return Ok(new
             {

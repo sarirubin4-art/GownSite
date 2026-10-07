@@ -366,3 +366,5 @@ FodyWeavers.xsd
 appsettings.Development.json
 appsettings.local.json
 appsettings.*.local.json
+# Downloaded GeoLite2 database (see GeoLocator) — refreshed weekly, never committed
+GownSite.Web/App_Data/

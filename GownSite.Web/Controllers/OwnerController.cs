@@ -60,12 +60,14 @@ namespace GownSite.Web.Controllers
         private readonly IConfiguration _configuration;
         private readonly IEmailSender _emailSender;
         private static readonly PasswordHasher<Owner> _hasher = new();
+        private readonly AnalyticsRecorder _analytics;
 
-        public OwnerController(IConfiguration configuration, IEmailSender emailSender)
+        public OwnerController(IConfiguration configuration, IEmailSender emailSender, AnalyticsRecorder analytics)
         {
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("ConStr");
             _emailSender = emailSender;
+            _analytics = analytics;
         }
 
         private string FrontendBaseUrl()
@@ -113,6 +115,7 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "An account with that email already exists." });
             }
 
+            _analytics.RecordEvent(HttpContext, SiteEventTypes.Signup, owner.Id);
             await SendVerificationEmail(owner);
 
             await SignInOwner(owner);

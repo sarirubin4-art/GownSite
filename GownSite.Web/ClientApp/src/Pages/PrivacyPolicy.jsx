@@ -14,7 +14,7 @@ const PrivacyPolicy = () => {
     return (
     <Container maxWidth="md" sx={{ py: 6 }}>
         <Typography variant="h4" gutterBottom>Privacy Policy</Typography>
-        <Typography color="text.secondary" sx={{ mb: 3 }}>Last updated: August 2026</Typography>
+        <Typography color="text.secondary" sx={{ mb: 3 }}>Last updated: October 2026</Typography>
         <Paper variant="outlined" sx={{ p: { xs: 3, sm: 4 } }}>
             <Typography>
                 This Privacy Policy explains what information Regowned collects, how we use it, and the choices
@@ -34,6 +34,9 @@ const PrivacyPolicy = () => {
                     </ListItem>
                     <ListItem sx={{ display: 'list-item', px: 0 }}>
                         <ListItemText primary="Communications: messages you send us, and inquiry activity on listings (for example, when you click 'I'm interested' on a gown)." />
+                    </ListItem>
+                    <ListItem sx={{ display: 'list-item', px: 0 }}>
+                        <ListItemText primary="Anonymous visit statistics: which pages are viewed, the approximate location of each visit (city, state, and country, estimated from your IP address), the website that referred you, and whether you're on a phone or computer. We do not store your IP address, and these statistics are not linked to your account. They're kept for about 13 months and used only to understand how the site is used — for example, to show listing owners and advertisers how many people viewed their posts." />
                     </ListItem>
                 </List>
             </Section>
@@ -61,7 +64,7 @@ const PrivacyPolicy = () => {
                         <ListItemText primary="With other users: your name (only if you choose to display it), and your phone number and email, are shown to someone only after they express interest in your listing — never published openly." />
                     </ListItem>
                     <ListItem sx={{ display: 'list-item', px: 0 }}>
-                        <ListItemText primary="With service providers who help us run the Service: Stripe (payments), Microsoft Azure (hosting, file storage, and email delivery). These providers only receive what they need to perform their function and are not permitted to use your data for their own purposes." />
+                        <ListItemText primary="With service providers who help us run the Service: Stripe (payments), Microsoft Azure (hosting, file storage, and email delivery). Visit locations are looked up on our own servers using a GeoLite2 database, so your IP address is not sent to a third party for this. These providers only receive what they need to perform their function and are not permitted to use your data for their own purposes." />
                     </ListItem>
                     <ListItem sx={{ display: 'list-item', px: 0 }}>
                         <ListItemText primary="We do not sell your personal information." />
@@ -112,6 +115,12 @@ const PrivacyPolicy = () => {
                     through the contact options available on the Service.
                 </Typography>
             </Section>
+
+            {/* Attribution required by the GeoLite2 license (see GeoLocator.cs). */}
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 4 }}>
+                This product includes GeoLite2 data created by MaxMind, available from{' '}
+                <a href="https://www.maxmind.com" target="_blank" rel="noopener noreferrer">https://www.maxmind.com</a>.
+            </Typography>
         </Paper>
     </Container>
     );

@@ -11,6 +11,7 @@ import { adCategoryLabels } from '../constants/gownOptions';
 import usePageTitle from '../hooks/usePageTitle';
 import { getCachedInterest, setCachedInterest } from '../utils/interestCache';
 import { focalObjectPosition } from '../utils/imageFocal';
+import { trackEvent } from '../utils/analytics';
 
 const AdDetail = () => {
     const { id } = useParams();
@@ -74,7 +75,7 @@ const AdDetail = () => {
             <Typography variant="body1" sx={{ mb: 4, whiteSpace: 'pre-line' }}>{ad.description}</Typography>
             <Stack direction="row" spacing={2} sx={{ justifyContent: 'center', flexWrap: 'wrap', rowGap: 2 }}>
                 {ad.targetUrl && (
-                    <Button variant="contained" size="large" href={ad.targetUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="contained" size="large" href={ad.targetUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent('AdLinkClick', ad.id)}>
                         Learn More
                     </Button>
                 )}

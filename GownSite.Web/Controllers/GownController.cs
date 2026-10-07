@@ -132,8 +132,9 @@ namespace GownSite.Web.Controllers
         private readonly IConfiguration _configuration;
         private readonly IEmailSender _emailSender;
         private readonly IGownColorScoreService _colorScoreService;
+        private readonly AnalyticsRecorder _analytics;
 
-        public GownController(IConfiguration configuration, IWebHostEnvironment env, IFileStorageService storage, IEmailSender emailSender, IGownColorScoreService colorScoreService)
+        public GownController(IConfiguration configuration, IWebHostEnvironment env, IFileStorageService storage, IEmailSender emailSender, IGownColorScoreService colorScoreService, AnalyticsRecorder analytics)
         {
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("ConStr");
@@ -141,13 +142,37 @@ namespace GownSite.Web.Controllers
             _storage = storage;
             _emailSender = emailSender;
             _colorScoreService = colorScoreService;
+            _analytics = analytics;
         }
 
         [HttpPost("search")]
         public GownSearchResult Search([FromBody] GownSearchFilters filters)
         {
+            filters ??= new GownSearchFilters();
             var repo = new GownRepository(_connectionString);
-            return repo.Search(filters ?? new GownSearchFilters());
+            var result = repo.Search(filters);
+
+            // Unmet demand: someone looked for something specific and we had nothing.
+            // Only page 1 (later pages of a non-empty search can't be empty by definition)
+            // and only when at least one filter was set (an empty unfiltered search just
+            // means no gowns are live at all).
+            var summary = DescribeFilters(filters);
+            if (result.TotalCount == 0 && filters.Page <= 1 && summary != null)
+                _analytics.RecordEvent(HttpContext, SiteEventTypes.SearchNoResults, detail: summary);
+
+            return result;
+        }
+
+        private static string DescribeFilters(GownSearchFilters f)
+        {
+            var parts = new List<string>();
+            if (f.Colors?.Count > 0) parts.Add(string.Join("/", f.Colors.OrderBy(c => c)));
+            if (f.Sizes?.Count > 0) parts.Add("Size " + string.Join("/", f.Sizes.OrderBy(s => s)));
+            if (f.Styles?.Count > 0) parts.Add(string.Join("/", f.Styles.OrderBy(s => s)));
+            if (f.ListingTypes?.Count > 0) parts.Add(string.Join("/", f.ListingTypes.OrderBy(t => t)));
+            if (f.Locations?.Count > 0) parts.Add("in " + string.Join("/", f.Locations.OrderBy(l => l)));
+            if (f.MinPrice.HasValue || f.MaxPrice.HasValue) parts.Add($"${f.MinPrice ?? 0}–{(f.MaxPrice.HasValue ? "$" + f.MaxPrice : "any")}");
+            return parts.Count == 0 ? null : string.Join(", ", parts);
         }
 
         [HttpGet("get")]
@@ -173,6 +198,17 @@ namespace GownSite.Web.Controllers
         {
             var repo = new GownRepository(_connectionString);
             return repo.GetByOwner(CurrentOwnerId());
+        }
+
+        // Per-listing view counts for My Listings, keyed by gown id. Inquiries already
+        // ride along on the listing itself (InquiryCount), so this is just views.
+        [HttpGet("mylistings/stats")]
+        [Authorize]
+        public IActionResult MyListingStats()
+        {
+            var ids = new GownRepository(_connectionString).GetByOwner(CurrentOwnerId()).Select(g => g.Id).ToList();
+            if (ids.Count == 0) return Ok(new Dictionary<int, EntityViewCounts>());
+            return Ok(new AnalyticsRepository(_connectionString).GetEntityViewCounts("Gown", ids, DateTime.UtcNow.AddDays(-30)));
         }
 
         public const int MaxMorePictures = 5;
@@ -691,6 +727,7 @@ namespace GownSite.Web.Controllers
 
             repo.IncrementInquiry(request.Id);
             posting.InquiryCount++;
+            _analytics.RecordEvent(HttpContext, SiteEventTypes.GownContact, request.Id);
 
             return Ok(new
             {

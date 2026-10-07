@@ -5,6 +5,7 @@ import { Paper, Box, Typography, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { orderAdsForDisplay } from '../utils/shuffle';
 import { focalObjectPosition } from '../utils/imageFocal';
+import { trackAdImpression, trackEvent } from '../utils/analytics';
 
 export const AD_TOP = 84;
 const STACK_GAP = 16;
@@ -60,8 +61,19 @@ const FloatingAds = ({ onVisibilityChange, onStackTopChange }) => {
         };
     }, [dismissed, ads, index, onStackTopChange]);
 
+    // Proof-of-value numbers for advertisers (shown on their My Ads page): each ad that
+    // actually appears counts once per visit; clicking the card counts every time.
+    const shownAdId = !dismissed && ads.length > 0 ? ads[index]?.id : null;
+    useEffect(() => {
+        if (shownAdId != null) trackAdImpression(shownAdId);
+    }, [shownAdId]);
+
     if (dismissed || ads.length === 0) return null;
     const ad = ads[index];
+    const onAdClick = () => {
+        trackEvent('AdClick', ad.id);
+        navigate(`/ad/${ad.id}`);
+    };
 
     return (
         <>
@@ -69,7 +81,7 @@ const FloatingAds = ({ onVisibilityChange, onStackTopChange }) => {
             <Paper
                 ref={cardRef}
                 elevation={6}
-                onClick={() => navigate(`/ad/${ad.id}`)}
+                onClick={onAdClick}
                 sx={{
                     display: { xs: 'none', md: 'block' },
                     position: 'fixed',
@@ -119,7 +131,7 @@ const FloatingAds = ({ onVisibilityChange, onStackTopChange }) => {
                 becomes a slim, dismissable bar docked right under the AppBar instead. */}
             <Paper
                 elevation={3}
-                onClick={() => navigate(`/ad/${ad.id}`)}
+                onClick={onAdClick}
                 square
                 sx={{
                     display: { xs: 'flex', md: 'none' },

@@ -103,14 +103,16 @@ namespace GownSite.Web.Controllers
         private readonly IEmailSender _emailSender;
         private readonly IFileStorageService _storage;
         private readonly IGownColorScoreService _colorScoreService;
+        private readonly GeoLocator _geo;
 
-        public AdminController(IConfiguration configuration, IEmailSender emailSender, IFileStorageService storage, IGownColorScoreService colorScoreService)
+        public AdminController(IConfiguration configuration, IEmailSender emailSender, IFileStorageService storage, IGownColorScoreService colorScoreService, GeoLocator geo)
         {
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("ConStr");
             _emailSender = emailSender;
             _storage = storage;
             _colorScoreService = colorScoreService;
+            _geo = geo;
         }
 
         private string FrontendBaseUrl()
@@ -1066,6 +1068,136 @@ namespace GownSite.Web.Controllers
             repo.SetActive(id, request.IsActive);
             return Ok();
         }
+
+        // ---- Site traffic (see AnalyticsRecorder for how rows get recorded) ----
+
+        // "Today"/"this week" and the daily chart follow the business's own calendar day,
+        // not UTC's (which rolls over at 8pm Eastern).
+        private static readonly TimeZoneInfo Eastern = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+
+        private static DateTime TodayEastern() => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, Eastern).Date;
+        private static DateTime EasternDayStartUtc(DateTime easternDate) => TimeZoneInfo.ConvertTimeToUtc(easternDate, Eastern);
+
+        // days <= 0 or null == all time.
+        private static DateTime? RangeStartUtc(int? days) =>
+            days is > 0 ? EasternDayStartUtc(TodayEastern().AddDays(-(days.Value - 1))) : null;
+
+        // Small, always-on summary for the bubble on the Admin page.
+        [HttpGet("analytics/overview")]
+        public IActionResult GetAnalyticsOverview()
+        {
+            var repo = new AnalyticsRepository(_connectionString);
+            var today = TodayEastern();
+            var monthStart = EasternDayStartUtc(today.AddDays(-29));
+            var stamps = repo.GetViewStampsSince(monthStart);
+
+            object Range(DateTime fromUtc)
+            {
+                var inRange = stamps.Where(s => s.CreatedDate >= fromUtc).ToList();
+                return new { views = inRange.Count, visitors = inRange.Select(s => s.VisitorId).Distinct().Count() };
+            }
+
+            var byDay = stamps
+                .GroupBy(s => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(s.CreatedDate, DateTimeKind.Utc), Eastern).Date)
+                .ToDictionary(g => g.Key, g => (Views: g.Count(), Visitors: g.Select(s => s.VisitorId).Distinct().Count()));
+            var daily = Enumerable.Range(0, 30)
+                .Select(i => today.AddDays(i - 29))
+                .Select(d => new
+                {
+                    date = d.ToString("yyyy-MM-dd"),
+                    views = byDay.TryGetValue(d, out var v) ? v.Views : 0,
+                    visitors = byDay.TryGetValue(d, out var v2) ? v2.Visitors : 0
+                });
+
+            var firstView = repo.FirstViewDate();
+            return Ok(new
+            {
+                today = Range(EasternDayStartUtc(today)),
+                week = Range(EasternDayStartUtc(today.AddDays(-6))),
+                month = Range(monthStart),
+                allTimeViews = repo.CountAllViews(),
+                onlineNow = stamps.Where(s => s.CreatedDate >= DateTime.UtcNow.AddMinutes(-5)).Select(s => s.VisitorId).Distinct().Count(),
+                daily,
+                topLocations = repo.TopCities(monthStart, 5),
+                trackingSince = firstView.HasValue ? DateTime.SpecifyKind(firstView.Value, DateTimeKind.Utc) : (DateTime?)null,
+                locationsEnabled = _geo.IsLoaded
+            });
+        }
+
+        [HttpGet("analytics/breakdown")]
+        public IActionResult GetAnalyticsBreakdown(int? days = 30)
+        {
+            return Ok(new AnalyticsRepository(_connectionString).GetBreakdown(RangeStartUtc(days)));
+        }
+
+        [HttpGet("analytics/views")]
+        public IActionResult GetViewLog([FromQuery] ViewLogQuery query)
+        {
+            var (items, totalCount) = new AnalyticsRepository(_connectionString)
+                .GetViewLog(query.ToFilter(RangeStartUtc(query.Days)), Math.Max(1, query.Page), Math.Clamp(query.PageSize, 10, 200));
+            return Ok(new { items, totalCount });
+        }
+
+        [HttpGet("analytics/views.csv")]
+        public IActionResult ExportViewLog([FromQuery] ViewLogQuery query)
+        {
+            var (items, _) = new AnalyticsRepository(_connectionString)
+                .GetViewLog(query.ToFilter(RangeStartUtc(query.Days)), 1, 0, maxRows: 50000);
+
+            // Source (a visitor's ?utm_source=) and Title (a gown's Brand) are outsider-supplied
+            // text, so a leading = + - @ is defused with an apostrophe — otherwise Excel would
+            // run it as a formula when the admin opens the file.
+            static string Csv(string value)
+            {
+                if (string.IsNullOrEmpty(value)) return "";
+                if ("=+-@\t\r".Contains(value[0])) value = "'" + value;
+                return value.IndexOfAny(new[] { ',', '"', '\n', '\r' }) >= 0 ? $"\"{value.Replace("\"", "\"\"")}\"" : value;
+            }
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Time (Eastern),Page,Title,Location,Came From,Device,Visitor");
+            foreach (var v in items)
+            {
+                var eastern = TimeZoneInfo.ConvertTimeFromUtc(v.CreatedDate, Eastern);
+                sb.AppendLine(string.Join(",",
+                    eastern.ToString("yyyy-MM-dd HH:mm:ss"), Csv(v.Path), Csv(v.Title), Csv(v.Location),
+                    Csv(v.IsEntry ? v.Source : "(within site)"), Csv(v.Device), Csv(v.VisitorId)));
+            }
+
+            // UTF-8 with a BOM so Excel doesn't mangle accented city names.
+            var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+            return File(bytes, "text/csv", $"regowned-views-{TodayEastern():yyyy-MM-dd}.csv");
+        }
+    }
+
+    public class ViewLogQuery
+    {
+        public int? Days { get; set; } = 30;
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 50;
+        public string PageType { get; set; }
+        public string Source { get; set; }
+        public string Device { get; set; }
+        public string City { get; set; }
+        public string RegionCode { get; set; }
+        public string CountryCode { get; set; }
+        public string VisitorId { get; set; }
+        public int? EntityId { get; set; }
+        public string Search { get; set; }
+
+        public ViewLogFilter ToFilter(DateTime? fromUtc) => new()
+        {
+            FromUtc = fromUtc,
+            PageType = PageType,
+            Source = Source,
+            Device = Device,
+            City = City,
+            RegionCode = RegionCode,
+            CountryCode = CountryCode,
+            VisitorId = VisitorId,
+            EntityId = EntityId,
+            Search = Search
+        };
     }
 
     public class TogglePromoRequest

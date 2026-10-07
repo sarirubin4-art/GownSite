@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import {
@@ -12,6 +12,7 @@ import { AdLaneProvider } from '../context/AdLaneContext';
 import FloatingAds from './FloatingAds';
 import ContactAdminDialog from './ContactAdminDialog';
 import { wallpaperBackground } from '../theme';
+import { trackPageView } from '../utils/analytics';
 
 const NAV_LINKS = [
     { to: '/search', label: 'Browse Gowns' },
@@ -38,6 +39,11 @@ const Layout = ({ children }) => {
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [resendState, setResendState] = useState('idle'); // idle | sending | sent
     const [contactOpen, setContactOpen] = useState(false);
+
+    // Layout wraps every route, so this is the one place every page view passes through.
+    useEffect(() => {
+        trackPageView(location.pathname);
+    }, [location.pathname]);
 
     const onContactUsClick = () => {
         if (owner) {

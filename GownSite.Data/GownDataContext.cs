@@ -54,6 +54,12 @@ public class GownDataContext : DbContext
         modelBuilder.Entity<ContactMessage>()
             .HasIndex(c => c.IsResolved);
 
+        modelBuilder.Entity<PageView>().HasIndex(v => v.CreatedDate);
+        modelBuilder.Entity<PageView>().HasIndex(v => new { v.PageType, v.EntityId });
+        modelBuilder.Entity<PageView>().HasIndex(v => v.VisitorId);
+        modelBuilder.Entity<SiteEvent>().HasIndex(e => new { e.Type, e.CreatedDate });
+        modelBuilder.Entity<SiteEvent>().HasIndex(e => new { e.Type, e.EntityId });
+
         foreach (var relationship in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetForeignKeys()))
         {
             relationship.DeleteBehavior = DeleteBehavior.Restrict;
@@ -67,4 +73,6 @@ public class GownDataContext : DbContext
     public DbSet<PromoCode> PromoCodes { get; set; }
     public DbSet<SearchAlert> SearchAlerts { get; set; }
     public DbSet<ContactMessage> ContactMessages { get; set; }
+    public DbSet<PageView> PageViews { get; set; }
+    public DbSet<SiteEvent> SiteEvents { get; set; }
 }

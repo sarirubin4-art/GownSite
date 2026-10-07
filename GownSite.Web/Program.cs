@@ -48,6 +48,13 @@ public class Program
 
         builder.Services.AddSingleton<IGownColorScoreService, GownColorScoreService>();
 
+        // Site traffic: GeoLite2 city lookup (database kept fresh by GeoDatabaseUpdater)
+        // plus the recorder that turns requests into anonymous PageView/SiteEvent rows.
+        builder.Services.AddHttpClient();
+        builder.Services.AddSingleton<GeoLocator>();
+        builder.Services.AddSingleton<AnalyticsRecorder>();
+        builder.Services.AddHostedService<GeoDatabaseUpdater>();
+
         var emailConnectionString = builder.Configuration["Email:ConnectionString"];
         if (!string.IsNullOrEmpty(emailConnectionString))
         {
