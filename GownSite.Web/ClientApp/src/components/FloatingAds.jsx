@@ -61,7 +61,7 @@ const FloatingAds = ({ onVisibilityChange, onStackTopChange }) => {
         };
     }, [dismissed, ads, index, onStackTopChange]);
 
-    // Proof-of-value numbers for advertisers (shown on their My Ads page): each ad that
+    // Proof-of-value numbers for advertisers (shown in the Ads section of their My Listings page): each ad that
     // actually appears counts once per visit; clicking the card counts every time.
     const shownAdId = !dismissed && ads.length > 0 ? ads[index]?.id : null;
     useEffect(() => {

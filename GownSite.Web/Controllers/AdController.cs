@@ -121,7 +121,7 @@ namespace GownSite.Web.Controllers
             return repo.GetByOwner(CurrentOwnerId());
         }
 
-        // Proof-of-value numbers for My Ads, keyed by ad id: how often the floating card was
+        // Proof-of-value numbers for the Ads section of My Listings, keyed by ad id: how often the floating card was
         // shown and clicked, detail-page views, and "Learn More" clicks out to their site.
         // Contact reveals already ride along on the ad itself (InquiryCount).
         [HttpGet("myads/stats")]

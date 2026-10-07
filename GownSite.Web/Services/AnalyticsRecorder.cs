@@ -81,7 +81,7 @@ namespace GownSite.Web.Services
 
         // Events the browser reports itself (see SiteEventTypes.ClientReportable) come from an
         // anonymous endpoint anyone could script, and they feed numbers advertisers see on
-        // My Ads — so one visitor repeating the same event on the same ad within the window
+        // My Listings — so one visitor repeating the same event on the same ad within the window
         // counts once. Impressions get a long window (the client already sends one per
         // visit); clicks a short one, so genuine repeat clicks still count.
         public void RecordClientEvent(HttpContext http, string type, int? entityId)

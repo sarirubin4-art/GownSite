@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import {
     Box, Typography, Grid, Card, CardMedia, CardContent, Chip, Button, Stack,
@@ -19,10 +19,14 @@ import PromoApplyBox from '../components/PromoApplyBox';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
 import LoadingSpinner from '../components/LoadingSpinner';
 import useFormError from '../hooks/useFormError';
+import MyAds from './MyAds';
 
 const MyListings = () => {
     const { owner, loading } = useAuth();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const focusAds = searchParams.get('tab') === 'ads';
+    const [adCount, setAdCount] = useState(null); // reported by the Ads section once it loads
     const { laneSx } = useAdLane();
     const fullScreen = useFullScreenDialog();
     const [listings, setListings] = useState([]);
@@ -61,7 +65,7 @@ const MyListings = () => {
 
     useEffect(() => {
         if (!loading && !owner) {
-            navigate('/login?redirect=/mylistings');
+            navigate(`/login?redirect=${encodeURIComponent(focusAds ? '/mylistings?tab=ads' : '/mylistings')}`);
             return;
         }
         if (owner) load();
@@ -198,10 +202,29 @@ const MyListings = () => {
 
     const activeCount = listings.filter((g) => g.isActive).length;
     const hasActiveUnsoldListing = listings.some((g) => g.isActive && !g.isSold);
+    const hasBoth = listings.length > 0 && adCount > 0;
+    // An advertiser with no gowns just sees their ads — no empty "no gowns yet" section.
+    const showGownSection = listings.length > 0 || !adCount;
+    const scrollToAds = () => document.getElementById('my-ads')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     return (
         <Box>
             <Typography variant="h4" gutterBottom>My Listings</Typography>
+            {/* Gowns and ads used to be two separate pages (My Listings / My Ads). They're one
+                page now so nobody has to hunt for the other one: gowns first, then the Ads
+                section (only for people who actually have ads). Old /myads links and the
+                post-ad flows land here with ?tab=ads, which scrolls straight to the ads. */}
+            {hasBoth && (
+                <Alert severity="info" sx={{ mb: 3, mr: laneSx }} action={
+                    <Button color="inherit" size="small" onClick={scrollToAds} sx={{ whiteSpace: 'nowrap' }}>
+                        Jump to Your Ads
+                    </Button>
+                }>
+                    Your gowns are listed first, then your {adCount === 1 ? 'ad' : `${adCount} ads`} below.
+                </Alert>
+            )}
+            {showGownSection && (<>
+            {hasBoth && <Typography variant="h5" sx={{ mb: 0.5 }}>Your Gowns</Typography>}
             <Typography color="text.secondary" sx={{ mb: 2 }}>
                 {activeCount} gown{activeCount === 1 ? '' : 's'} live
             </Typography>
@@ -354,6 +377,9 @@ const MyListings = () => {
                     </Grid>
                 ))}
             </Grid>
+            </>)}
+
+            <MyAds onLoaded={setAdCount} scrollIntoViewOnLoad={focusAds} />
 
             <Dialog open={!!editTarget} onClose={onCloseEditDialog} maxWidth="sm" fullWidth fullScreen={fullScreen}>
                 <DialogTitle>Edit Listing</DialogTitle>

@@ -17,7 +17,7 @@ const AdPaymentSuccess = () => {
             }
             try {
                 await axios.post('/api/payment/confirm-ad-session', { sessionId });
-                navigate('/myads', { state: { posted: true } });
+                navigate('/mylistings?tab=ads', { state: { posted: true } });
             } catch (err) {
                 setError(err?.response?.data?.message || 'Could not confirm your payment.');
             }

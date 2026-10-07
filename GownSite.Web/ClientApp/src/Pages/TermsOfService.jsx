@@ -75,7 +75,7 @@ const TermsOfService = () => {
                         <ListItemText primary="Adding a card does not charge you immediately — you're only charged once your listing or ad is approved and goes live." />
                     </ListItem>
                     <ListItem sx={{ display: 'list-item', px: 0 }}>
-                        <ListItemText primary="You can cancel an active listing or ad at any time from My Listings or My Ads, which stops future billing immediately." />
+                        <ListItemText primary="You can cancel an active listing or ad at any time from My Listings, which stops future billing immediately." />
                     </ListItem>
                     <ListItem sx={{ display: 'list-item', px: 0 }}>
                         <ListItemText primary="Promotional codes, including any discounted or free introductory period, are subject to the specific terms disclosed at the time they're offered and may be changed, limited, or discontinued at any time. Billing automatically reverts to the regular price once a promotional period ends." />

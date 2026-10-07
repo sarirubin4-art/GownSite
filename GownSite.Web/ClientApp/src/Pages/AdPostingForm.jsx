@@ -126,7 +126,7 @@ const AdPostingForm = () => {
         }
     }, [loading, owner]);
 
-    // Resuming an in-progress draft (from "Complete Setup" in My Ads, or a
+    // Resuming an in-progress draft (from "Complete Setup" in My Listings' Ads section, or a
     // reloaded tab) — load whatever was already saved before the user touches anything,
     // so the autosave effect below doesn't immediately re-save an unchanged form.
     useEffect(() => {

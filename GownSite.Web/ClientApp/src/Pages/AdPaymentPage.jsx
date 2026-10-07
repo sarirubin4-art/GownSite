@@ -38,7 +38,7 @@ const AdPaymentPage = () => {
         setLoading(true);
         try {
             await axios.post('/api/ad/activate-test', { id: Number(adId) });
-            navigate('/myads', { state: { posted: true } });
+            navigate('/mylistings?tab=ads', { state: { posted: true } });
         } catch {
             setError('Could not activate the ad.');
         } finally {

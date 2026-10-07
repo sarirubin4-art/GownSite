@@ -235,7 +235,7 @@ namespace GownSite.Web.Controllers
             if (ad == null) return NotFound();
             if (ad.OwnerId != CurrentOwnerId()) return Forbid();
             if (ad.ModerationStatus != ModerationStatus.Draft && ad.ModerationStatus != ModerationStatus.PendingReview)
-                return BadRequest(new { message = "This ad has already started billing — use the promo box on My Ads instead." });
+                return BadRequest(new { message = "This ad has already started billing — use the promo box on your ad in My Listings instead." });
 
             var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m);
             var result = DraftPromoApplier.ApplyToAd(_connectionString, feeUsd, ad, request.PromoCode);

@@ -458,11 +458,18 @@ const SearchGowns = () => {
 
             <Snackbar
                 open={showPostedNotice}
-                autoHideDuration={6000}
-                onClose={() => setShowPostedNotice(false)}
+                autoHideDuration={12000}
+                onClose={(e, reason) => { if (reason !== 'clickaway') setShowPostedNotice(false); }}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
-                <Alert onClose={() => setShowPostedNotice(false)} severity="success" variant="filled">
+                <Alert
+                    onClose={() => setShowPostedNotice(false)} severity="success" variant="filled"
+                    action={
+                        <Button color="inherit" size="small" component={Link} to="/mylistings" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                            View My Listings
+                        </Button>
+                    }
+                >
                     Posted successfully! Your gown is now live.
                 </Alert>
             </Snackbar>

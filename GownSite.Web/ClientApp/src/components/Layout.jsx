@@ -113,7 +113,6 @@ const Layout = ({ children }) => {
                         {owner && (
                             <>
                                 <Button component={Link} to="/mylistings" color="inherit">My Listings</Button>
-                                <Button component={Link} to="/myads" color="inherit">My Ads</Button>
                                 {owner.isAdmin && (
                                     <Button component={Link} to="/admin" color="inherit" variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.6)' }}>
                                         Admin
@@ -151,14 +150,6 @@ const Layout = ({ children }) => {
                                     sx={{ display: { xs: 'flex', md: 'none' } }}
                                 >
                                     My Listings
-                                </MenuItem>
-                                <MenuItem
-                                    component={Link}
-                                    to="/myads"
-                                    onClick={() => setMenuAnchor(null)}
-                                    sx={{ display: { xs: 'flex', md: 'none' } }}
-                                >
-                                    My Ads
                                 </MenuItem>
                                 {owner.isAdmin && (
                                     <MenuItem
@@ -203,9 +194,6 @@ const Layout = ({ children }) => {
                             <>
                                 <ListItemButton component={Link} to="/mylistings" onClick={closeDrawer}>
                                     <ListItemText primary="My Listings" />
-                                </ListItemButton>
-                                <ListItemButton component={Link} to="/myads" onClick={closeDrawer}>
-                                    <ListItemText primary="My Ads" />
                                 </ListItemButton>
                                 {owner.isAdmin && (
                                     <ListItemButton component={Link} to="/admin" onClick={closeDrawer}>

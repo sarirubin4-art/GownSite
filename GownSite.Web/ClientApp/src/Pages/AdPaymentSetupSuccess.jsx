@@ -36,8 +36,8 @@ const AdPaymentSetupSuccess = () => {
                         <Typography color="text.secondary" sx={{ mb: 3 }}>
                             We'll email you as soon as it's approved — your card won't be charged until then.
                         </Typography>
-                        <Button variant="contained" component={Link} to="/myads">
-                            View My Ads
+                        <Button variant="contained" component={Link} to="/mylistings?tab=ads">
+                            View My Listings
                         </Button>
                     </>
                 ) : (

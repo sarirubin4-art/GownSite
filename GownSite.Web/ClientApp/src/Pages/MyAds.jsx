@@ -13,12 +13,13 @@ import LocationField from '../components/LocationField';
 import FilterAutocomplete from '../components/FilterAutocomplete';
 import PromoApplyBox from '../components/PromoApplyBox';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
-import LoadingSpinner from '../components/LoadingSpinner';
 import ImagePositionEditor from '../components/ImagePositionEditor';
 import { focalObjectPosition } from '../utils/imageFocal';
 import useFormError from '../hooks/useFormError';
 
-const MyAds = () => {
+// The Ads section of My Listings (it was its own My Ads page). Renders nothing for someone
+// with no ads, and reports its count up so My Listings can decide what headings to show.
+const MyAds = ({ onLoaded, scrollIntoViewOnLoad }) => {
     const { owner, loading } = useAuth();
     const fullScreen = useFullScreenDialog();
     const navigate = useNavigate();
@@ -46,17 +47,28 @@ const MyAds = () => {
         }
     };
 
+    // Rendered as the Ads tab of My Listings, which already handles the logged-out redirect.
     useEffect(() => {
-        if (!loading && !owner) {
-            navigate('/login?redirect=/myads');
-            return;
-        }
         if (owner) load();
-    }, [loading, owner]);
+    }, [owner]);
+
+    useEffect(() => {
+        if (!adsLoaded) return;
+        onLoaded?.(ads.length);
+    }, [adsLoaded, ads.length]);
+
+    // Arriving from an old My Ads link or right after posting an ad: go straight to the ads.
+    const scrolledRef = React.useRef(false);
+    useEffect(() => {
+        if (!adsLoaded || !scrollIntoViewOnLoad || scrolledRef.current || ads.length === 0) return;
+        scrolledRef.current = true;
+        setTimeout(() => document.getElementById('my-ads')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    }, [adsLoaded, scrollIntoViewOnLoad, ads.length]);
 
     useEffect(() => {
         if (routerLocation.state?.posted) {
-            navigate(routerLocation.pathname, { replace: true, state: {} });
+            // Keep the query string — it's what selects the Ads tab.
+            navigate(routerLocation.pathname + routerLocation.search, { replace: true, state: {} });
         }
     }, []);
 
@@ -132,22 +144,19 @@ const MyAds = () => {
         }
     };
 
-    if (loading || !owner) return null;
-    if (!adsLoaded) return <LoadingSpinner />;
+    if (loading || !owner || !adsLoaded) return null;
+    // The posted-ad notice still has to show even before the list refreshes — so only bail
+    // out entirely when there's truly nothing to render.
+    if (ads.length === 0 && !showPostedNotice) return null;
 
     const activeCount = ads.filter((a) => a.isActive).length;
 
     return (
-        <Box>
-            <Typography variant="h4" gutterBottom>My Ads</Typography>
-            {ads.length > 0 && (
-                <Typography color="text.secondary" sx={{ mb: 2 }}>
-                    {activeCount} ad{activeCount === 1 ? '' : 's'} live
-                </Typography>
-            )}
-            {ads.length === 0 && (
-                <Typography color="text.secondary">You haven't placed any ads yet.</Typography>
-            )}
+        <Box id="my-ads" sx={{ mt: 5, scrollMarginTop: { xs: 140, md: 80 } }}>
+            <Typography variant="h5" sx={{ mb: 0.5 }}>Your Ads</Typography>
+            <Typography color="text.secondary" sx={{ mb: 2 }}>
+                {activeCount} ad{activeCount === 1 ? '' : 's'} live
+            </Typography>
             <Grid container spacing={3}>
                 {ads.map((a) => (
                     <Grid key={a.id} size={{ xs: 12, sm: 6, md: 4 }}>

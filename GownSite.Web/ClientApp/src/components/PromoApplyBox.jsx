@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Box, Typography, Stack, TextField, Button } from '@mui/material';
 
 // Bordered "Apply a Promo Code" box, reused everywhere a promo can be applied to an
-// already-created gown/ad (owner's My Listings/My Ads, admin's edit dialogs, and the
+// already-created gown/ad (owner's My Listings page, admin's edit dialogs, and the
 // checkout/payment-setup screens). Pre-fills from currentPromoCode whenever one is already
 // applied, so it's immediately apparent rather than the box looking empty/unset.
 const PromoApplyBox = ({ currentPromoCode, onApply, applying, message, title = 'Apply a Promo Code' }) => {

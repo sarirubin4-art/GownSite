@@ -1,5 +1,5 @@
 import React from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
 import ReloadOnNewDeploy from './components/ReloadOnNewDeploy';
@@ -29,7 +29,7 @@ import AdPaymentPage from './Pages/AdPaymentPage';
 import AdPaymentSuccess from './Pages/AdPaymentSuccess';
 import AdPaymentSetupPage from './Pages/AdPaymentSetupPage';
 import AdPaymentSetupSuccess from './Pages/AdPaymentSetupSuccess';
-import MyAds from './Pages/MyAds';
+
 import AdminDashboard from './Pages/AdminDashboard';
 import TermsOfService from './Pages/TermsOfService';
 import PrivacyPolicy from './Pages/PrivacyPolicy';
@@ -37,6 +37,13 @@ import BusinessBillingSetupPage from './Pages/BusinessBillingSetupPage';
 import BusinessBillingSetupSuccess from './Pages/BusinessBillingSetupSuccess';
 import ConciergePostingTerms from './Pages/ConciergePostingTerms';
 import ConciergePostingForm from './Pages/ConciergePostingForm';
+
+// My Ads is now the Ads section of My Listings. Old links (emails, bookmarks) still land there,
+// carrying along any router state (e.g. the "posted successfully" notice).
+const MyAdsRedirect = () => {
+    const location = useLocation();
+    return <Navigate to="/mylistings?tab=ads" replace state={location.state} />;
+};
 
 const App = () => {
     return (
@@ -72,7 +79,7 @@ const App = () => {
                     <Route path='/adpaymentsuccess' element={<AdPaymentSuccess />} />
                     <Route path='/advertise/payment-setup/:adId' element={<AdPaymentSetupPage />} />
                     <Route path='/advertise/setup-success' element={<AdPaymentSetupSuccess />} />
-                    <Route path='/myads' element={<MyAds />} />
+                    <Route path='/myads' element={<MyAdsRedirect />} />
                     <Route path='/admin' element={<AdminDashboard />} />
                     <Route path='/terms' element={<TermsOfService />} />
                     <Route path='/privacy' element={<PrivacyPolicy />} />

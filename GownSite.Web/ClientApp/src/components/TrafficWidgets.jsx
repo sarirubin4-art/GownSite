@@ -17,7 +17,7 @@ export const PAGE_TYPE_LABELS = {
     Advertise: 'Advertise',
     Concierge: 'Concierge',
     Account: 'Log in / Sign up',
-    MyAccount: 'My Listings / My Ads',
+    MyAccount: 'My Listings',
     Checkout: 'Checkout',
     Info: 'Terms / Privacy',
     Other: 'Other'
