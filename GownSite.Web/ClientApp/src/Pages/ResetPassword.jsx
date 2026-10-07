@@ -6,6 +6,7 @@ import {
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import axios from 'axios';
+import useFormError from '../hooks/useFormError';
 
 const ResetPassword = () => {
     const [searchParams] = useSearchParams();
@@ -16,7 +17,7 @@ const ResetPassword = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState('');
+    const [error, setError, errorRef] = useFormError();
     const [done, setDone] = useState(false);
 
     const onSubmit = async () => {
@@ -70,8 +71,8 @@ const ResetPassword = () => {
             <Typography color="text.secondary" sx={{ mb: 3 }}>
                 Choose a new password for your account.
             </Typography>
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-            <Stack spacing={2}>
+            {error && <Alert ref={errorRef} severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+            <Stack component="form" noValidate spacing={2} onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
                 <TextField
                     label="New Password" type={showPassword ? 'text' : 'password'} value={password}
                     onChange={(e) => setPassword(e.target.value)} fullWidth
@@ -91,7 +92,7 @@ const ResetPassword = () => {
                     label="Confirm New Password" type={showPassword ? 'text' : 'password'} value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)} fullWidth
                 />
-                <Button variant="contained" size="large" disabled={submitting} onClick={onSubmit}>
+                <Button type="submit" variant="contained" size="large" disabled={submitting}>
                     {submitting ? 'Saving...' : 'Reset Password'}
                 </Button>
             </Stack>

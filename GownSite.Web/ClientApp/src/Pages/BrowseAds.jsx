@@ -11,14 +11,23 @@ import usePageTitle from '../hooks/usePageTitle';
 import useDragSelectGuard from '../hooks/useDragSelectGuard';
 import { orderAdsForDisplay } from '../utils/shuffle';
 import { focalObjectPosition } from '../utils/imageFocal';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const ALL_LOCATIONS = 'All';
+
+// Always at the end of the tab strip, in this order, whether or not they have ads.
+const PINNED_LAST_CATEGORIES = ['Gemachs', 'Other'];
+
+// Dropdown: plain A-Z so a specific category is easy to find, with "Other" pinned last.
+const ALPHABETICAL_CATEGORIES = [...AD_CATEGORY_OPTIONS].sort((a, b) =>
+    a.value === 'Other' ? 1 : b.value === 'Other' ? -1 : a.label.localeCompare(b.label));
 
 const BrowseAds = () => {
     usePageTitle('Ad Directory', 'Browse trusted event service providers — hair, makeup, alterations, gown rental/sales, apparel, and more.');
     const navigate = useNavigate();
     const { laneSx } = useAdLane();
     const [ads, setAds] = useState([]);
+    const [adsLoaded, setAdsLoaded] = useState(false);
     const [category, setCategory] = useState('All');
     const [location, setLocation] = useState(ALL_LOCATIONS);
     const [locationOptions, setLocationOptions] = useState([]);
@@ -26,8 +35,12 @@ const BrowseAds = () => {
 
     useEffect(() => {
         const load = async () => {
-            const { data } = await axios.get('/api/ad/getactive');
-            setAds(data);
+            try {
+                const { data } = await axios.get('/api/ad/getactive');
+                setAds(data);
+            } finally {
+                setAdsLoaded(true);
+            }
         };
         load();
         axios.get('/api/ad/locations').then(({ data }) => setLocationOptions(data));
@@ -38,6 +51,19 @@ const BrowseAds = () => {
     // keep any one advertiser from permanently owning top placement in that category.
     // Memoized so it doesn't reshuffle on every render — only when the ad list itself changes.
     const shuffledAds = useMemo(() => orderAdsForDisplay(ads), [ads]);
+
+    // Tabs follow AD_CATEGORY_OPTIONS' hand-picked order, except that categories with no
+    // live ads move behind the ones that have some (keeping their relative order), so
+    // visitors don't land on empty tabs first. Gemachs and Other always stay at the end.
+    const tabCategories = useMemo(() => {
+        const withAds = new Set(ads.flatMap((a) => (a.categories || '').split(',').filter(Boolean)));
+        const regular = AD_CATEGORY_OPTIONS.filter((c) => !PINNED_LAST_CATEGORIES.includes(c.value));
+        return [
+            ...regular.filter((c) => withAds.has(c.value)),
+            ...regular.filter((c) => !withAds.has(c.value)),
+            ...PINNED_LAST_CATEGORIES.map((value) => AD_CATEGORY_OPTIONS.find((c) => c.value === value))
+        ];
+    }, [ads]);
 
     const visibleAds = (category === 'All' ? ads : shuffledAds)
         .filter(a => category === 'All' || (a.categories || '').split(',').includes(category))
@@ -60,7 +86,7 @@ const BrowseAds = () => {
                 sx={{ mr: laneSx, borderBottom: 1, borderColor: 'divider' }}
             >
                 <Tab label="All" value="All" />
-                {AD_CATEGORY_OPTIONS.map(c => (
+                {tabCategories.map(c => (
                     <Tab key={c.value} label={c.label} value={c.value} />
                 ))}
             </Tabs>
@@ -78,7 +104,7 @@ const BrowseAds = () => {
                     sx={{ width: 220 }}
                 >
                     <MenuItem value="All">All Categories</MenuItem>
-                    {AD_CATEGORY_OPTIONS.map((c) => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
+                    {ALPHABETICAL_CATEGORIES.map((c) => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
                 </TextField>
                 <TextField
                     select size="small" label="Location" value={location}
@@ -90,7 +116,9 @@ const BrowseAds = () => {
                 </TextField>
             </Stack>
 
-            {visibleAds.length === 0 ? (
+            {!adsLoaded ? (
+                <LoadingSpinner />
+            ) : visibleAds.length === 0 ? (
                 <Typography color="text.secondary">No advertisers in this category yet.</Typography>
             ) : (
                 <Stack spacing={2.5} sx={{ mr: laneSx }}>

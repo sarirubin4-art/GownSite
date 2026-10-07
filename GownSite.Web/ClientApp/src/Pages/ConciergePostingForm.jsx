@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import LocationField from '../components/LocationField';
 import MorePicturesInput from '../components/MorePicturesInput';
 import FilterAutocomplete from '../components/FilterAutocomplete';
+import useFormError from '../hooks/useFormError';
 
 const MAX_BATCH_GOWNS = 20;
 const DRAFT_KEY = 'regowned_concierge_posting_draft';
@@ -51,7 +52,7 @@ const ConciergePostingForm = () => {
     const { owner, loading } = useAuth();
     const navigate = useNavigate();
     const [batchId] = useState(() => crypto.randomUUID());
-    const [error, setError] = useState('');
+    const [error, setError, errorRef] = useFormError();
     const [submitting, setSubmitting] = useState(false);
     const [progressIndex, setProgressIndex] = useState(0);
     const [submittedIds, setSubmittedIds] = useState([]);
@@ -230,7 +231,7 @@ const ConciergePostingForm = () => {
                 </Alert>
             )}
             {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
+                <Alert ref={errorRef} severity="error" sx={{ mb: 2 }}>
                     {error}
                 </Alert>
             )}

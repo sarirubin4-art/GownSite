@@ -7,7 +7,7 @@ namespace GownSite.Web.Services
     {
         public static string VerifyEmail(string ownerName, string verifyUrl, string frontendBaseUrl) =>
             EmailLayout.Wrap(
-                EmailLayout.Heading($"Welcome, {ownerName}!") +
+                EmailLayout.Heading($"Welcome, {EmailLayout.UserText(ownerName)}!") +
                 $"<p>Thanks for joining Regowned. Please verify your email address to activate your account.</p>" +
                 EmailLayout.Button("Verify My Email", verifyUrl) +
                 $"<p style=\"font-size:13px;color:#8A6D72;\">If the button doesn't work, copy and paste this link into your browser:<br>{verifyUrl}</p>",
@@ -16,36 +16,36 @@ namespace GownSite.Web.Services
         public static string ResetPassword(string ownerName, string resetUrl, string frontendBaseUrl) =>
             EmailLayout.Wrap(
                 EmailLayout.Heading("Reset Your Password") +
-                $"<p>Hi {ownerName}, we received a request to reset your Regowned password. This link expires in 1 hour.</p>" +
+                $"<p>Hi {EmailLayout.UserText(ownerName)}, we received a request to reset your Regowned password. This link expires in 1 hour.</p>" +
                 EmailLayout.Button("Reset Password", resetUrl) +
                 $"<p style=\"font-size:13px;color:#8A6D72;\">If you didn't request this, you can safely ignore this email — your password won't change.</p>",
                 frontendBaseUrl);
 
         public static string NewSubmissionAdmin(string type, string ownerName, string description, string adminUrl, string frontendBaseUrl) =>
             EmailLayout.Wrap(
-                $"<p>A new {type} was submitted by <strong>{ownerName}</strong> and is awaiting your review.</p>" +
-                $"<p>{description}</p>" +
+                $"<p>A new {type} was submitted by <strong>{EmailLayout.UserText(ownerName)}</strong> and is awaiting your review.</p>" +
+                $"<p>{EmailLayout.UserText(description)}</p>" +
                 EmailLayout.Button("Review in Admin Dashboard", adminUrl),
                 frontendBaseUrl);
 
         public static string NewSubmissionAdminBatch(string ownerName, List<string> descriptions, string adminUrl, string frontendBaseUrl) =>
             EmailLayout.Wrap(
-                $"<p><strong>{ownerName}</strong> submitted {descriptions.Count} gowns in one batch, all awaiting your review.</p>" +
-                $"<ul>{string.Join("", descriptions.Select(d => $"<li>{d}</li>"))}</ul>" +
+                $"<p><strong>{EmailLayout.UserText(ownerName)}</strong> submitted {descriptions.Count} gowns in one batch, all awaiting your review.</p>" +
+                $"<ul>{string.Join("", descriptions.Select(d => $"<li>{EmailLayout.UserText(d)}</li>"))}</ul>" +
                 EmailLayout.Button("Review in Admin Dashboard", adminUrl),
                 frontendBaseUrl);
 
         public static string ContactReply(string topic, string originalMessage, string reply, string frontendBaseUrl) =>
             EmailLayout.Wrap(
                 EmailLayout.Heading("A Reply From Regowned") +
-                $"<p>{reply}</p>" +
-                $"<p style=\"font-size:13px;color:#8A6D72;margin-top:24px;\">In response to your message ({topic}):<br><em>{originalMessage}</em></p>",
+                $"<p>{EmailLayout.UserText(reply)}</p>" +
+                $"<p style=\"font-size:13px;color:#8A6D72;margin-top:24px;\">In response to your message ({EmailLayout.UserText(topic)}):<br><em>{EmailLayout.UserText(originalMessage)}</em></p>",
                 frontendBaseUrl);
 
         public static string ConciergeDraftReady(string ownerName, int gownCount, string myListingsUrl, string frontendBaseUrl) =>
             EmailLayout.Wrap(
                 EmailLayout.Heading("Your Concierge Draft Is Ready!") +
-                $"<p>Hi {ownerName}, we've finished putting together {(gownCount > 1 ? $"your {gownCount} gowns" : "your gown")} for Regowned. " +
+                $"<p>Hi {EmailLayout.UserText(ownerName)}, we've finished putting together {(gownCount > 1 ? $"your {gownCount} gowns" : "your gown")} for Regowned. " +
                 $"Head to My Listings to review the details, add a card, and submit for approval.</p>" +
                 EmailLayout.Button("Review My Listings", myListingsUrl),
                 frontendBaseUrl);
@@ -72,14 +72,14 @@ namespace GownSite.Web.Services
         public static string Removed(string type, string reason, string frontendBaseUrl) =>
             EmailLayout.Wrap(
                 $"<p>Your {type} on Regowned has been taken down by an administrator.</p>" +
-                $"<p><strong>Reason:</strong> {reason}</p>" +
+                $"<p><strong>Reason:</strong> {EmailLayout.UserText(reason)}</p>" +
                 $"<p>Your subscription has been canceled and you will not be charged further.</p>",
                 frontendBaseUrl);
 
         public static string Rejected(string type, string reason, string frontendBaseUrl) =>
             EmailLayout.Wrap(
                 $"<p>Your {type} submission on Regowned was not approved.</p>" +
-                $"<p><strong>Reason:</strong> {reason}</p>" +
+                $"<p><strong>Reason:</strong> {EmailLayout.UserText(reason)}</p>" +
                 $"<p>You're welcome to submit a new listing that addresses this.</p>",
                 frontendBaseUrl);
 

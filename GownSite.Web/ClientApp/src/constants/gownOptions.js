@@ -49,19 +49,23 @@ export const LISTING_TYPE_OPTIONS = [
     { value: 'Sale', label: 'For Sale' },
 ];
 
+// Display order is hand-picked by the owner — this is the order the Ad Directory tabs and
+// the posting form's category picker follow. (The backend AdCategory enum's order doesn't
+// matter here; new values are always appended there.)
 export const AD_CATEGORY_OPTIONS = [
+    { value: 'GownRental', label: 'Gown Rental/Sales' },
+    { value: 'Bridal', label: 'Bridal' },
     { value: 'Makeup', label: 'Makeup' },
     { value: 'Hair', label: 'Hair' },
     { value: 'Sheitels', label: 'Sheitels' },
     { value: 'Alterations', label: 'Alterations' },
-    { value: 'GownRental', label: 'Gown Rental/Sales' },
     { value: 'GirlsWomensApparel', label: 'Girls/Womens Apparel' },
-    { value: 'Bridal', label: 'Bridal' },
-    { value: 'Photography', label: 'Photography' },
-    { value: 'PartyPlanners', label: 'Party Planners' },
-    { value: 'Gemachs', label: 'Gemachs' },
     { value: 'PartyRentals', label: 'Party Rentals' },
+    { value: 'PartyPlanners', label: 'Party Planners' },
     { value: 'Catering', label: 'Catering' },
+    { value: 'Gifts', label: 'Gifts' },
+    { value: 'Photography', label: 'Photography' },
+    { value: 'Gemachs', label: 'Gemachs' },
     { value: 'Other', label: 'Other' },
 ];
 

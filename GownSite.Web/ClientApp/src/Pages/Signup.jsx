@@ -4,6 +4,7 @@ import { Container, TextField, Button, Typography, Alert, Stack, IconButton, Inp
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useAuth } from '../context/AuthContext';
+import useFormError from '../hooks/useFormError';
 
 const Signup = () => {
     const [name, setName] = useState('');
@@ -11,7 +12,7 @@ const Signup = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState('');
+    const [error, setError, errorRef] = useFormError();
     const { signup } = useAuth();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -44,7 +45,7 @@ const Signup = () => {
             <Alert severity="info" sx={{ mb: 2 }}>
                 The email and phone number you enter here are what interested buyers or renters will see when they reach out about your listings — make sure they're ones you check.
             </Alert>
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+            {error && <Alert ref={errorRef} severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             <Stack spacing={2}>
                 <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
                 <TextField label="Phone Number" value={number} onChange={(e) => setNumber(e.target.value)} fullWidth />

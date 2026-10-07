@@ -24,8 +24,10 @@ import ImageZoomDialog from '../components/ImageZoomDialog';
 import FilterAutocomplete from '../components/FilterAutocomplete';
 import PromoApplyBox from '../components/PromoApplyBox';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
+import LoadingSpinner from '../components/LoadingSpinner';
 import ImagePositionEditor from '../components/ImagePositionEditor';
 import { focalObjectPosition } from '../utils/imageFocal';
+import useFormError from '../hooks/useFormError';
 
 const MAX_POST_FOR_PATRON_GOWNS = 20;
 const TRAFFIC_TAB = 9;
@@ -75,7 +77,7 @@ const DetailRow = ({ label, value }) => {
     return (
         <Stack direction="row" spacing={1} sx={{ py: 0.5 }}>
             <Typography variant="body2" sx={{ fontWeight: 700, minWidth: 140 }}>{label}</Typography>
-            <Typography variant="body2" color="text.secondary">{value}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>{value}</Typography>
         </Stack>
     );
 };
@@ -161,7 +163,7 @@ const itemSearchText = (item, type) => [
     type === 'ad' ? adCategoryLabels(item.categories).join(' ') : null
 ].filter(Boolean).join(' ').toLowerCase();
 
-const PendingList = ({ items, type, onApprove, onRejectClick, error, fullScreen, onEditClick, laneSx }) => {
+const PendingList = ({ items, loaded, type, onApprove, onRejectClick, error, fullScreen, onEditClick, laneSx }) => {
     const batchCounts = items.reduce((acc, i) => {
         if (i.batchId) acc[i.batchId] = (acc[i.batchId] || 0) + 1;
         return acc;
@@ -171,7 +173,9 @@ const PendingList = ({ items, type, onApprove, onRejectClick, error, fullScreen,
     return (
     <Box sx={{ mt: 3 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        {items.length === 0 ? (
+        {!loaded ? (
+            <LoadingSpinner />
+        ) : items.length === 0 ? (
             <Typography color="text.secondary">Nothing pending review right now.</Typography>
         ) : (
             <Grid container spacing={3} sx={{ mr: laneSx }}>
@@ -224,7 +228,7 @@ const PendingList = ({ items, type, onApprove, onRejectClick, error, fullScreen,
     );
 };
 
-const ActiveList = ({ items, type, onTakeDownClick, onEditClick, error, laneSx }) => {
+const ActiveList = ({ items, loaded, type, onTakeDownClick, onEditClick, error, laneSx }) => {
     const [search, setSearch] = useState('');
     const visibleItems = search.trim()
         ? items.filter((item) => itemSearchText(item, type).includes(search.trim().toLowerCase()))
@@ -240,7 +244,9 @@ const ActiveList = ({ items, type, onTakeDownClick, onEditClick, error, laneSx }
                 sx={{ mb: 2, mr: laneSx, width: { xs: '100%', sm: 320 } }}
             />
         )}
-        {items.length === 0 ? (
+        {!loaded ? (
+            <LoadingSpinner />
+        ) : items.length === 0 ? (
             <Typography color="text.secondary">Nothing live right now.</Typography>
         ) : visibleItems.length === 0 ? (
             <Typography color="text.secondary">No matches for "{search}".</Typography>
@@ -303,6 +309,12 @@ const AdminDashboard = () => {
     const [pendingAds, setPendingAds] = useState([]);
     const [activeGowns, setActiveGowns] = useState([]);
     const [activeAds, setActiveAds] = useState([]);
+    // Which sections' first load has finished (pending, active, promoCodes, owners,
+    // contactMessages, conciergeQueue) — each tab shows a spinner until then instead of
+    // flashing its "nothing here" message while the data is still on its way. Marked in a
+    // finally so a failed request falls back to the empty state rather than spinning forever.
+    const [loaded, setLoaded] = useState({});
+    const markLoaded = (section) => setLoaded((prev) => (prev[section] ? prev : { ...prev, [section]: true }));
     const [rejectTarget, setRejectTarget] = useState(null); // { type: 'gown'|'ad', id }
     const [rejectReason, setRejectReason] = useState('');
     const [takeDownTarget, setTakeDownTarget] = useState(null); // { type: 'gown'|'ad', id }
@@ -310,14 +322,14 @@ const AdminDashboard = () => {
     const [editGownTarget, setEditGownTarget] = useState(null);
     const [editGownNewPrimaryPicture, setEditGownNewPrimaryPicture] = useState(null);
     const [editGownNewPrimaryPreview, setEditGownNewPrimaryPreview] = useState(null);
-    const [editGownError, setEditGownError] = useState('');
+    const [editGownError, setEditGownError, editGownErrorRef] = useFormError();
     const [editGownRemovePictureIds, setEditGownRemovePictureIds] = useState([]);
     const [editGownNewMorePictures, setEditGownNewMorePictures] = useState([]);
     const [zoomEditGownPrimary, setZoomEditGownPrimary] = useState(false);
     const [editAdTarget, setEditAdTarget] = useState(null);
     const [editAdNewImage, setEditAdNewImage] = useState(null);
     const [editAdNewImagePreview, setEditAdNewImagePreview] = useState(null);
-    const [editAdError, setEditAdError] = useState('');
+    const [editAdError, setEditAdError, editAdErrorRef] = useFormError();
     const [editGownPromoApplying, setEditGownPromoApplying] = useState(false);
     const [editGownPromoMessage, setEditGownPromoMessage] = useState(null);
     const [editAdPromoApplying, setEditAdPromoApplying] = useState(false);
@@ -351,7 +363,7 @@ const AdminDashboard = () => {
     const [postForPatronShared, setPostForPatronShared] = useState(emptyPostForPatronShared);
     const [postForPatronGowns, setPostForPatronGowns] = useState([makePostForPatronGown()]);
     const [postForPatronExpanded, setPostForPatronExpanded] = useState(0);
-    const [postForPatronError, setPostForPatronError] = useState('');
+    const [postForPatronError, setPostForPatronError, postForPatronErrorRef] = useFormError();
     const [postForPatronSending, setPostForPatronSending] = useState(false);
     const [postForPatronProgressIndex, setPostForPatronProgressIndex] = useState(0);
     const [postForPatronSavedCount, setPostForPatronSavedCount] = useState(0);
@@ -372,41 +384,65 @@ const AdminDashboard = () => {
     const [conciergeMarkingBatchId, setConciergeMarkingBatchId] = useState(null);
 
     const loadPending = async () => {
-        const [gowns, ads] = await Promise.all([
-            axios.get('/api/admin/gowns/pending'),
-            axios.get('/api/admin/ads/pending')
-        ]);
-        setPendingGowns(gowns.data);
-        setPendingAds(ads.data);
+        try {
+            const [gowns, ads] = await Promise.all([
+                axios.get('/api/admin/gowns/pending'),
+                axios.get('/api/admin/ads/pending')
+            ]);
+            setPendingGowns(gowns.data);
+            setPendingAds(ads.data);
+        } finally {
+            markLoaded('pending');
+        }
     };
 
     const loadActive = async () => {
-        const [gowns, ads] = await Promise.all([
-            axios.get('/api/admin/gowns/active'),
-            axios.get('/api/admin/ads/active')
-        ]);
-        setActiveGowns(gowns.data);
-        setActiveAds(ads.data);
+        try {
+            const [gowns, ads] = await Promise.all([
+                axios.get('/api/admin/gowns/active'),
+                axios.get('/api/admin/ads/active')
+            ]);
+            setActiveGowns(gowns.data);
+            setActiveAds(ads.data);
+        } finally {
+            markLoaded('active');
+        }
     };
 
     const loadPromoCodes = async () => {
-        const { data } = await axios.get('/api/admin/promocodes');
-        setPromoCodes(data);
+        try {
+            const { data } = await axios.get('/api/admin/promocodes');
+            setPromoCodes(data);
+        } finally {
+            markLoaded('promoCodes');
+        }
     };
 
     const loadOwners = async () => {
-        const { data } = await axios.get('/api/admin/owners');
-        setOwners(data);
+        try {
+            const { data } = await axios.get('/api/admin/owners');
+            setOwners(data);
+        } finally {
+            markLoaded('owners');
+        }
     };
 
     const loadContactMessages = async () => {
-        const { data } = await axios.get('/api/admin/contact-messages');
-        setContactMessages(data);
+        try {
+            const { data } = await axios.get('/api/admin/contact-messages');
+            setContactMessages(data);
+        } finally {
+            markLoaded('contactMessages');
+        }
     };
 
     const loadConciergeQueue = async () => {
-        const { data } = await axios.get('/api/admin/concierge/queue');
-        setConciergeQueue(data);
+        try {
+            const { data } = await axios.get('/api/admin/concierge/queue');
+            setConciergeQueue(data);
+        } finally {
+            markLoaded('conciergeQueue');
+        }
     };
 
     // $12/gown for 1-3 gowns, $9/gown once a batch has 4+ — a pre-filled starting
@@ -991,6 +1027,7 @@ const AdminDashboard = () => {
             {tab === 0 && (
                 <PendingList
                     items={pendingGowns}
+                    loaded={loaded.pending}
                     type="gown"
                     error={error}
                     onApprove={(id) => onApprove('gown', id)}
@@ -1003,6 +1040,7 @@ const AdminDashboard = () => {
             {tab === 1 && (
                 <PendingList
                     items={pendingAds}
+                    loaded={loaded.pending}
                     type="ad"
                     error={error}
                     onApprove={(id) => onApprove('ad', id)}
@@ -1015,6 +1053,7 @@ const AdminDashboard = () => {
             {tab === 2 && (
                 <ActiveList
                     items={activeGowns}
+                    loaded={loaded.active}
                     type="gown"
                     error={error}
                     onTakeDownClick={(id) => setTakeDownTarget({ type: 'gown', id })}
@@ -1025,6 +1064,7 @@ const AdminDashboard = () => {
             {tab === 3 && (
                 <ActiveList
                     items={activeAds}
+                    loaded={loaded.active}
                     type="ad"
                     error={error}
                     onTakeDownClick={(id) => setTakeDownTarget({ type: 'ad', id })}
@@ -1044,7 +1084,9 @@ const AdminDashboard = () => {
                             Create Promo Code
                         </Button>
                     </Stack>
-                    {promoCodes.length === 0 ? (
+                    {!loaded.promoCodes ? (
+                        <LoadingSpinner />
+                    ) : promoCodes.length === 0 ? (
                         <Typography color="text.secondary">No promo codes yet.</Typography>
                     ) : visiblePromoCodes.length === 0 ? (
                         <Typography color="text.secondary">No matches for "{promoSearch}".</Typography>
@@ -1099,7 +1141,9 @@ const AdminDashboard = () => {
                             sx={{ mb: 2, mr: laneSx, width: { xs: '100%', sm: 320 } }}
                         />
                     )}
-                    {owners.length === 0 ? (
+                    {!loaded.owners ? (
+                        <LoadingSpinner />
+                    ) : owners.length === 0 ? (
                         <Typography color="text.secondary">No patrons yet.</Typography>
                     ) : visibleOwners.length === 0 ? (
                         <Typography color="text.secondary">No matches for "{patronSearch}".</Typography>
@@ -1248,7 +1292,9 @@ const AdminDashboard = () => {
                             label="Show resolved"
                         />
                     </Stack>
-                    {visibleContactMessages.length === 0 ? (
+                    {!loaded.contactMessages ? (
+                        <LoadingSpinner />
+                    ) : visibleContactMessages.length === 0 ? (
                         <Typography color="text.secondary">Nothing to show.</Typography>
                     ) : (
                         <Grid container spacing={2}>
@@ -1266,14 +1312,14 @@ const AdminDashboard = () => {
                                         </Box>
                                         {m.isResolved && <Chip size="small" label="Resolved" />}
                                     </Stack>
-                                    <Typography variant="body2" sx={{ mb: 2 }}>{m.message}</Typography>
+                                    <Typography variant="body2" sx={{ mb: 2, whiteSpace: 'pre-line' }}>{m.message}</Typography>
 
                                     {m.replyMessage ? (
                                         <Box sx={{ p: 2, borderRadius: 1, bgcolor: 'background.default', mb: 2 }}>
                                             <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
                                                 Your reply &middot; {new Date(m.repliedDate).toLocaleString()}
                                             </Typography>
-                                            <Typography variant="body2">{m.replyMessage}</Typography>
+                                            <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>{m.replyMessage}</Typography>
                                         </Box>
                                     ) : (
                                         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 2 }}>
@@ -1314,7 +1360,9 @@ const AdminDashboard = () => {
 
             {tab === 8 && (
                 <Box sx={{ mt: 3, mr: laneSx }}>
-                    {conciergeQueue.length === 0 ? (
+                    {!loaded.conciergeQueue ? (
+                        <LoadingSpinner />
+                    ) : conciergeQueue.length === 0 ? (
                         <Typography color="text.secondary">Nothing to show.</Typography>
                     ) : (
                         <Stack spacing={3}>
@@ -1344,7 +1392,7 @@ const AdminDashboard = () => {
                                                         </Box>
                                                     </Stack>
                                                     {g.description && (
-                                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{g.description}</Typography>
+                                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, whiteSpace: 'pre-line' }}>{g.description}</Typography>
                                                     )}
                                                     <Stack direction="row" spacing={1} alignItems="center">
                                                         <TextField
@@ -1429,7 +1477,7 @@ const AdminDashboard = () => {
                 {editGownTarget && (
                     <DialogContent>
                         <Stack spacing={2} sx={{ mt: 1 }}>
-                            {editGownError && <Alert severity="error">{editGownError}</Alert>}
+                            {editGownError && <Alert ref={editGownErrorRef} severity="error">{editGownError}</Alert>}
                             <PromoApplyBox
                                 currentPromoCode={editGownTarget.promoCode?.code}
                                 onApply={onApplyEditGownPromo}
@@ -1556,7 +1604,7 @@ const AdminDashboard = () => {
                 {editAdTarget && (
                     <DialogContent>
                         <Stack spacing={2} sx={{ mt: 1 }}>
-                            {editAdError && <Alert severity="error">{editAdError}</Alert>}
+                            {editAdError && <Alert ref={editAdErrorRef} severity="error">{editAdError}</Alert>}
                             <PromoApplyBox
                                 currentPromoCode={editAdTarget.promoCode?.code}
                                 onApply={onApplyEditAdPromo}
@@ -1707,7 +1755,7 @@ const AdminDashboard = () => {
                     ) : (
                         <Stack spacing={2} sx={{ mt: 1 }}>
                             {postForPatronError && (
-                                <Alert severity="error">
+                                <Alert ref={postForPatronErrorRef} severity="error">
                                     {postForPatronError}
                                     {postForPatronSavedCount > 0 && (
                                         <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
