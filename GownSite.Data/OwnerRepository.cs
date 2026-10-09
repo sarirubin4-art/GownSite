@@ -140,6 +140,68 @@ namespace GownSite.Data
             return true;
         }
 
+        public bool UpdateNameAndNumber(int id, string name, string number)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o => o.Id == id);
+            if (owner == null) return false;
+
+            owner.Name = name;
+            owner.Number = number;
+            context.SaveChanges();
+            return true;
+        }
+
+        // markVerified is for a patron confirming the change via a link sent to the new
+        // address (which proves they own it). An admin edit leaves verification as-is.
+        // Either way any pending signup verification link is invalidated: it was sent to the
+        // OLD address, and must not be able to verify the account under the new one.
+        // Throws DbUpdateException if another owner already has this email (unique index).
+        public bool SetEmail(int id, string email, bool markVerified)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o => o.Id == id);
+            if (owner == null) return false;
+
+            owner.Email = email;
+            owner.EmailVerificationToken = null;
+            if (markVerified) owner.EmailVerified = true;
+            context.SaveChanges();
+            return true;
+        }
+
+        public bool SetPasswordHash(int id, string passwordHash)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o => o.Id == id);
+            if (owner == null) return false;
+
+            owner.PasswordHash = passwordHash;
+            // A password change also kills any outstanding "forgot password" link.
+            owner.PasswordResetToken = null;
+            owner.PasswordResetTokenExpiresAt = null;
+            context.SaveChanges();
+            return true;
+        }
+
+        // Every Stripe customer created for this owner — each gown, ad, and business-plan
+        // checkout makes its own — so contact-info changes can be pushed to all of them.
+        public List<string> GetStripeCustomerIds(int ownerId)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var ids = context.Gowns
+                .Where(g => g.OwnerId == ownerId && g.StripeCustomerId != null)
+                .Select(g => g.StripeCustomerId)
+                .ToList();
+            ids.AddRange(context.Ads
+                .Where(a => a.OwnerId == ownerId && a.StripeCustomerId != null)
+                .Select(a => a.StripeCustomerId));
+            ids.AddRange(context.Owners
+                .Where(o => o.Id == ownerId && o.BusinessStripeCustomerId != null)
+                .Select(o => o.BusinessStripeCustomerId));
+            return ids.Where(id => id != "").Distinct().ToList();
+        }
+
         public bool ResetPassword(string token, string newPasswordHash)
         {
             using var context = new GownDataContext(_connectionString);

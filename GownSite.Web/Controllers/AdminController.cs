@@ -33,6 +33,13 @@ namespace GownSite.Web.Controllers
         public List<string> Emails { get; set; }
     }
 
+    public class AdminEditOwnerRequest
+    {
+        public string Name { get; set; }
+        public string Number { get; set; }
+        public string Email { get; set; }
+    }
+
     public class SetBusinessPlanRequest
     {
         public decimal MonthlyFee { get; set; }
@@ -104,9 +111,11 @@ namespace GownSite.Web.Controllers
         private readonly IFileStorageService _storage;
         private readonly IGownColorScoreService _colorScoreService;
         private readonly GeoLocator _geo;
+        private readonly StripeCustomerSync _stripeCustomerSync;
 
-        public AdminController(IConfiguration configuration, IEmailSender emailSender, IFileStorageService storage, IGownColorScoreService colorScoreService, GeoLocator geo)
+        public AdminController(IConfiguration configuration, IEmailSender emailSender, IFileStorageService storage, IGownColorScoreService colorScoreService, GeoLocator geo, StripeCustomerSync stripeCustomerSync)
         {
+            _stripeCustomerSync = stripeCustomerSync;
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("ConStr");
             _emailSender = emailSender;
@@ -741,6 +750,46 @@ namespace GownSite.Web.Controllers
         {
             var repo = new OwnerRepository(_connectionString);
             if (!repo.RemoveBusinessPlan(id)) return NotFound();
+            return Ok();
+        }
+
+        // Admin counterpart to the patron's own My Account page, same validation rules. Unlike a
+        // patron's self-service change, an email edit here applies immediately with no
+        // confirmation link — the admin is vouching for it (typically fixing a typo the patron
+        // reported), and the patron may not be able to receive mail at the old address anyway.
+        // Verification status is left as-is: an unverified patron can hit "Resend Email" on their
+        // verification screen, which will now go to the corrected address.
+        [HttpPost("owners/{id}/edit")]
+        public async Task<IActionResult> EditOwner(int id, [FromBody] AdminEditOwnerRequest request)
+        {
+            var validationError = OwnerController.ValidateNameAndNumber(request.Name, request.Number);
+            if (validationError != null) return BadRequest(new { message = validationError });
+            if (!OwnerController.IsValidEmail(request.Email))
+                return BadRequest(new { message = "Please enter a valid email address." });
+
+            var repo = new OwnerRepository(_connectionString);
+            var owner = repo.Get(id);
+            if (owner == null) return NotFound();
+
+            var email = request.Email.Trim();
+            if (!string.Equals(email, owner.Email, StringComparison.Ordinal))
+            {
+                var existing = repo.FindByEmail(email);
+                if (existing != null && existing.Id != id)
+                    return BadRequest(new { message = "Another account already uses that email." });
+                try
+                {
+                    repo.SetEmail(id, email, markVerified: false);
+                }
+                catch (DbUpdateException)
+                {
+                    return BadRequest(new { message = "Another account already uses that email." });
+                }
+            }
+            var name = request.Name.Trim();
+            repo.UpdateNameAndNumber(id, name, request.Number.Trim());
+            if (name != owner.Name || !string.Equals(email, owner.Email, StringComparison.Ordinal))
+                await _stripeCustomerSync.SyncOwnerContactAsync(id);
             return Ok();
         }
 

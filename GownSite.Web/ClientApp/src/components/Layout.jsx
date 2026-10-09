@@ -161,6 +161,7 @@ const Layout = ({ children }) => {
                                         Admin
                                     </MenuItem>
                                 )}
+                                <MenuItem component={Link} to="/account" onClick={() => setMenuAnchor(null)}>My Account</MenuItem>
                                 <MenuItem onClick={onLogoutClick}>Log Out</MenuItem>
                             </Menu>
                         </>
@@ -200,6 +201,9 @@ const Layout = ({ children }) => {
                                         <ListItemText primary="Admin" />
                                     </ListItemButton>
                                 )}
+                                <ListItemButton component={Link} to="/account" onClick={closeDrawer}>
+                                    <ListItemText primary="My Account" />
+                                </ListItemButton>
                                 <Divider sx={{ my: 1 }} />
                                 <ListItemButton onClick={onLogoutClick}>
                                     <ListItemText primary="Log Out" />
@@ -217,7 +221,9 @@ const Layout = ({ children }) => {
                 always starts right below the navbar regardless of its rendered
                 height (e.g. if the nav wraps to two lines on a narrower screen). */}
             <Box sx={{ ...wallpaperBackground, minHeight: 'calc(100vh - 64px)' }}>
-                {owner && !owner.emailVerified ? (
+                {/* My Account stays reachable while unverified: it's how a patron who mistyped
+                    their email at signup fixes it (confirming the new address verifies them). */}
+                {owner && !owner.emailVerified && location.pathname !== '/account' ? (
                     // A hard gate, not a dismissable nudge: unverified accounts can't use the
                     // site at all (browsing while logged out is unaffected) until they click
                     // the link in their verification email. Accounts that existed before this
@@ -235,6 +241,7 @@ const Layout = ({ children }) => {
                             >
                                 {resendState === 'sent' ? 'Email Sent' : resendState === 'sending' ? 'Sending...' : 'Resend Email'}
                             </Button>
+                            <Button variant="text" fullWidth component={Link} to="/account">Wrong email address? Change it</Button>
                             <Button variant="text" fullWidth onClick={onLogoutClick}>Log Out</Button>
                         </Paper>
                     </Container>

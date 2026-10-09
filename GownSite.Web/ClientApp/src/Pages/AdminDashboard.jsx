@@ -30,6 +30,7 @@ import { focalObjectPosition } from '../utils/imageFocal';
 import useFormError from '../hooks/useFormError';
 
 const MAX_POST_FOR_PATRON_GOWNS = 20;
+const PATRONS_TAB = 5;
 const TRAFFIC_TAB = 9;
 
 const DISCOUNT_TYPE_OPTIONS = [
@@ -297,7 +298,7 @@ const AdminDashboard = () => {
     const laneSx = LANE_SX;
     const fullScreen = useFullScreenDialog();
     const navigate = useNavigate();
-    const [tab, setTab] = useState(0);
+    const [tab, setTab] = useState(PATRONS_TAB);
     // Set by the traffic bubble: jump to the Traffic tab, optionally pre-filtered.
     // Wrapped in a fresh object each time so clicking the same location twice re-applies.
     const [trafficFilterRequest, setTrafficFilterRequest] = useState(null);
@@ -352,6 +353,9 @@ const AdminDashboard = () => {
     const [spreadSending, setSpreadSending] = useState(false);
     const [spreadResult, setSpreadResult] = useState(null);
     const [deleteOwnerTarget, setDeleteOwnerTarget] = useState(null);
+    const [editOwnerTarget, setEditOwnerTarget] = useState(null); // { id, name, number, email, originalEmail }
+    const [editOwnerError, setEditOwnerError, editOwnerErrorRef] = useFormError();
+    const [editOwnerSaving, setEditOwnerSaving] = useState(false);
     const [deleteOwnerError, setDeleteOwnerError] = useState('');
     const [deleteOwnerSending, setDeleteOwnerSending] = useState(false);
     const [businessPlanTarget, setBusinessPlanTarget] = useState(null);
@@ -803,6 +807,33 @@ const AdminDashboard = () => {
         }
     };
 
+    const onOpenEditOwner = (patron) => {
+        setEditOwnerError('');
+        setEditOwnerTarget({
+            id: patron.id, name: patron.name || '', number: patron.number || '',
+            email: patron.email || '', originalEmail: patron.email || ''
+        });
+    };
+
+    const onSaveEditOwner = async () => {
+        setEditOwnerError('');
+        const { id, name, number, email } = editOwnerTarget;
+        if (!name.trim() || !number.trim() || !email.trim()) {
+            setEditOwnerError('Name, phone number, and email are required.');
+            return;
+        }
+        setEditOwnerSaving(true);
+        try {
+            await axios.post(`/api/admin/owners/${id}/edit`, { name, number, email });
+            setEditOwnerTarget(null);
+            await loadOwners();
+        } catch (err) {
+            setEditOwnerError(err?.response?.data?.message || 'Could not save this patron.');
+        } finally {
+            setEditOwnerSaving(false);
+        }
+    };
+
     const onDeleteOwnerConfirm = async () => {
         if (!deleteOwnerTarget) return;
         setDeleteOwnerError('');
@@ -1132,7 +1163,7 @@ const AdminDashboard = () => {
                     )}
                 </Box>
             )}
-            {tab === 5 && (
+            {tab === PATRONS_TAB && (
                 <Box sx={{ mt: 3 }}>
                     {owners.length > 0 && (
                         <TextField
@@ -1184,6 +1215,12 @@ const AdminDashboard = () => {
                                             </TableCell>
                                             <TableCell align="right">
                                                 <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+                                                    <Button
+                                                        size="small" variant="outlined"
+                                                        onClick={() => onOpenEditOwner(o)}
+                                                    >
+                                                        Edit
+                                                    </Button>
                                                     <Button
                                                         size="small" variant="outlined"
                                                         onClick={() => onOpenPostForPatron(o)}
@@ -1677,6 +1714,35 @@ const AdminDashboard = () => {
                         disabled={editAdTarget && !editAdTarget.showPhone && !editAdTarget.showEmail}
                     >
                         Save Changes
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={!!editOwnerTarget} onClose={() => setEditOwnerTarget(null)} maxWidth="xs" fullWidth fullScreen={fullScreen}>
+                <DialogTitle>Edit Patron</DialogTitle>
+                {editOwnerTarget && (
+                    <DialogContent>
+                        <Stack spacing={2} sx={{ mt: 1 }}>
+                            {editOwnerError && <Alert ref={editOwnerErrorRef} severity="error">{editOwnerError}</Alert>}
+                            <TextField label="Name" value={editOwnerTarget.name} fullWidth
+                                onChange={(e) => setEditOwnerTarget({ ...editOwnerTarget, name: e.target.value })} />
+                            <TextField label="Phone Number" value={editOwnerTarget.number} fullWidth
+                                onChange={(e) => setEditOwnerTarget({ ...editOwnerTarget, number: e.target.value })} />
+                            <TextField label="Email" type="email" value={editOwnerTarget.email} fullWidth
+                                onChange={(e) => setEditOwnerTarget({ ...editOwnerTarget, email: e.target.value })} />
+                            {editOwnerTarget.email.trim().toLowerCase() !== editOwnerTarget.originalEmail.toLowerCase() && (
+                                <Alert severity="warning">
+                                    The new email takes effect immediately — no confirmation link is sent. It's what the
+                                    patron logs in with from now on, and where buyers' inquiries and our emails go.
+                                </Alert>
+                            )}
+                        </Stack>
+                    </DialogContent>
+                )}
+                <DialogActions>
+                    <Button onClick={() => setEditOwnerTarget(null)}>Cancel</Button>
+                    <Button variant="contained" disabled={editOwnerSaving} onClick={onSaveEditOwner}>
+                        {editOwnerSaving ? 'Saving...' : 'Save'}
                     </Button>
                 </DialogActions>
             </Dialog>
