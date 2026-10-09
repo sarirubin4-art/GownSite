@@ -144,7 +144,7 @@ const TrafficTab = ({ filterRequest, onFilterRequestHandled, laneSx }) => {
                     {RANGES.map((r) => <ToggleButton key={r.value} value={r.value}>{r.label}</ToggleButton>)}
                 </ToggleButtonGroup>
                 <Typography variant="caption" color="text.secondary">
-                    Times are Eastern. Your own visits while logged in as admin aren't counted.
+                    Each page counts once per visit (a visit ends after 30 minutes of no activity). Times are Eastern. Your own visits while logged in as admin aren't counted.
                 </Typography>
             </Stack>
 

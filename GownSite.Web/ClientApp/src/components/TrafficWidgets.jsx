@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Paper, Box, Typography, Stack, Tooltip, Button, ButtonBase } from '@mui/material';
+import { Paper, Box, Typography, Stack, Tooltip, ButtonBase, Link } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useAdLane } from '../context/AdLaneContext';
 import { AD_TOP } from './FloatingAds';
@@ -128,15 +128,19 @@ const StatCell = ({ label, views, visitors }) => (
 
 const BubbleContent = ({ data, onOpenTraffic }) => (
     <Box sx={{ p: { xs: 2, md: 1.5, xl: 2 } }}>
-        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+        <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Site Traffic</Typography>
-            {data.onlineNow > 0 && (
-                <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }} title="Visitors active in the last 5 minutes">
-                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main' }} />
-                    <Typography variant="caption" color="text.secondary">{data.onlineNow} on now</Typography>
-                </Stack>
-            )}
+            {/* Up top so it's reachable without scrolling the bubble. */}
+            <Link component="button" variant="caption" onClick={() => onOpenTraffic(null)} sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                See full traffic &rsaquo;
+            </Link>
         </Stack>
+        {data.onlineNow > 0 ? (
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', mb: 1 }} title="Visitors active in the last 5 minutes">
+                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main' }} />
+                <Typography variant="caption" color="text.secondary">{data.onlineNow} on the site now</Typography>
+            </Stack>
+        ) : <Box sx={{ mb: 1 }} />}
 
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.25, mb: 1.5 }}>
             <StatCell label="Today" views={data.today.views} visitors={data.today.visitors} />
@@ -165,11 +169,8 @@ const BubbleContent = ({ data, onOpenTraffic }) => (
             </Typography>
         )}
 
-        <Button size="small" fullWidth variant="outlined" sx={{ mt: 1.5 }} onClick={() => onOpenTraffic(null)}>
-            See Full Traffic
-        </Button>
         {data.trackingSince && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 0.75 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 1.25 }}>
                 Tracking since {new Date(data.trackingSince).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
             </Typography>
         )}

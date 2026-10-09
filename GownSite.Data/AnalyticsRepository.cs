@@ -334,6 +334,12 @@ namespace GownSite.Data
                 .ToDictionary(g => g.Id, g => g.Count);
         }
 
+        public bool HasRecentPageView(string visitorId, string path, DateTime sinceUtc)
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.PageViews.Any(v => v.VisitorId == visitorId && v.Path == path && v.CreatedDate >= sinceUtc);
+        }
+
         public bool HasRecentEvent(string type, int? entityId, string visitorId, DateTime sinceUtc)
         {
             using var context = new GownDataContext(_connectionString);

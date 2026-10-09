@@ -25,6 +25,9 @@ namespace GownSite.Web.Services
         private readonly byte[] _visitorKey;
         private readonly ILogger<AnalyticsRecorder> _logger;
 
+        // Matches the browser's visit length (VISIT_IDLE_MS in ClientApp's utils/analytics.js).
+        private static readonly TimeSpan VisitWindow = TimeSpan.FromMinutes(30);
+
         public AnalyticsRecorder(IConfiguration configuration, GeoLocator geo, ILogger<AnalyticsRecorder> logger)
         {
             _connectionString = configuration.GetConnectionString("ConStr");
@@ -55,6 +58,13 @@ namespace GownSite.Web.Services
                     && repo.GetListingOwnerId(pageType, entityId.Value) == ownerId)
                     return;
 
+                // Each page counts once per visit. The browser already enforces this (see
+                // ClientApp's utils/analytics.js), so this is the backstop for browsers that
+                // block storage or a reload that lost it: the same visitor viewing the same
+                // page again within the visit window isn't a new view.
+                var visitorId = VisitorId(http);
+                if (repo.HasRecentPageView(visitorId, path, DateTime.UtcNow - VisitWindow)) return;
+
                 var geo = _geo.Lookup(ClientIp(http));
                 repo.AddPageView(new PageView
                 {
@@ -62,7 +72,7 @@ namespace GownSite.Web.Services
                     Path = path,
                     PageType = pageType,
                     EntityId = entityId,
-                    VisitorId = VisitorId(http),
+                    VisitorId = visitorId,
                     CountryCode = geo?.CountryCode,
                     Country = Truncate(geo?.Country, 80),
                     RegionCode = Truncate(geo?.RegionCode, 10),
