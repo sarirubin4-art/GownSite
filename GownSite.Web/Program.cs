@@ -53,6 +53,7 @@ public class Program
         builder.Services.AddHttpClient();
         builder.Services.AddSingleton<GeoLocator>();
         builder.Services.AddSingleton<AnalyticsRecorder>();
+        builder.Services.AddSingleton<StripeCustomerSync>();
         builder.Services.AddHostedService<GeoDatabaseUpdater>();
 
         var emailConnectionString = builder.Configuration["Email:ConnectionString"];

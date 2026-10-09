@@ -111,9 +111,11 @@ namespace GownSite.Web.Controllers
         private readonly IFileStorageService _storage;
         private readonly IGownColorScoreService _colorScoreService;
         private readonly GeoLocator _geo;
+        private readonly StripeCustomerSync _stripeCustomerSync;
 
-        public AdminController(IConfiguration configuration, IEmailSender emailSender, IFileStorageService storage, IGownColorScoreService colorScoreService, GeoLocator geo)
+        public AdminController(IConfiguration configuration, IEmailSender emailSender, IFileStorageService storage, IGownColorScoreService colorScoreService, GeoLocator geo, StripeCustomerSync stripeCustomerSync)
         {
+            _stripeCustomerSync = stripeCustomerSync;
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("ConStr");
             _emailSender = emailSender;
@@ -758,7 +760,7 @@ namespace GownSite.Web.Controllers
         // Verification status is left as-is: an unverified patron can hit "Resend Email" on their
         // verification screen, which will now go to the corrected address.
         [HttpPost("owners/{id}/edit")]
-        public IActionResult EditOwner(int id, [FromBody] AdminEditOwnerRequest request)
+        public async Task<IActionResult> EditOwner(int id, [FromBody] AdminEditOwnerRequest request)
         {
             var validationError = OwnerController.ValidateNameAndNumber(request.Name, request.Number);
             if (validationError != null) return BadRequest(new { message = validationError });
@@ -784,7 +786,10 @@ namespace GownSite.Web.Controllers
                     return BadRequest(new { message = "Another account already uses that email." });
                 }
             }
-            repo.UpdateNameAndNumber(id, request.Name.Trim(), request.Number.Trim());
+            var name = request.Name.Trim();
+            repo.UpdateNameAndNumber(id, name, request.Number.Trim());
+            if (name != owner.Name || !string.Equals(email, owner.Email, StringComparison.Ordinal))
+                await _stripeCustomerSync.SyncOwnerContactAsync(id);
             return Ok();
         }
 

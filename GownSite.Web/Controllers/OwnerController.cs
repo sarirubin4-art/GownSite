@@ -93,10 +93,12 @@ namespace GownSite.Web.Controllers
         private static readonly PasswordHasher<Owner> _hasher = new();
         private readonly AnalyticsRecorder _analytics;
         private readonly ITimeLimitedDataProtector _emailChangeProtector;
+        private readonly StripeCustomerSync _stripeCustomerSync;
         private static readonly TimeSpan EmailChangeLinkLifetime = TimeSpan.FromHours(24);
 
-        public OwnerController(IConfiguration configuration, IEmailSender emailSender, AnalyticsRecorder analytics, IDataProtectionProvider dataProtection)
+        public OwnerController(IConfiguration configuration, IEmailSender emailSender, AnalyticsRecorder analytics, IDataProtectionProvider dataProtection, StripeCustomerSync stripeCustomerSync)
         {
+            _stripeCustomerSync = stripeCustomerSync;
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("ConStr");
             _emailSender = emailSender;
@@ -284,14 +286,19 @@ namespace GownSite.Web.Controllers
 
         [HttpPost("update-profile")]
         [Authorize]
-        public IActionResult UpdateProfile([FromBody] UpdateProfileRequest request)
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
         {
             var validationError = ValidateNameAndNumber(request.Name, request.Number);
             if (validationError != null) return BadRequest(new { message = validationError });
 
             var repo = new OwnerRepository(_connectionString);
-            if (!repo.UpdateNameAndNumber(CurrentOwnerId(), request.Name.Trim(), request.Number.Trim())) return Unauthorized();
-            return Ok(ToViewModel(repo.Get(CurrentOwnerId())));
+            var before = repo.Get(CurrentOwnerId());
+            if (before == null) return Unauthorized();
+            var name = request.Name.Trim();
+            repo.UpdateNameAndNumber(before.Id, name, request.Number.Trim());
+            // Stripe only stores name and email, so a phone-only edit doesn't need a sync.
+            if (name != before.Name) await _stripeCustomerSync.SyncOwnerContactAsync(before.Id);
+            return Ok(ToViewModel(repo.Get(before.Id)));
         }
 
         // Doesn't change anything yet — emails a confirmation link to the NEW address, and the
@@ -364,6 +371,7 @@ namespace GownSite.Web.Controllers
                 // Someone else claimed this address between the check above and the save.
                 return Outcome("taken");
             }
+            await _stripeCustomerSync.SyncOwnerContactAsync(owner.Id);
 
             try
             {
