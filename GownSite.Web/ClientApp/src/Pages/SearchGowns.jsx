@@ -14,6 +14,7 @@ import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import usePageTitle from '../hooks/usePageTitle';
 import FilterAutocomplete from '../components/FilterAutocomplete';
+import { trackNoResultsSearch } from '../utils/analytics';
 
 const emptyFilters = { colors: [], sizes: [], locations: [], styles: [], listingTypes: [], minPrice: '', maxPrice: '' };
 const PAGE_SIZE = 24;
@@ -190,8 +191,17 @@ const SearchGowns = () => {
         };
     }, [routerLocation.pathname, routerLocation.search]);
 
+    // "Searches with no results" on the admin Traffic tab should reflect what people actually
+    // wanted, not every in-between filter combo on the way there — so an empty result is only
+    // reported once it's been sitting on screen for a few seconds without another change.
+    // (The server re-checks it's really empty and counts each search once per visit, which
+    // covers pressing Back onto the same empty search.)
+    const noResultsTimer = useRef(null);
+    useEffect(() => () => clearTimeout(noResultsTimer.current), []);
+
     const runSearch = async (f, p) => {
         const seq = ++searchSeq.current;
+        clearTimeout(noResultsTimer.current);
         setSearching(true);
         const body = {
             colors: f.colors,
@@ -209,6 +219,9 @@ const SearchGowns = () => {
             if (seq !== searchSeq.current) return; // a newer search already started; ignore this stale response
             setResults(data.items);
             setTotalCount(data.totalCount);
+            if (data.totalCount === 0 && p <= 1) {
+                noResultsTimer.current = setTimeout(() => trackNoResultsSearch(body), 4000);
+            }
         } finally {
             if (seq === searchSeq.current) setSearching(false);
         }

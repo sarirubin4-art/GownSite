@@ -3,11 +3,10 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GownSite.Data
 {
-    // One row per page a visitor lands on (the SPA reports each route change — see
-    // ClientApp's usePageViewTracking). Deliberately stores no IP address and no account
-    // identity: VisitorId is a keyed hash of IP + user agent that rotates monthly (see
-    // AnalyticsRecorder), so it can group one person's views within a month without being
-    // reversible to who they are.
+    // One row per page per visit (the SPA reports route changes — see ClientApp's
+    // utils/analytics.js). Deliberately stores no IP address and no account identity:
+    // VisitorId is a keyed hash of IP + user agent (see AnalyticsRecorder), so it can group
+    // one person's views without being reversible to who they are.
     public class PageView
     {
         public long Id { get; set; }

@@ -7,7 +7,7 @@ using GownSite.Data;
 
 namespace GownSite.Web.Services
 {
-    // Turns a request into an anonymous PageView/SiteEvent row: who (a rotating hash, never
+    // Turns a request into an anonymous PageView/SiteEvent row: who (a keyed hash, never
     // the IP itself), where (GeoLite2 city lookup), how they arrived (referrer), and on what
     // (device). Skips bots and the admin's own browsing so neither inflates the numbers.
     // Recording never throws — analytics failing must never break the page or action that
@@ -100,21 +100,56 @@ namespace GownSite.Web.Services
             RecordEvent(http, type, entityId, dedupeWindow: window);
         }
 
+        // Unmet demand: someone searched for something specific and we had nothing. Only
+        // counted when at least one filter was set (an unfiltered empty search just means no
+        // gowns are live), only if the search is still empty now, and once per visit.
+        public void RecordNoResultsSearch(HttpContext http, GownSearchFilters filters)
+        {
+            try
+            {
+                var detail = DescribeSearch(filters);
+                if (detail == null || ShouldIgnore(http)) return;
+                filters.Page = 1;
+                filters.PageSize = 1;
+                if (new GownRepository(_connectionString).Search(filters).TotalCount > 0) return;
+                RecordEvent(http, SiteEventTypes.SearchNoResults, detail: detail, dedupeWindow: VisitWindow);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to record no-results search");
+            }
+        }
+
+        public static string DescribeSearch(GownSearchFilters f)
+        {
+            var parts = new List<string>();
+            if (f.Colors?.Count > 0) parts.Add(string.Join("/", f.Colors.OrderBy(c => c)));
+            if (f.Sizes?.Count > 0) parts.Add("Size " + string.Join("/", f.Sizes.OrderBy(s => s)));
+            if (f.Styles?.Count > 0) parts.Add(string.Join("/", f.Styles.OrderBy(s => s)));
+            if (f.ListingTypes?.Count > 0) parts.Add(string.Join("/", f.ListingTypes.OrderBy(t => t)));
+            if (f.Locations?.Count > 0) parts.Add("in " + string.Join("/", f.Locations.OrderBy(l => l)));
+            if (f.MinPrice.HasValue || f.MaxPrice.HasValue) parts.Add($"${f.MinPrice ?? 0}–{(f.MaxPrice.HasValue ? "$" + f.MaxPrice : "any")}");
+            return parts.Count == 0 ? null : string.Join(", ", parts);
+        }
+
+        // dedupeWindow: skip if this visitor already has the same event (same type, entity, and
+        // detail) within the window.
         public void RecordEvent(HttpContext http, string type, int? entityId = null, string detail = null, TimeSpan? dedupeWindow = null)
         {
             try
             {
                 if (ShouldIgnore(http)) return;
+                detail = Truncate(detail, 400);
                 var repo = new AnalyticsRepository(_connectionString);
                 var visitorId = VisitorId(http);
-                if (dedupeWindow.HasValue && repo.HasRecentEvent(type, entityId, visitorId, DateTime.UtcNow - dedupeWindow.Value)) return;
+                if (dedupeWindow.HasValue && repo.HasRecentEvent(type, entityId, visitorId, DateTime.UtcNow - dedupeWindow.Value, detail)) return;
                 repo.AddEvent(new SiteEvent
                 {
                     CreatedDate = DateTime.UtcNow,
                     Type = type,
                     EntityId = entityId,
                     VisitorId = visitorId,
-                    Detail = Truncate(detail, 400)
+                    Detail = detail
                 });
             }
             catch (Exception ex)
@@ -130,13 +165,17 @@ namespace GownSite.Web.Services
             return string.IsNullOrWhiteSpace(ua) || BotRegex.IsMatch(ua);
         }
 
-        // HMAC(secret, month | IP | user agent), truncated. Rotating the month in means the
-        // same person keeps the same id for the whole calendar month — enough for accurate
-        // 30-day unique-visitor counts and following one visit's path — but ids can't be
-        // linked across months, and without the secret can't be reversed to an IP at all.
+        // HMAC(secret, IP | user agent), truncated — without the secret it can't be reversed
+        // to an IP, and it changes on its own whenever the visitor's IP or browser does.
+        // It used to also mix in the current month, but that split one person into two
+        // visitors in any 7/30-day range crossing a month boundary. The "2026-10" prefix is
+        // that scheme frozen at the month it was dropped, so ids recorded before the change
+        // still match the same visitor afterward. Rows age out after 13 months regardless.
+        private const string VisitorIdEpoch = "2026-10";
+
         private string VisitorId(HttpContext http)
         {
-            var input = $"{DateTime.UtcNow:yyyy-MM}|{ClientIp(http)}|{http.Request.Headers.UserAgent}";
+            var input = $"{VisitorIdEpoch}|{ClientIp(http)}|{http.Request.Headers.UserAgent}";
             var hash = HMACSHA256.HashData(_visitorKey, Encoding.UTF8.GetBytes(input));
             return Convert.ToHexString(hash, 0, 8).ToLowerInvariant();
         }

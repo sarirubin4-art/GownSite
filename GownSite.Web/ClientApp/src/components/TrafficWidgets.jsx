@@ -27,14 +27,18 @@ const parseDay = (s) => {
     const [y, m, d] = s.split('-').map(Number);
     return new Date(y, m - 1, d);
 };
-// View-log filter for a location row. A row with no country at all is the "Unknown"
-// bucket, which the server matches with the "none" sentinel (a plain missing param would
-// mean "no location filter" and show everything instead).
-export const locationFilter = (row) => ({
+// View-log filter for a location row. A missing part of the location is sent as the
+// "none" sentinel, which the server matches as "this field is blank" — a plain missing
+// param would mean "don't filter on it" and widen the results instead. That matters for
+// city rows (`cityLevel`): "New Jersey, USA" with no city must show only the NJ views whose
+// city is unknown, not every NJ view. State/country rows leave city unfiltered on purpose.
+export const locationFilter = (row, { cityLevel = false } = {}) => ({
     key: 'location',
     label: `Location: ${row.label}`,
     params: row.countryCode
-        ? { city: row.city, regionCode: row.regionCode, countryCode: row.countryCode }
+        ? cityLevel
+            ? { city: row.city ?? 'none', regionCode: row.regionCode ?? 'none', countryCode: row.countryCode }
+            : { regionCode: row.regionCode, countryCode: row.countryCode }
         : { countryCode: 'none' }
 });
 
@@ -160,7 +164,7 @@ const BubbleContent = ({ data, onOpenTraffic }) => (
                 label={l.label}
                 percent={l.percent}
                 dense
-                onClick={() => onOpenTraffic(locationFilter(l))}
+                onClick={() => onOpenTraffic(locationFilter(l, { cityLevel: true }))}
             />
         ))}
         {!data.locationsEnabled && (

@@ -128,7 +128,7 @@ namespace GownSite.Web.Controllers
         [Authorize]
         public IActionResult MyAdStats()
         {
-            var ids = new AdRepository(_connectionString).GetByOwner(CurrentOwnerId()).Select(a => a.Id).ToList();
+            var ids = new AnalyticsRepository(_connectionString).GetOwnerListingIds("Ad", CurrentOwnerId());
             if (ids.Count == 0) return Ok(new Dictionary<int, object>());
 
             var analytics = new AnalyticsRepository(_connectionString);

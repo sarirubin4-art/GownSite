@@ -41,6 +41,17 @@ namespace GownSite.Web.Controllers
             return NoContent();
         }
 
+        // A gown search that stayed empty on screen for a few seconds (see ClientApp's
+        // SearchGowns). Takes the structured filters rather than a description, so the server
+        // both writes the label itself and re-checks the search really is empty.
+        [HttpPost("no-results")]
+        public IActionResult TrackNoResultsSearch([FromBody] GownSearchFilters filters)
+        {
+            if (filters == null) return BadRequest();
+            _recorder.RecordNoResultsSearch(HttpContext, filters);
+            return NoContent();
+        }
+
         [HttpPost("event")]
         public IActionResult TrackEvent([FromBody] TrackEventRequest request)
         {

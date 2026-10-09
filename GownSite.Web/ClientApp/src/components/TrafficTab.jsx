@@ -174,7 +174,7 @@ const TrafficTab = ({ filterRequest, onFilterRequestHandled, laneSx }) => {
                                     <PercentRow
                                         key={`${r.city}|${r.regionCode}|${r.countryCode}`}
                                         label={r.label} percent={r.percent} count={r.count}
-                                        onClick={() => applyFilter(locationFilter(r))}
+                                        onClick={() => applyFilter(locationFilter(r, { cityLevel: true }))}
                                     />
                                 ))}
                             </Card>
@@ -408,7 +408,7 @@ const TrafficTab = ({ filterRequest, onFilterRequestHandled, laneSx }) => {
                     />
                 </Paper>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                    Visitors are anonymous: the visitor code is a scrambled tag (not an IP address or account) that stays the same for one person through the calendar month, so you can follow a single visit's path.
+                    Visitors are anonymous: the visitor code is a scrambled tag (not an IP address or account) that stays the same for one person on the same device and internet connection, so you can follow their path through the site.
                 </Typography>
             </Box>
         </Box>

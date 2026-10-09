@@ -59,6 +59,12 @@ export const trackPageView = (pathname) => {
     }).catch(() => {});
 };
 
+// The search's filters (same shape as /api/gown/search's body), sent once a search has
+// sat empty on screen for a few seconds — see SearchGowns.
+export const trackNoResultsSearch = (filters) => {
+    axios.post('/api/analytics/no-results', filters).catch(() => {});
+};
+
 export const trackEvent = (type, entityId) => {
     axios.post('/api/analytics/event', { type, entityId }).catch(() => {});
 };

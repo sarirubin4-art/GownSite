@@ -148,31 +148,11 @@ namespace GownSite.Web.Controllers
         [HttpPost("search")]
         public GownSearchResult Search([FromBody] GownSearchFilters filters)
         {
-            filters ??= new GownSearchFilters();
+            // Empty searches aren't recorded here: every in-between filter change and Back press
+            // runs this, which inflated "Searches with no results". The browser reports one only
+            // after it's sat on screen a few seconds — see AnalyticsController.TrackNoResultsSearch.
             var repo = new GownRepository(_connectionString);
-            var result = repo.Search(filters);
-
-            // Unmet demand: someone looked for something specific and we had nothing.
-            // Only page 1 (later pages of a non-empty search can't be empty by definition)
-            // and only when at least one filter was set (an empty unfiltered search just
-            // means no gowns are live at all).
-            var summary = DescribeFilters(filters);
-            if (result.TotalCount == 0 && filters.Page <= 1 && summary != null)
-                _analytics.RecordEvent(HttpContext, SiteEventTypes.SearchNoResults, detail: summary);
-
-            return result;
-        }
-
-        private static string DescribeFilters(GownSearchFilters f)
-        {
-            var parts = new List<string>();
-            if (f.Colors?.Count > 0) parts.Add(string.Join("/", f.Colors.OrderBy(c => c)));
-            if (f.Sizes?.Count > 0) parts.Add("Size " + string.Join("/", f.Sizes.OrderBy(s => s)));
-            if (f.Styles?.Count > 0) parts.Add(string.Join("/", f.Styles.OrderBy(s => s)));
-            if (f.ListingTypes?.Count > 0) parts.Add(string.Join("/", f.ListingTypes.OrderBy(t => t)));
-            if (f.Locations?.Count > 0) parts.Add("in " + string.Join("/", f.Locations.OrderBy(l => l)));
-            if (f.MinPrice.HasValue || f.MaxPrice.HasValue) parts.Add($"${f.MinPrice ?? 0}–{(f.MaxPrice.HasValue ? "$" + f.MaxPrice : "any")}");
-            return parts.Count == 0 ? null : string.Join(", ", parts);
+            return repo.Search(filters ?? new GownSearchFilters());
         }
 
         [HttpGet("get")]
@@ -206,7 +186,7 @@ namespace GownSite.Web.Controllers
         [Authorize]
         public IActionResult MyListingStats()
         {
-            var ids = new GownRepository(_connectionString).GetByOwner(CurrentOwnerId()).Select(g => g.Id).ToList();
+            var ids = new AnalyticsRepository(_connectionString).GetOwnerListingIds("Gown", CurrentOwnerId());
             if (ids.Count == 0) return Ok(new Dictionary<int, EntityViewCounts>());
             return Ok(new AnalyticsRepository(_connectionString).GetEntityViewCounts("Gown", ids, DateTime.UtcNow.AddDays(-30)));
         }

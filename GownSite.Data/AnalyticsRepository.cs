@@ -274,7 +274,10 @@ namespace GownSite.Data
                     : query.Where(v => v.Source == filter.Source);
             }
             if (!string.IsNullOrEmpty(filter.Device)) query = query.Where(v => v.Device == filter.Device);
-            if (!string.IsNullOrEmpty(filter.City)) query = query.Where(v => v.City == filter.City);
+            // "none" (for City/RegionCode/CountryCode) means "this part of the location is
+            // unknown" — e.g. the "New Jersey, USA" city row, whose views have no city at all.
+            if (filter.City == "none") query = query.Where(v => v.City == null);
+            else if (!string.IsNullOrEmpty(filter.City)) query = query.Where(v => v.City == filter.City);
             if (filter.RegionCode == "none") query = query.Where(v => v.RegionCode == null);
             else if (!string.IsNullOrEmpty(filter.RegionCode)) query = query.Where(v => v.RegionCode == filter.RegionCode);
             // "none" is the "Unknown" location row — visits the GeoIP lookup couldn't place.
@@ -340,10 +343,21 @@ namespace GownSite.Data
             return context.PageViews.Any(v => v.VisitorId == visitorId && v.Path == path && v.CreatedDate >= sinceUtc);
         }
 
-        public bool HasRecentEvent(string type, int? entityId, string visitorId, DateTime sinceUtc)
+        public bool HasRecentEvent(string type, int? entityId, string visitorId, DateTime sinceUtc, string detail = null)
         {
             using var context = new GownDataContext(_connectionString);
-            return context.SiteEvents.Any(e => e.Type == type && e.EntityId == entityId && e.VisitorId == visitorId && e.CreatedDate >= sinceUtc);
+            return context.SiteEvents.Any(e => e.Type == type && e.EntityId == entityId && e.VisitorId == visitorId
+                && e.CreatedDate >= sinceUtc && e.Detail == detail);
+        }
+
+        // Just the ids — the My Listings stats endpoints don't need full listings with
+        // pictures, which is what Gown/AdRepository.GetByOwner loads.
+        public List<int> GetOwnerListingIds(string pageType, int ownerId)
+        {
+            using var context = new GownDataContext(_connectionString);
+            return pageType == "Ad"
+                ? context.Ads.Where(a => a.OwnerId == ownerId).Select(a => a.Id).ToList()
+                : context.Gowns.Where(g => g.OwnerId == ownerId).Select(g => g.Id).ToList();
         }
 
         public int? GetListingOwnerId(string pageType, int id)
