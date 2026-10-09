@@ -1039,7 +1039,8 @@ const AdminDashboard = () => {
     return (
         <Box>
             <Typography variant="h4" gutterBottom>Admin</Typography>
-            <TrafficBubble onOpenTraffic={openTraffic} />
+            {/* The bubble is a summary of the Traffic tab, so it's redundant while that tab is open. */}
+            {tab !== TRAFFIC_TAB && <TrafficBubble onOpenTraffic={openTraffic} />}
             <Tabs value={tab} onChange={(e, v) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ mb: 1, mr: laneSx }}>
                 <Tab label={`Pending Gowns${pendingGowns.length ? ` (${pendingGowns.length})` : ''}`} />
                 <Tab label={`Pending Ads${pendingAds.length ? ` (${pendingAds.length})` : ''}`} />
