@@ -402,6 +402,10 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "Password must be at least 8 characters." });
 
             repo.SetPasswordHash(owner.Id, _hasher.HashPassword(owner, request.NewPassword));
+            // The new password invalidates every existing login cookie (SessionStampValidator),
+            // including this one — re-issue it so the patron stays logged in on THIS device
+            // while every other device gets logged out.
+            await SignInOwner(repo.Get(owner.Id));
             try
             {
                 await _emailSender.SendAsync(
@@ -428,7 +432,8 @@ namespace GownSite.Web.Controllers
             {
                 new(ClaimTypes.NameIdentifier, owner.Id.ToString()),
                 new(ClaimTypes.Name, owner.Name),
-                new(ClaimTypes.Email, owner.Email)
+                new(ClaimTypes.Email, owner.Email),
+                new(SessionStampValidator.StampClaimType, SessionStampValidator.StampFor(owner))
             };
             if (owner.IsAdmin)
             {
