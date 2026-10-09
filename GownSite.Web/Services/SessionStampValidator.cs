@@ -2,7 +2,6 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using GownSite.Data;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace GownSite.Web.Services
@@ -15,7 +14,9 @@ namespace GownSite.Web.Services
     // the session) logged in. Now each cookie carries a short fingerprint of the password
     // hash, and every request compares it to the account's current one. A new password means
     // a new fingerprint, so every cookie issued before the change stops working. Deleting an
-    // account logs it out everywhere too, since there's no owner left to match.
+    // account logs it out everywhere too, since there's no owner left to match. Admin status
+    // is part of the fingerprint as well, so removing someone's admin rights takes effect
+    // immediately instead of lingering in their cookie's role claim.
     //
     // Cookies issued before this shipped have no fingerprint; rather than logging every patron
     // out at once, they're quietly given the current one on their next request. (The one gap:
@@ -37,15 +38,15 @@ namespace GownSite.Web.Services
         // Not the hash itself: just enough of a SHA-256 of it to detect a change, so the
         // cookie never carries anything usable for cracking the password.
         public static string StampFor(Owner owner) =>
-            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(owner.PasswordHash ?? ""))).Substring(0, 16);
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{owner.PasswordHash}|{owner.IsAdmin}"))).Substring(0, 16);
 
-        public async Task ValidateAsync(CookieValidatePrincipalContext context)
+        public Task ValidateAsync(CookieValidatePrincipalContext context)
         {
             var principal = context.Principal;
             if (!int.TryParse(principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var ownerId))
             {
-                await RejectAsync(context);
-                return;
+                context.RejectPrincipal();
+                return Task.CompletedTask;
             }
 
             Owner owner;
@@ -55,38 +56,46 @@ namespace GownSite.Web.Services
             }
             catch (Exception ex)
             {
-                // A database hiccup shouldn't log everyone out or 500 every page — let the cookie
-                // through this once; anything that actually needs the database fails on its own.
-                _logger.LogWarning(ex, "Could not check session stamp for owner {OwnerId}; allowing request", ownerId);
-                return;
+                // Can't verify, so don't trust it — but rejecting never deletes the cookie (see
+                // below), so this only treats the request as logged-out while the database is
+                // unreachable; the same cookie works again as soon as it's back.
+                _logger.LogWarning(ex, "Could not check session stamp for owner {OwnerId}; treating request as logged out", ownerId);
+                context.RejectPrincipal();
+                return Task.CompletedTask;
             }
 
             if (owner == null)
             {
-                await RejectAsync(context);
-                return;
+                context.RejectPrincipal();
+                return Task.CompletedTask;
             }
 
             var expected = StampFor(owner);
             var stamp = principal.FindFirstValue(StampClaimType);
             if (stamp == null)
             {
-                // Pre-rollout cookie: upgrade it in place instead of logging the patron out.
+                // Pre-rollout cookie: upgrade it in place instead of logging the patron out —
+                // unless its Admin role no longer matches the account, since the upgrade keeps
+                // the cookie's existing claims and would otherwise carry a revoked role forward.
+                if (principal.IsInRole("Admin") != owner.IsAdmin)
+                {
+                    context.RejectPrincipal();
+                    return Task.CompletedTask;
+                }
                 var identity = new ClaimsIdentity(principal.Claims, principal.Identity?.AuthenticationType);
                 identity.AddClaim(new Claim(StampClaimType, expected));
                 context.ReplacePrincipal(new ClaimsPrincipal(identity));
                 context.ShouldRenew = true;
-                return;
+                return Task.CompletedTask;
             }
 
-            if (stamp != expected) await RejectAsync(context);
-        }
-
-        private static async Task RejectAsync(CookieValidatePrincipalContext context)
-        {
-            context.RejectPrincipal();
-            // Also deletes the cookie, so the browser stops sending a dead one on every request.
-            await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            // Rejecting only ignores the cookie for this request; it deliberately does NOT send a
+            // cookie-delete. A request still in flight with the old cookie while the patron changes
+            // their password would otherwise have its delete land after ChangePassword's fresh
+            // cookie and log them out on the very device they just used. A dead cookie is just
+            // ignored until the browser replaces it at the next login.
+            if (stamp != expected) context.RejectPrincipal();
+            return Task.CompletedTask;
         }
     }
 }

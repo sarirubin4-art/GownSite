@@ -58,9 +58,13 @@ public class Program
         builder.Services.AddSingleton<GeoLocator>();
         builder.Services.AddSingleton<AnalyticsRecorder>();
         builder.Services.AddSingleton<StripeCustomerSync>();
-        builder.Services.AddSingleton(sp => new SessionStampValidator(
-            ownerId => new OwnerRepository(builder.Configuration.GetConnectionString("ConStr")).Get(ownerId),
-            sp.GetRequiredService<ILogger<SessionStampValidator>>()));
+        builder.Services.AddSingleton(sp =>
+        {
+            var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString("ConStr");
+            return new SessionStampValidator(
+                ownerId => new OwnerRepository(connectionString).Get(ownerId),
+                sp.GetRequiredService<ILogger<SessionStampValidator>>());
+        });
         builder.Services.AddHostedService<GeoDatabaseUpdater>();
 
         var emailConnectionString = builder.Configuration["Email:ConnectionString"];
