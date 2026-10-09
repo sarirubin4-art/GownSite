@@ -116,8 +116,8 @@ namespace GownSite.Web.Controllers
 
         public static bool IsValidEmail(string email) => !string.IsNullOrWhiteSpace(email) && EmailRegex.IsMatch(email.Trim());
 
-        // Same name/phone rules as signup — shared by the patron's own My Account page and
-        // AdminController.EditOwner so the two can't drift apart. Returns null when valid.
+        // Name/phone rules shared by signup, the patron's own My Account page, and
+        // AdminController.EditOwner so they can't drift apart. Returns null when valid.
         public static string ValidateNameAndNumber(string name, string number)
         {
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(number))
@@ -134,11 +134,11 @@ namespace GownSite.Web.Controllers
                 string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Number))
                 return BadRequest(new { message = "Name, email, phone number, and password are required." });
 
-            if (!EmailRegex.IsMatch(request.Email.Trim()))
+            if (!IsValidEmail(request.Email))
                 return BadRequest(new { message = "Please enter a valid email address." });
 
-            if (request.Number.Count(char.IsDigit) < 10)
-                return BadRequest(new { message = "Please enter a valid phone number." });
+            var validationError = ValidateNameAndNumber(request.Name, request.Number);
+            if (validationError != null) return BadRequest(new { message = validationError });
 
             var repo = new OwnerRepository(_connectionString);
             if (repo.FindByEmail(request.Email) != null)

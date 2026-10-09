@@ -179,7 +179,7 @@ namespace GownSite.Web.Services
             if (Starts("/advertise") != null) return ("Advertise", null);
             if (Starts("/concierge") != null) return ("Concierge", null);
             if (path is "/login" or "/signup" or "/forgot-password" or "/reset-password") return ("Account", null);
-            if (path is "/mylistings" or "/myads") return ("MyAccount", null);
+            if (path is "/mylistings" or "/myads" or "/account") return ("MyAccount", null);
             if (path is "/terms" or "/privacy") return ("Info", null);
             return ("Other", null);
         }

@@ -46,10 +46,12 @@ const ReloadOnNewDeploy = () => {
     }, []);
 
     useEffect(() => {
-        // Skips back/forward (POP) for the same reason ScrollToTop does — SearchGowns
-        // restores your scroll spot when you back out of a gown. The next forward
-        // navigation picks up the reload instead.
-        if (newVersionAvailable.current && navigationType !== 'POP') window.location.reload();
+        // Only on PUSH (the user going somewhere new). Skips back/forward (POP) for the same
+        // reason ScrollToTop does — SearchGowns restores your scroll spot when you back out
+        // of a gown — and REPLACE, which pages use to tidy up router state right after showing
+        // something from it (e.g. My Listings clearing its "posted" notice flag); reloading
+        // there would wipe the notice the user is looking at.
+        if (newVersionAvailable.current && navigationType === 'PUSH') window.location.reload();
     }, [pathname, navigationType]);
 
     return null;

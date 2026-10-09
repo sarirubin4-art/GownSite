@@ -154,6 +154,8 @@ namespace GownSite.Data
 
         // markVerified is for a patron confirming the change via a link sent to the new
         // address (which proves they own it). An admin edit leaves verification as-is.
+        // Either way any pending signup verification link is invalidated: it was sent to the
+        // OLD address, and must not be able to verify the account under the new one.
         // Throws DbUpdateException if another owner already has this email (unique index).
         public bool SetEmail(int id, string email, bool markVerified)
         {
@@ -162,11 +164,8 @@ namespace GownSite.Data
             if (owner == null) return false;
 
             owner.Email = email;
-            if (markVerified)
-            {
-                owner.EmailVerified = true;
-                owner.EmailVerificationToken = null;
-            }
+            owner.EmailVerificationToken = null;
+            if (markVerified) owner.EmailVerified = true;
             context.SaveChanges();
             return true;
         }
