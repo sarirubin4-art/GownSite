@@ -37,6 +37,7 @@ import BusinessBillingSetupPage from './Pages/BusinessBillingSetupPage';
 import BusinessBillingSetupSuccess from './Pages/BusinessBillingSetupSuccess';
 import ConciergePostingTerms from './Pages/ConciergePostingTerms';
 import ConciergePostingForm from './Pages/ConciergePostingForm';
+import Account from './Pages/Account';
 
 // My Ads is now the Ads section of My Listings. Old links (emails, bookmarks) still land there,
 // carrying along any router state (e.g. the "posted successfully" notice).
@@ -70,6 +71,7 @@ const App = () => {
                     <Route path='/search' element={<SearchGowns />} />
                     <Route path='/gown/:id' element={<ViewGown />} />
                     <Route path='/mylistings' element={<MyListings />} />
+                    <Route path='/account' element={<Account />} />
                     <Route path='/ad/:id' element={<AdDetail />} />
                     <Route path='/ads' element={<BrowseAds />} />
                     <Route path='/advertise' element={<AdvertiseTerms />} />

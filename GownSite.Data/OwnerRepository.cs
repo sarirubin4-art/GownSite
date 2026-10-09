@@ -140,6 +140,51 @@ namespace GownSite.Data
             return true;
         }
 
+        public bool UpdateNameAndNumber(int id, string name, string number)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o => o.Id == id);
+            if (owner == null) return false;
+
+            owner.Name = name;
+            owner.Number = number;
+            context.SaveChanges();
+            return true;
+        }
+
+        // markVerified is for a patron confirming the change via a link sent to the new
+        // address (which proves they own it). An admin edit leaves verification as-is.
+        // Throws DbUpdateException if another owner already has this email (unique index).
+        public bool SetEmail(int id, string email, bool markVerified)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o => o.Id == id);
+            if (owner == null) return false;
+
+            owner.Email = email;
+            if (markVerified)
+            {
+                owner.EmailVerified = true;
+                owner.EmailVerificationToken = null;
+            }
+            context.SaveChanges();
+            return true;
+        }
+
+        public bool SetPasswordHash(int id, string passwordHash)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var owner = context.Owners.FirstOrDefault(o => o.Id == id);
+            if (owner == null) return false;
+
+            owner.PasswordHash = passwordHash;
+            // A password change also kills any outstanding "forgot password" link.
+            owner.PasswordResetToken = null;
+            owner.PasswordResetTokenExpiresAt = null;
+            context.SaveChanges();
+            return true;
+        }
+
         public bool ResetPassword(string token, string newPasswordHash)
         {
             using var context = new GownDataContext(_connectionString);

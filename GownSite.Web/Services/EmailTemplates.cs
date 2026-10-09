@@ -21,6 +21,33 @@ namespace GownSite.Web.Services
                 $"<p style=\"font-size:13px;color:#8A6D72;\">If you didn't request this, you can safely ignore this email — your password won't change.</p>",
                 frontendBaseUrl);
 
+        public static string ConfirmEmailChange(string ownerName, string newEmail, string confirmUrl, string frontendBaseUrl) =>
+            EmailLayout.Wrap(
+                EmailLayout.Heading("Confirm Your New Email") +
+                $"<p>Hi {EmailLayout.UserText(ownerName)}, you asked to change your Regowned email to <strong>{EmailLayout.UserText(newEmail)}</strong>. " +
+                $"Click below to confirm — your email won't change until you do. This link expires in 24 hours.</p>" +
+                EmailLayout.Button("Confirm New Email", confirmUrl) +
+                $"<p style=\"font-size:13px;color:#8A6D72;\">If you didn't request this, you can safely ignore this email.</p>",
+                frontendBaseUrl);
+
+        // Sent to the OLD address after a change goes through, so a patron whose account was
+        // taken over finds out (and knows to contact us) even though they no longer get mail
+        // at the new address.
+        public static string EmailChanged(string ownerName, string newEmail, string frontendBaseUrl) =>
+            EmailLayout.Wrap(
+                EmailLayout.Heading("Your Email Was Changed") +
+                $"<p>Hi {EmailLayout.UserText(ownerName)}, the email on your Regowned account was just changed to <strong>{EmailLayout.UserText(newEmail)}</strong>. " +
+                $"From now on, use that address to log in.</p>" +
+                $"<p style=\"font-size:13px;color:#8A6D72;\">If you didn't make this change, please contact us right away using the Contact Us link on regowned.com.</p>",
+                frontendBaseUrl);
+
+        public static string PasswordChanged(string ownerName, string frontendBaseUrl) =>
+            EmailLayout.Wrap(
+                EmailLayout.Heading("Your Password Was Changed") +
+                $"<p>Hi {EmailLayout.UserText(ownerName)}, the password on your Regowned account was just changed.</p>" +
+                $"<p style=\"font-size:13px;color:#8A6D72;\">If you didn't make this change, reset your password from the login page right away, and contact us using the Contact Us link on regowned.com.</p>",
+                frontendBaseUrl);
+
         public static string NewSubmissionAdmin(string type, string ownerName, string description, string adminUrl, string frontendBaseUrl) =>
             EmailLayout.Wrap(
                 $"<p>A new {type} was submitted by <strong>{EmailLayout.UserText(ownerName)}</strong> and is awaiting your review.</p>" +
