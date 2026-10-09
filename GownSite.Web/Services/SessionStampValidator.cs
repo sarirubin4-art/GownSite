@@ -19,9 +19,13 @@ namespace GownSite.Web.Services
     // immediately instead of lingering in their cookie's role claim.
     //
     // Cookies issued before this shipped have no fingerprint; rather than logging every patron
-    // out at once, they're quietly given the current one on their next request. (The one gap:
+    // out at once, they're quietly given the current one on their next request. The one gap:
     // a session left completely unused from rollout until after a password change gets the
-    // NEW fingerprint when it next shows up. Rare, and it only affects pre-rollout cookies.)
+    // NEW fingerprint when it next shows up. That gap closes on its own within 30 days of
+    // rollout: an unused cookie expires 30 days after its last use (the expiry is sealed inside
+    // the signed cookie), and any pre-rollout cookie that IS used gets upgraded on that visit —
+    // so after 30 days, no cookie without a fingerprint can still be valid. Closing it outright
+    // would need a "password changed at" column and a migration, which wasn't worth it.
     public class SessionStampValidator
     {
         public const string StampClaimType = "regowned:pwstamp";
