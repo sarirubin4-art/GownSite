@@ -298,7 +298,7 @@ const AdminDashboard = () => {
     const laneSx = LANE_SX;
     const fullScreen = useFullScreenDialog();
     const navigate = useNavigate();
-    const [tab, setTab] = useState(PATRONS_TAB);
+    const [tab, setTab] = useState(TRAFFIC_TAB);
     // Set by the traffic bubble: jump to the Traffic tab, optionally pre-filtered.
     // Wrapped in a fresh object each time so clicking the same location twice re-applies.
     const [trafficFilterRequest, setTrafficFilterRequest] = useState(null);
