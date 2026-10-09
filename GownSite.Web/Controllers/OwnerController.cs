@@ -246,7 +246,10 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "This reset link is invalid or has expired. Please request a new one." });
 
             var newHash = _hasher.HashPassword(owner, request.NewPassword);
-            repo.ResetPassword(request.Token, newHash);
+            // The token can expire or be used by a second submission between the lookup above
+            // and this save — report that rather than claiming a reset that didn't happen.
+            if (!repo.ResetPassword(request.Token, newHash))
+                return BadRequest(new { message = "This reset link is invalid or has expired. Please request a new one." });
             return Ok();
         }
 
@@ -401,7 +404,12 @@ namespace GownSite.Web.Controllers
             if (string.IsNullOrEmpty(request.NewPassword) || request.NewPassword.Length < 8)
                 return BadRequest(new { message = "Password must be at least 8 characters." });
 
-            repo.SetPasswordHash(owner.Id, _hasher.HashPassword(owner, request.NewPassword));
+            owner.PasswordHash = _hasher.HashPassword(owner, request.NewPassword);
+            if (!repo.SetPasswordHash(owner.Id, owner.PasswordHash)) return Unauthorized();
+            // The new password invalidates every existing login cookie (SessionStampValidator),
+            // including this one — re-issue it so the patron stays logged in on THIS device
+            // while every other device gets logged out.
+            await SignInOwner(owner);
             try
             {
                 await _emailSender.SendAsync(
@@ -428,7 +436,8 @@ namespace GownSite.Web.Controllers
             {
                 new(ClaimTypes.NameIdentifier, owner.Id.ToString()),
                 new(ClaimTypes.Name, owner.Name),
-                new(ClaimTypes.Email, owner.Email)
+                new(ClaimTypes.Email, owner.Email),
+                new(SessionStampValidator.StampClaimType, SessionStampValidator.StampFor(owner))
             };
             if (owner.IsAdmin)
             {

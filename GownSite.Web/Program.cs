@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using GownSite.Data;
 using GownSite.Web.Services;
 using System.Text.Json.Serialization;
 
@@ -23,6 +24,9 @@ public class Program
                 options.Cookie.Name = "GownSiteAuth";
                 options.ExpireTimeSpan = TimeSpan.FromDays(30);
                 options.SlidingExpiration = true;
+                // Logs out other devices after a password change — see SessionStampValidator.
+                options.Events.OnValidatePrincipal = context =>
+                    context.HttpContext.RequestServices.GetRequiredService<SessionStampValidator>().ValidateAsync(context);
                 options.Events.OnRedirectToLogin = context =>
                 {
                     context.Response.StatusCode = 401;
@@ -54,6 +58,13 @@ public class Program
         builder.Services.AddSingleton<GeoLocator>();
         builder.Services.AddSingleton<AnalyticsRecorder>();
         builder.Services.AddSingleton<StripeCustomerSync>();
+        builder.Services.AddSingleton(sp =>
+        {
+            var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString("ConStr");
+            return new SessionStampValidator(
+                ownerId => new OwnerRepository(connectionString).Get(ownerId),
+                sp.GetRequiredService<ILogger<SessionStampValidator>>());
+        });
         builder.Services.AddHostedService<GeoDatabaseUpdater>();
 
         var emailConnectionString = builder.Configuration["Email:ConnectionString"];
