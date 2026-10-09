@@ -298,7 +298,7 @@ const AdminDashboard = () => {
     const laneSx = LANE_SX;
     const fullScreen = useFullScreenDialog();
     const navigate = useNavigate();
-    const [tab, setTab] = useState(PATRONS_TAB);
+    const [tab, setTab] = useState(TRAFFIC_TAB);
     // Set by the traffic bubble: jump to the Traffic tab, optionally pre-filtered.
     // Wrapped in a fresh object each time so clicking the same location twice re-applies.
     const [trafficFilterRequest, setTrafficFilterRequest] = useState(null);
@@ -1039,7 +1039,8 @@ const AdminDashboard = () => {
     return (
         <Box>
             <Typography variant="h4" gutterBottom>Admin</Typography>
-            <TrafficBubble onOpenTraffic={openTraffic} />
+            {/* The bubble is a summary of the Traffic tab, so it's redundant while that tab is open. */}
+            {tab !== TRAFFIC_TAB && <TrafficBubble onOpenTraffic={openTraffic} />}
             <Tabs value={tab} onChange={(e, v) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ mb: 1, mr: laneSx }}>
                 <Tab label={`Pending Gowns${pendingGowns.length ? ` (${pendingGowns.length})` : ''}`} />
                 <Tab label={`Pending Ads${pendingAds.length ? ` (${pendingAds.length})` : ''}`} />
