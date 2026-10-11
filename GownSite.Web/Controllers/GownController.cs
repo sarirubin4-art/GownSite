@@ -157,7 +157,7 @@ namespace GownSite.Web.Controllers
 
         private static readonly string[] ShowcaseStyles =
         {
-            "MotherOfBrideOrGroom", "SisterOfBrideOrGroom", "Evening", "Bridal", "BallGown", "ALine", "Maternity"
+            "MotherOfBrideOrGroom", "SisterOfBrideOrGroom", "Evening", "Bridal", "Engagement", "BallGown", "ALine", "Maternity"
         };
 
         [HttpGet("home-showcase")]

@@ -46,6 +46,7 @@ const STYLE_PATTERNS = [
     ]],
     ['BallGown', [/\bball\s*gowns?\b/g, /\bprincess\b/g]],
     ['Bridal', [/\b(wedding|bridal)\s+(dress|dresses|gown|gowns)\b/g, /\bbridal\b/g, /\bkallah\b/g, /\bbrides?\b/g]],
+    ['Engagement', [/\bengage(d|ment|ments)\b/g, /\bvorts?\b/g]],
     ['ALine', [/\ba[\s-]?lines?\b/g]],
     ['Evening', [/\bevening\b/g, /\bformal\b/g, /\bgala\b/g]],
     ['Maternity', [/\bmaternity\b/g, /\bpregnan\w*/g, /\bexpecting\b/g]],

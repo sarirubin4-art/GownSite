@@ -31,6 +31,7 @@ export const STYLE_OPTIONS = [
     { value: 'MotherOfBrideOrGroom', label: 'Mother of the Bride/Groom' },
     { value: 'SisterOfBrideOrGroom', label: 'Sister of the Bride/Groom' },
     { value: 'Bridal', label: 'Bridal' },
+    { value: 'Engagement', label: 'Engagement' },
     { value: 'Evening', label: 'Evening Gown' },
     { value: 'BallGown', label: 'Ball Gown' },
     { value: 'ALine', label: 'A-Line' },
