@@ -29,8 +29,11 @@ namespace GownSite.Data
         public int? BusinessGownAllowance { get; set; }
         // Reference only for the admin's own bookkeeping — not enforced anywhere in code.
         public decimal? BusinessOverageFeePerGownUsd { get; set; }
+        [JsonIgnore]
         public string BusinessStripeCustomerId { get; set; }
+        [JsonIgnore]
         public string BusinessStripePaymentMethodId { get; set; }
+        [JsonIgnore]
         public string BusinessStripeSubscriptionId { get; set; }
     }
 
@@ -80,10 +83,16 @@ namespace GownSite.Data
         // adds them) since phone/email were shown unconditionally before this pair existed.
         public bool DisplayOwnerNumber { get; set; }
         public bool DisplayOwnerEmail { get; set; }
+        // All Stripe ids (here, on Ad, and Owner's Business* ones) are server-only — this
+        // entity is serialized straight into public responses like /api/gown/search, and
+        // no client page reads them.
+        [JsonIgnore]
         public string StripeSubscriptionId { get; set; }
+        [JsonIgnore]
         public string StripeCustomerId { get; set; }
         public ModerationStatus ModerationStatus { get; set; }
         public string RejectionReason { get; set; }
+        [JsonIgnore]
         public string StripePaymentMethodId { get; set; }
         public int? PromoCodeId { get; set; }
         public PromoCode PromoCode { get; set; }
@@ -206,10 +215,13 @@ namespace GownSite.Data
         public string Categories { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedDate { get; set; }
+        [JsonIgnore]
         public string StripeSubscriptionId { get; set; }
+        [JsonIgnore]
         public string StripeCustomerId { get; set; }
         public ModerationStatus ModerationStatus { get; set; }
         public string RejectionReason { get; set; }
+        [JsonIgnore]
         public string StripePaymentMethodId { get; set; }
         public int? PromoCodeId { get; set; }
         public PromoCode PromoCode { get; set; }

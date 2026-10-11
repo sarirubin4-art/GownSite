@@ -111,6 +111,9 @@ namespace GownSite.Web.Services
                 if (detail == null || ShouldIgnore(http)) return;
                 filters.Page = 1;
                 filters.PageSize = 1;
+                // "No results" means no exact match — near-miss suggestions don't count as
+                // having found what they wanted.
+                filters.IncludeSimilar = false;
                 if (new GownRepository(_connectionString).Search(filters).TotalCount > 0) return;
                 RecordEvent(http, SiteEventTypes.SearchNoResults, detail: detail, dedupeWindow: VisitWindow);
             }
@@ -129,6 +132,7 @@ namespace GownSite.Web.Services
             if (f.ListingTypes?.Count > 0) parts.Add(string.Join("/", f.ListingTypes.OrderBy(t => t)));
             if (f.Locations?.Count > 0) parts.Add("in " + string.Join("/", f.Locations.OrderBy(l => l)));
             if (f.MinPrice.HasValue || f.MaxPrice.HasValue) parts.Add($"${f.MinPrice ?? 0}–{(f.MaxPrice.HasValue ? "$" + f.MaxPrice : "any")}");
+            if (!string.IsNullOrWhiteSpace(f.Keywords)) parts.Add($"\"{f.Keywords.Trim()}\"");
             return parts.Count == 0 ? null : string.Join(", ", parts);
         }
 

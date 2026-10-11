@@ -14,6 +14,13 @@ namespace GownSite.Data
         public List<ListingType> ListingTypes { get; set; } = new();
         public decimal? MinPrice { get; set; }
         public decimal? MaxPrice { get; set; }
+        // Free-text words left over after the search bar pulls out colors/sizes/styles etc.
+        // (e.g. "lace long sleeve"), matched against the description and other text fields.
+        public string Keywords { get; set; }
+        // When true, results also include near-misses (neighboring sizes, related colors and
+        // styles) after the exact matches — see GownSearchMatcher. Off by default so callers
+        // like the no-results analytics re-check keep their strict meaning.
+        public bool IncludeSimilar { get; set; }
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 24;
     }
@@ -22,6 +29,31 @@ namespace GownSite.Data
     {
         public List<GownPosting> Items { get; set; }
         public int TotalCount { get; set; }
+        // Items are ordered exact matches first, then close, then the rest — so the client
+        // can tell which group any result belongs to from its overall position alone.
+        public int ExactCount { get; set; }
+        public int CloseCount { get; set; }
+    }
+
+    public class HomeShowcaseStyle
+    {
+        public string Style { get; set; }
+        public string ImageUrl { get; set; }
+        public int Count { get; set; }
+    }
+
+    public class HomeShowcase
+    {
+        public List<GownPosting> Newest { get; set; }
+        public List<HomeShowcaseStyle> Styles { get; set; }
+        public List<string> Colors { get; set; }
+        public List<HomeShowcaseBrand> Brands { get; set; }
+    }
+
+    public class HomeShowcaseBrand
+    {
+        public string Name { get; set; }
+        public int Count { get; set; }
     }
 
     public class GownRepository
@@ -55,46 +87,91 @@ namespace GownSite.Data
             if (filters.MaxPrice.HasValue)
                 query = query.Where(g => g.Price <= filters.MaxPrice.Value);
 
-            var results = query.OrderByDescending(g => g.CreatedDate).ToList();
+            var candidates = query.OrderByDescending(g => g.CreatedDate).ToList();
 
-            if (filters.Colors.Count > 0)
-            {
-                results = results.Where(g =>
-                    !string.IsNullOrEmpty(g.Color) &&
-                    g.Color.Split(',').Any(c => filters.Colors.Contains(c))
-                ).ToList();
-
-                // Only meaningful with a single color selected — with several selected,
-                // "most of which color" is ambiguous, so leave the default CreatedDate order.
-                if (filters.Colors.Count == 1)
-                {
-                    var targetColor = filters.Colors[0];
-                    results = results.OrderByDescending(g => GetColorScore(g.ColorScoresJson, targetColor)).ToList();
-                }
-            }
-
-            if (filters.Styles.Count > 0)
-            {
-                results = results.Where(g =>
-                    !string.IsNullOrEmpty(g.StyleTags) &&
-                    g.StyleTags.Split(',').Any(t => filters.Styles.Contains(t))
-                ).ToList();
-            }
-
-            if (filters.Sizes.Count > 0)
-            {
-                results = results.Where(g =>
-                    !string.IsNullOrEmpty(g.Size) &&
-                    g.Size.Split(',').Any(s => filters.Sizes.Contains(s))
-                ).ToList();
-            }
+            // Color/size/style/keywords are graded per gown rather than filtered in SQL (they're
+            // comma-separated strings, and near-misses need ranking, not just a yes/no).
+            // Ordering: match group, then sold gowns last within each group, then best score,
+            // then — only meaningful with a single color selected — the gown that's mostly that
+            // color, then newest (OrderBy is stable over the CreatedDate order above).
+            var keywords = GownSearchMatcher.ParseKeywords(filters.Keywords);
+            var targetColor = filters.Colors.Count == 1 ? filters.Colors[0] : null;
+            var results = candidates
+                .Select(g => (Gown: g, Match: GownSearchMatcher.Evaluate(g, filters, keywords)))
+                .Where(x => x.Match.Tier == GownMatchTier.Exact
+                    || (filters.IncludeSimilar && x.Match.Tier != GownMatchTier.None))
+                .OrderBy(x => x.Match.Tier)
+                .ThenBy(x => x.Gown.IsSold)
+                .ThenByDescending(x => x.Match.Score)
+                .ThenByDescending(x => targetColor == null ? 0 : GetColorScore(x.Gown.ColorScoresJson, targetColor))
+                .ToList();
 
             var page = filters.Page < 1 ? 1 : filters.Page;
             var pageSize = filters.PageSize < 1 ? 24 : filters.PageSize;
             return new GownSearchResult
             {
-                Items = results.Skip((page - 1) * pageSize).Take(pageSize).ToList(),
-                TotalCount = results.Count
+                Items = results.Skip((page - 1) * pageSize).Take(pageSize).Select(x => x.Gown).ToList(),
+                TotalCount = results.Count,
+                ExactCount = results.Count(x => x.Match.Tier == GownMatchTier.Exact),
+                CloseCount = results.Count(x => x.Match.Tier == GownMatchTier.Close)
+            };
+        }
+
+        // Everything the home page needs in one call: the newest available gowns, plus which
+        // styles, colors and designers currently have at least one available (live, unsold)
+        // gown — the home page only offers shortcuts that actually lead somewhere. Same
+        // no-Owner rule as Search, since this is public too.
+        public HomeShowcase GetHomeShowcase(IEnumerable<string> styles, int newestCount, int maxBrands)
+        {
+            using var context = new GownDataContext(_connectionString);
+            // This runs on every home page view, so the style/color/brand scan reads only the
+            // columns it needs; full rows (with pictures) are loaded just for the newest few.
+            var available = context.Gowns
+                .Where(g => g.IsActive && !g.IsSold)
+                .OrderByDescending(g => g.CreatedDate)
+                .Select(g => new { g.Id, g.StyleTags, g.Color, g.PrimaryPictureUrl, g.Brand })
+                .ToList();
+
+            List<string> SplitTags(string s) => (s ?? "")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+            // A gown tagged with several styles would otherwise put the same photo on several
+            // tiles — prefer the newest gown not already used for another tile.
+            var usedIds = new HashSet<int>();
+            var styleTiles = new List<HomeShowcaseStyle>();
+            foreach (var style in styles)
+            {
+                var gowns = available.Where(g => SplitTags(g.StyleTags).Contains(style)).ToList();
+                if (gowns.Count == 0) continue;
+                var cover = gowns.FirstOrDefault(g => !usedIds.Contains(g.Id)) ?? gowns[0];
+                usedIds.Add(cover.Id);
+                styleTiles.Add(new HomeShowcaseStyle { Style = style, ImageUrl = cover.PrimaryPictureUrl, Count = gowns.Count });
+            }
+
+            return new HomeShowcase
+            {
+                Newest = context.Gowns
+                    .Include(g => g.MorePictures)
+                    .Where(g => g.IsActive && !g.IsSold)
+                    .OrderByDescending(g => g.CreatedDate)
+                    .Take(newestCount)
+                    .ToList(),
+                Styles = styleTiles,
+                Colors = available.SelectMany(g => SplitTags(g.Color)).Distinct().ToList(),
+                // Brand is free text typed by the seller, so "Sherri Hill" and "sherri hill "
+                // are grouped as one designer, shown under its most common spelling.
+                Brands = available
+                    .Where(g => !string.IsNullOrWhiteSpace(g.Brand))
+                    .GroupBy(g => string.Join(" ", g.Brand.Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant())
+                    .Select(grp => new HomeShowcaseBrand
+                    {
+                        Name = grp.GroupBy(g => g.Brand.Trim()).OrderByDescending(s => s.Count()).First().Key,
+                        Count = grp.Count()
+                    })
+                    .OrderByDescending(b => b.Count)
+                    .ThenBy(b => b.Name)
+                    .Take(maxBrands)
+                    .ToList()
             };
         }
 

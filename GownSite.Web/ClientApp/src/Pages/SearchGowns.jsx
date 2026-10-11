@@ -2,22 +2,67 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import {
-    Typography, Paper, Grid, TextField, Card, CardActionArea,
-    CardMedia, CardContent, Box, Chip, Snackbar, Alert, Button, Stack,
+    Typography, Paper, Grid, TextField, Box, Snackbar, Alert, Button, Stack,
     Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Pagination
 } from '@mui/material';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, styleLabel, formatPriceRange, sortSizes } from '../constants/gownOptions';
+import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, styleLabel } from '../constants/gownOptions';
 import { useAdLane } from '../context/AdLaneContext';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import usePageTitle from '../hooks/usePageTitle';
 import FilterAutocomplete from '../components/FilterAutocomplete';
+import GownCard from '../components/GownCard';
+import SmartSearchBar from '../components/SmartSearchBar';
+import { parsedToSearchParams } from '../utils/parseSearchQuery';
+import { loadLocations } from '../utils/locations';
 import { trackNoResultsSearch } from '../utils/analytics';
 
-const emptyFilters = { colors: [], sizes: [], locations: [], styles: [], listingTypes: [], minPrice: '', maxPrice: '' };
+const emptyFilters = { colors: [], sizes: [], locations: [], styles: [], listingTypes: [], minPrice: '', maxPrice: '', keywords: '' };
 const PAGE_SIZE = 24;
+
+// The server orders results exact matches first, then close, then the rest, and reports
+// how many are in each of the first two groups — so a result's group follows from its
+// overall position. Headings only appear when there are near-matches at all; a plain
+// all-exact result list looks exactly as it always did.
+const TIER_HEADINGS = [
+    { title: 'Exact matches', note: null },
+    { title: 'Close matches', note: 'Neighboring sizes, similar colors and styles' },
+    { title: 'You might also like', note: 'Matches most of what you’re looking for' },
+];
+
+const tierOf = (index, exactCount, closeCount) =>
+    index < exactCount ? 0 : index < exactCount + closeCount ? 1 : 2;
+
+// Splits one page of results into consecutive runs by group. Headings are skipped entirely
+// when every result is an exact match (plain filter browsing looks as it always has), and
+// the "Exact matches" heading is skipped when there are none — the notice above covers that.
+const groupResults = (items, offset, exactCount, closeCount, totalCount) => {
+    const hasSimilar = totalCount > exactCount;
+    const groups = [];
+    items.forEach((gown, i) => {
+        const tier = tierOf(offset + i, exactCount, closeCount);
+        const last = groups[groups.length - 1];
+        if (last && last.tier === tier) last.items.push(gown);
+        else groups.push({ tier, items: [gown], showHeading: hasSimilar });
+    });
+    return groups;
+};
+
+const TierHeading = ({ tier, count, first }) => (
+    <Box sx={{ mt: first ? 0 : 6, mb: 2.5, pb: 1.25, borderBottom: '1px solid rgba(156, 78, 88, 0.18)' }}>
+        <Typography component="h2" sx={{ fontFamily: `'Playfair Display', serif`, fontSize: '1.4rem', fontWeight: 600 }}>
+            {TIER_HEADINGS[tier].title}
+            {count != null && (
+                <Box component="span" sx={{ ml: 1.5, fontFamily: `'Poppins', sans-serif`, fontSize: '0.85rem', fontWeight: 400, color: 'text.secondary' }}>
+                    {count}
+                </Box>
+            )}
+        </Typography>
+        {TIER_HEADINGS[tier].note && (
+            <Typography variant="body2" color="text.secondary">{TIER_HEADINGS[tier].note}</Typography>
+        )}
+    </Box>
+);
 
 // Filters (and the current page) live in the URL rather than plain component state, so
 // the browser's own back/forward history — not just this component's lifetime — is what
@@ -30,119 +75,9 @@ const filtersFromParams = (params) => ({
     styles: params.getAll('styles'),
     listingTypes: params.getAll('listingTypes'),
     minPrice: params.get('minPrice') || '',
-    maxPrice: params.get('maxPrice') || ''
+    maxPrice: params.get('maxPrice') || '',
+    keywords: params.get('keywords') || ''
 });
-
-// Browse-card with prev/next arrows to page through a gown's other photos (only shown
-// when it has more than one). The arrows/dots are siblings of CardActionArea — NOT
-// nested inside it — for two reasons: (1) CardActionArea renders a <button>, and a real
-// <button> nested inside another <button> is invalid HTML that breaks click handling;
-// (2) MUI's CardActionArea paints its own hover/press overlay based on the actual DOM
-// hierarchy (a CSS :hover/:active effect on the ancestor button), which a descendant's
-// stopPropagation() can't suppress — clicking an arrow nested inside it visibly flashed
-// a dark overlay across the whole image. Keeping the arrows as external siblings avoids
-// both problems entirely.
-const GownCard = ({ gown, navigate }) => {
-    const images = [gown.primaryPictureUrl, ...(gown.morePictures || []).map((p) => p.url)];
-    const [index, setIndex] = useState(0);
-    const [hovered, setHovered] = useState(false);
-    const hasMultiple = images.length > 1;
-
-    const step = (delta) => (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        setIndex((prev) => (prev + delta + images.length) % images.length);
-    };
-
-    const arrowSx = {
-        position: 'absolute', top: 110, transform: 'translateY(-50%)', zIndex: 1,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', color: '#fff',
-        bgcolor: 'rgba(0,0,0,0.4)',
-        transition: 'background-color 0.1s ease, transform 0.1s ease',
-        '&:hover': { bgcolor: 'rgba(0,0,0,0.6)' },
-        '&:active': { bgcolor: 'rgba(0,0,0,0.7)', transform: 'translateY(-50%) scale(0.88)' }
-    };
-
-    return (
-        // Hover state is tracked in React (not a CSS :hover on CardActionArea) so the
-        // "show the full uncropped photo" effect stays on while the mouse is over the
-        // arrows too — the arrows are siblings of CardActionArea (see note below), so a
-        // CSS-only `&:hover` scoped to the button wouldn't fire while hovering them, and
-        // switching photos would keep resetting back to the cropped view.
-        <Card
-            sx={{ position: 'relative' }}
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
-        >
-            <CardActionArea onClick={() => navigate(`/gown/${gown.id}`)}>
-                {gown.isSold && (
-                    <Box sx={{
-                        position: 'absolute', top: 0, left: 0, width: '100%', height: 220, zIndex: 1,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none'
-                    }}>
-                        <Typography sx={{
-                            fontFamily: `'Playfair Display', serif`, fontWeight: 700,
-                            fontSize: '2.3rem', letterSpacing: 6, textTransform: 'uppercase',
-                            color: 'rgba(156, 78, 88, 0.88)',
-                            transform: 'rotate(-16deg)',
-                            textShadow: '0 2px 6px rgba(255,255,255,0.55)'
-                        }}>
-                            Sold
-                        </Typography>
-                    </Box>
-                )}
-                <CardMedia
-                    component="img"
-                    height="220"
-                    image={images[index]}
-                    alt={gown.description}
-                    sx={{
-                        objectFit: hovered ? 'contain' : 'cover',
-                        bgcolor: 'background.default',
-                        opacity: gown.isSold ? 0.55 : 1
-                    }}
-                />
-                <CardContent>
-                    {gown.brand && (
-                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
-                            {gown.brand}
-                        </Typography>
-                    )}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-                        <Typography variant="h6">{formatPriceRange(gown.price, gown.priceMax)}</Typography>
-                        <Chip size="small" label={gown.listingType === 'Rent' ? 'For Rent' : 'For Sale'} color="primary" variant="outlined" />
-                    </Box>
-                    <Typography
-                        variant="body2" color="text.secondary"
-                        sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                    >
-                        {gown.description && `${gown.description} · `}Size {sortSizes(gown.size).join(', ')}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">{gown.location}</Typography>
-                </CardContent>
-            </CardActionArea>
-            {hasMultiple && (
-                <>
-                    <Box onClick={step(-1)} sx={{ ...arrowSx, left: 8 }}>
-                        <ChevronLeftIcon fontSize="small" />
-                    </Box>
-                    <Box onClick={step(1)} sx={{ ...arrowSx, right: 8 }}>
-                        <ChevronRightIcon fontSize="small" />
-                    </Box>
-                    <Stack direction="row" spacing={0.5} sx={{ position: 'absolute', top: 196, left: 0, right: 0, justifyContent: 'center', pointerEvents: 'none' }}>
-                        {images.map((_, i) => (
-                            <Box key={i} sx={{
-                                width: 6, height: 6, borderRadius: '50%',
-                                bgcolor: i === index ? '#fff' : 'rgba(255,255,255,0.5)'
-                            }} />
-                        ))}
-                    </Stack>
-                </>
-            )}
-        </Card>
-    );
-};
 
 const SearchGowns = () => {
     usePageTitle('Browse Gowns for Rent & Sale', 'Search gowns for rent or sale by color, size, style, and location — find the perfect dress for your event.');
@@ -155,6 +90,8 @@ const SearchGowns = () => {
     const page = Math.max(1, Number(searchParams.get('page')) || 1);
     const [results, setResults] = useState([]);
     const [totalCount, setTotalCount] = useState(0);
+    const [exactCount, setExactCount] = useState(0);
+    const [closeCount, setCloseCount] = useState(0);
     const [searching, setSearching] = useState(true);
     const [locationOptions, setLocationOptions] = useState([]);
     const [showPostedNotice, setShowPostedNotice] = useState(!!routerLocation.state?.posted);
@@ -211,6 +148,8 @@ const SearchGowns = () => {
             listingTypes: f.listingTypes,
             minPrice: f.minPrice === '' ? null : Number(f.minPrice),
             maxPrice: f.maxPrice === '' ? null : Number(f.maxPrice),
+            keywords: f.keywords || null,
+            includeSimilar: true,
             page: p,
             pageSize: PAGE_SIZE
         };
@@ -219,7 +158,11 @@ const SearchGowns = () => {
             if (seq !== searchSeq.current) return; // a newer search already started; ignore this stale response
             setResults(data.items);
             setTotalCount(data.totalCount);
-            if (data.totalCount === 0 && p <= 1) {
+            setExactCount(data.exactCount);
+            setCloseCount(data.closeCount);
+            // Near-matches don't count as having found what they wanted — the server
+            // re-checks this strictly too (see AnalyticsRecorder.RecordNoResultsSearch).
+            if (data.exactCount === 0 && p <= 1) {
                 noResultsTimer.current = setTimeout(() => trackNoResultsSearch(body), 4000);
             }
         } finally {
@@ -227,7 +170,16 @@ const SearchGowns = () => {
         }
     };
 
+    // `text` (what was typed in the search bar) and `notify` (auto-open the alert dialog)
+    // don't change the results, so dropping them from the URL shouldn't search again.
+    const lastSearchKey = useRef(null);
     useEffect(() => {
+        const params = new URLSearchParams(searchParams);
+        params.delete('text');
+        params.delete('notify');
+        const key = params.toString();
+        if (key === lastSearchKey.current) return;
+        lastSearchKey.current = key;
         runSearch(filters, page);
     }, [searchParams]);
 
@@ -244,7 +196,7 @@ const SearchGowns = () => {
     // The Location filter's option list needs every location in the marketplace, not just
     // the ones on the current page of results — fetched once, independent of pagination.
     useEffect(() => {
-        axios.get('/api/gown/locations').then(({ data }) => setLocationOptions(data));
+        loadLocations().then(setLocationOptions);
     }, []);
 
     useEffect(() => {
@@ -260,10 +212,26 @@ const SearchGowns = () => {
         setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
             mutate(next);
-            if (resetPage) next.delete('page');
+            // A filter edit (as opposed to a page change) also drops `text`: it only seeds
+            // the search bar with what was typed, and once the filters are edited by hand
+            // it no longer describes them.
+            if (resetPage) {
+                next.delete('page');
+                next.delete('text');
+            }
             return next;
         }, { replace: true });
     };
+
+    const onSmartSearch = (parsed, text) => {
+        setSearchParams(parsedToSearchParams(parsed, text), { replace: true });
+        window.scrollTo(0, 0);
+    };
+
+    const setKeywords = (event) => updateParams((next) => {
+        if (event.target.value.trim() === '') next.delete('keywords');
+        else next.set('keywords', event.target.value);
+    });
 
     const setField = (field) => (event, value) => updateParams((next) => {
         next.delete(field);
@@ -290,6 +258,18 @@ const SearchGowns = () => {
         setNotifyError('');
         setNotifyOpen(true);
     };
+
+    // The home page's "Notify Me" links here with ?notify=1 to open the dialog directly.
+    useEffect(() => {
+        if (searchParams.get('notify') === '1') {
+            onOpenNotify();
+            setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete('notify');
+                return next;
+            }, { replace: true });
+        }
+    }, []);
 
     const onNotifySubmit = async () => {
         setNotifyError('');
@@ -389,6 +369,14 @@ const SearchGowns = () => {
                 </Stack>
             )}
 
+            <Box sx={{ mt: 2, mb: 1, mr: laneSx, maxWidth: 760 }}>
+                <SmartSearchBar
+                    initialText={searchParams.get('text') || ''}
+                    onSearch={onSmartSearch}
+                    placeholder='Try “navy mother of the bride, size 12”'
+                />
+            </Box>
+
             <Paper variant="outlined" sx={{ p: 2.5, mb: 4, mr: laneSx }}>
                 <Grid container spacing={2}>
                     <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
@@ -438,6 +426,14 @@ const SearchGowns = () => {
                             onChange={setPriceField('maxPrice')}
                         />
                     </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 8 }}>
+                        <TextField
+                            size="small" label="Keywords" fullWidth
+                            placeholder="e.g. lace, long sleeve, brand"
+                            value={filters.keywords}
+                            onChange={setKeywords}
+                        />
+                    </Grid>
                 </Grid>
             </Paper>
 
@@ -448,13 +444,38 @@ const SearchGowns = () => {
             ) : results.length === 0 ? (
                 <Typography color="text.secondary">No gowns match your search yet. Try adjusting the filters.</Typography>
             ) : (
-                <Grid container spacing={3} sx={{ opacity: searching ? 0.6 : 1, transition: 'opacity 0.2s', mr: laneSx }}>
-                    {results.map((gown) => (
-                        <Grid key={gown.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                            <GownCard gown={gown} navigate={navigate} />
-                        </Grid>
+                <Box sx={{ opacity: searching ? 0.6 : 1, transition: 'opacity 0.2s', mr: laneSx }}>
+                    {exactCount === 0 && page === 1 && (
+                        <Paper variant="outlined" sx={{
+                            p: { xs: 2.5, sm: 3 }, mb: 4, display: 'flex', gap: 2, alignItems: 'center',
+                            flexWrap: 'wrap', justifyContent: 'space-between', borderColor: 'rgba(156, 78, 88, 0.25)'
+                        }}>
+                            <Box>
+                                <Typography sx={{ fontFamily: `'Playfair Display', serif`, fontSize: '1.25rem', fontWeight: 600 }}>
+                                    Nothing matches every detail just yet
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Here are the closest gowns we have. We can also email you the moment an exact match is posted.
+                                </Typography>
+                            </Box>
+                            <Button variant="outlined" startIcon={<NotificationsActiveIcon />} onClick={onOpenNotify}>
+                                Notify Me
+                            </Button>
+                        </Paper>
+                    )}
+                    {groupResults(results, (page - 1) * PAGE_SIZE, exactCount, closeCount, totalCount).map((group, gi) => (
+                        <Box key={group.tier}>
+                            {group.showHeading && !(group.tier === 0 && exactCount === 0) && <TierHeading tier={group.tier} first={gi === 0} count={group.tier === 0 ? exactCount : null} />}
+                            <Grid container spacing={3}>
+                                {group.items.map((gown) => (
+                                    <Grid key={gown.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                                        <GownCard gown={gown} navigate={navigate} />
+                                    </Grid>
+                                ))}
+                            </Grid>
+                        </Box>
                     ))}
-                </Grid>
+                </Box>
             )}
 
             {totalCount > PAGE_SIZE && (

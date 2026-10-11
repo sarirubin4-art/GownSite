@@ -1,34 +1,332 @@
-import React, { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Box, Typography, Button, Stack, Snackbar, Alert } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
+import { Box, Typography, Button, Stack, Snackbar, Alert, Grid } from '@mui/material';
 import usePageTitle from '../hooks/usePageTitle';
+import { useAdLane } from '../context/AdLaneContext';
+import SmartSearchBar from '../components/SmartSearchBar';
+import GownCard from '../components/GownCard';
+import { COLOR_OPTIONS, styleLabel } from '../constants/gownOptions';
+import { parsedToSearchParams } from '../utils/parseSearchQuery';
+
+const RULE = '1px solid rgba(156, 78, 88, 0.18)';
+const serif = `'Playfair Display', serif`;
+
+// Small letter-spaced label that sits above a section title.
+const Eyebrow = ({ children, sx }) => (
+    <Typography sx={{ fontSize: '0.72rem', letterSpacing: 3, textTransform: 'uppercase', color: 'primary.dark', fontWeight: 500, ...sx }}>
+        {children}
+    </Typography>
+);
+
+const SectionHeading = ({ eyebrow, title, linkTo, linkLabel }) => (
+    <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 2, pb: 1.5, mb: 3.5, borderBottom: RULE }}>
+        <Box>
+            <Eyebrow sx={{ mb: 0.5 }}>{eyebrow}</Eyebrow>
+            <Typography variant="h4" component="h2" sx={{ fontSize: { xs: '1.6rem', md: '2.1rem' } }}>{title}</Typography>
+        </Box>
+        {linkTo && (
+            <Typography
+                component={Link} to={linkTo}
+                sx={{ color: 'text.primary', fontSize: '0.9rem', whiteSpace: 'nowrap', textDecoration: 'none',
+                    borderBottom: '1px solid currentColor', pb: 0.25, mb: 0.75, '&:hover': { color: 'primary.dark' } }}
+            >
+                {linkLabel}
+            </Typography>
+        )}
+    </Box>
+);
+
+// Swatch fills for the "Shop by Color" row — metallics and prints get a soft gradient so
+// they read as what they are rather than a flat chip.
+const SWATCH = {
+    'Ivory/White': '#FBF7EE', Blush: '#F2CFCB', Champagne: '#EED9B9', Beige: '#D9C4A5', Black: '#1E1A1B',
+    Navy: '#1F2B47', Burgundy: '#6E1F2E', Emerald: '#1F5E46', Sage: '#A3B09A', Blue: '#4F74B3',
+    Silver: 'linear-gradient(135deg, #F2F2F2 0%, #B9BCC2 50%, #EDEDED 100%)',
+    Gold: 'linear-gradient(135deg, #F3E2A9 0%, #C9A44C 50%, #F1DE9D 100%)',
+    Pink: '#E59BB1', Purple: '#7A5194',
+    Floral: 'radial-gradient(circle at 30% 30%, #E8A1AE 0 18%, transparent 19%), radial-gradient(circle at 70% 65%, #A9B98F 0 16%, transparent 17%), radial-gradient(circle at 68% 28%, #F3D27A 0 12%, transparent 13%), #FBF1EE',
+    Multi: 'conic-gradient(#E59BB1, #F3D27A, #A3B09A, #4F74B3, #7A5194, #E59BB1)',
+};
+
+// One-click shortcuts under the hero search bar, straight to a pre-filtered Browse page.
+const POPULAR = [
+    { label: 'Mother of the Bride', params: 'styles=MotherOfBrideOrGroom' },
+    { label: 'Sister of the Bride', params: 'styles=SisterOfBrideOrGroom' },
+    { label: 'Navy', params: 'colors=Navy' },
+    { label: 'Bridal', params: 'styles=Bridal' },
+    { label: 'For Rent', params: 'listingTypes=Rent' },
+];
 
 const Home = () => {
     usePageTitle(null, "Buy, sell, and rent dresses for every event. Find the perfect dress nearby, or give one you love a beautiful second life.");
+    const navigate = useNavigate();
+    const { laneSx } = useAdLane();
     const [searchParams] = useSearchParams();
     const verified = searchParams.get('verified');
     const [noticeOpen, setNoticeOpen] = useState(!!verified);
+    const [showcase, setShowcase] = useState(null);
+
+    useEffect(() => {
+        axios.get('/api/gown/home-showcase').then(({ data }) => setShowcase(data)).catch(() => {});
+    }, []);
+
+    const onSearch = (parsed, text) => navigate(`/search?${parsedToSearchParams(parsed, text)}`);
+
+    const colors = showcase ? COLOR_OPTIONS.filter((c) => SWATCH[c] && showcase.colors.includes(c)) : [];
+    const styles = showcase?.styles || [];
+    const brands = showcase?.brands || [];
+    const newest = showcase?.newest || [];
+
+    // A designer list of one or two names looks thin, so that tab waits until there are a few.
+    const shopTabs = [
+        { key: 'color', label: 'Color', show: colors.length > 0 },
+        { key: 'designer', label: 'Designer', show: brands.length >= 3 },
+        { key: 'occasion', label: 'Occasion', show: styles.length > 0 },
+    ].filter((t) => t.show);
+    const [shopBy, setShopBy] = useState('color');
+    const activeTab = shopTabs.some((t) => t.key === shopBy) ? shopBy : shopTabs[0]?.key;
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', py: 10 }}>
-            <Box
-                component="img"
-                src="/logo.webp"
-                alt="Regowned"
-                sx={{ width: { xs: '80%', sm: 420 }, maxWidth: 500, height: 'auto', mb: 2 }}
-            />
-            <Typography variant="h6" color="text.secondary" sx={{ mb: 5, maxWidth: 560 }}>
-                Buy, sell, and rent dresses for every event. Find the perfect dress nearby,
-                or give one you love a beautiful second life.
-            </Typography>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <Button component={Link} to="/search" variant="contained" size="large" sx={{ px: 4, py: 1.5 }}>
-                    Start Your Search
-                </Button>
-                <Button component={Link} to="/postagown" variant="outlined" size="large" sx={{ px: 4, py: 1.5 }}>
-                    Post a Gown
-                </Button>
-            </Stack>
+        <Box>
+            {/* Hero */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', pt: { xs: 5, md: 9 }, pb: { xs: 6, md: 9 } }}>
+                <Box
+                    component="img"
+                    src="/logo.webp"
+                    alt="Regowned"
+                    sx={{ width: { xs: '80%', sm: 420 }, maxWidth: 500, height: 'auto', mb: 2 }}
+                />
+                <Typography variant="h6" color="text.secondary" sx={{ mb: { xs: 4, md: 5 }, maxWidth: 560, fontWeight: 400 }}>
+                    Buy, sell, and rent dresses for every event. Find the perfect dress nearby,
+                    or give one you love a beautiful second life.
+                </Typography>
+
+                <Box sx={{ width: '100%', maxWidth: 680 }}>
+                    <SmartSearchBar
+                        large
+                        onSearch={onSearch}
+                        placeholder='Try “navy mother of the bride, size 12”'
+                    />
+                </Box>
+
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'baseline', columnGap: 2.5, rowGap: 1, mt: 1, px: 2 }}>
+                    <Eyebrow sx={{ color: 'text.secondary', letterSpacing: 2.5 }}>Popular</Eyebrow>
+                    {POPULAR.map((p) => (
+                        <Typography
+                            key={p.label} component={Link} to={`/search?${p.params}`}
+                            sx={{ color: 'text.primary', fontSize: '0.9rem', textDecoration: 'none',
+                                borderBottom: '1px solid transparent', '&:hover': { borderColor: 'primary.main', color: 'primary.dark' } }}
+                        >
+                            {p.label}
+                        </Typography>
+                    ))}
+                </Box>
+
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: { xs: 4, md: 5 } }}>
+                    <Button component={Link} to="/search" variant="contained" size="large" sx={{ px: 4, py: 1.5 }}>
+                        Browse All Gowns
+                    </Button>
+                    <Button component={Link} to="/postagown" variant="outlined" size="large" sx={{ px: 4, py: 1.5 }}>
+                        Post a Gown
+                    </Button>
+                </Stack>
+            </Box>
+
+            <Box sx={{ mr: laneSx }}>
+                {/* Shop by — color, designer and occasion share one section (tabs) so the
+                    page doesn't turn into a long scroll of separate shortcut sections. Each
+                    tab only lists what currently has available gowns. */}
+                {shopTabs.length > 0 && (
+                    <Box component="section" sx={{ mb: { xs: 7, md: 10 } }}>
+                        <Box sx={{ pb: 1.5, mb: 3.5, borderBottom: RULE }}>
+                            <Eyebrow sx={{ mb: 0.75 }}>Shop by</Eyebrow>
+                            <Box role="tablist" sx={{ display: 'flex', flexWrap: 'wrap', columnGap: { xs: 2.5, md: 4 }, rowGap: 0.5 }}>
+                                {shopTabs.map((t) => {
+                                    const active = t.key === activeTab;
+                                    return (
+                                        <Box
+                                            key={t.key} component="button" type="button" role="tab" aria-selected={active}
+                                            onClick={() => setShopBy(t.key)}
+                                            sx={{
+                                                p: 0, border: 0, background: 'none', cursor: 'pointer',
+                                                fontFamily: serif, fontWeight: 600, fontSize: { xs: '1.5rem', md: '2.1rem' },
+                                                color: active ? 'text.primary' : 'rgba(74, 52, 57, 0.35)',
+                                                transition: 'color 0.2s',
+                                                '&:hover': { color: active ? 'text.primary' : 'rgba(74, 52, 57, 0.6)' }
+                                            }}
+                                        >
+                                            {t.label}
+                                        </Box>
+                                    );
+                                })}
+                            </Box>
+                        </Box>
+
+                        {activeTab === 'occasion' && (
+                            // A swipeable row on phones (seven tall photos stacked two-up would be
+                            // a very long scroll); a grid from tablet width up.
+                            <Box sx={{
+                                display: { xs: 'flex', sm: 'grid' }, gap: { xs: 1.5, md: 2.5 },
+                                overflowX: { xs: 'auto', sm: 'visible' }, scrollSnapType: 'x mandatory',
+                                mx: { xs: -2, sm: 0 }, px: { xs: 2, sm: 0 }, pb: { xs: 1, sm: 0 },
+                                gridTemplateColumns: { sm: 'repeat(3, 1fr)', md: `repeat(${Math.min(4, styles.length)}, 1fr)` },
+                                maxWidth: styles.length < 3 ? 720 : 'none',
+                                scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' }
+                            }}>
+                                {styles.map((s) => (
+                                    <Box
+                                        key={s.style} component={Link} to={`/search?styles=${s.style}`}
+                                        sx={{
+                                            display: 'block', flex: { xs: '0 0 44%', sm: 'none' }, scrollSnapAlign: 'start',
+                                            color: 'inherit', textDecoration: 'none',
+                                            '&:hover img': { transform: 'scale(1.04)' },
+                                            '&:hover .occasion-label': { color: 'primary.dark' }
+                                        }}
+                                    >
+                                        <Box sx={{ overflow: 'hidden', borderRadius: 2, aspectRatio: '3 / 4', bgcolor: 'background.paper' }}>
+                                            <Box
+                                                component="img" src={s.imageUrl} alt={styleLabel(s.style)} loading="lazy"
+                                                sx={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%',
+                                                    display: 'block', transition: 'transform 0.6s ease' }}
+                                            />
+                                        </Box>
+                                        <Typography className="occasion-label" sx={{ fontFamily: serif, fontSize: { xs: '1.05rem', md: '1.2rem' }, mt: 1.25, transition: 'color 0.2s' }}>
+                                            {styleLabel(s.style)}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {s.count} {s.count === 1 ? 'gown' : 'gowns'}
+                                        </Typography>
+                                    </Box>
+                                ))}
+                            </Box>
+                        )}
+
+                        {activeTab === 'designer' && (
+                            <Box sx={{
+                                display: 'grid', columnGap: 4,
+                                gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)', lg: 'repeat(4, 1fr)' }
+                            }}>
+                                {brands.map((b) => (
+                                    <Box
+                                        key={b.name} component={Link} to={`/search?keywords=${encodeURIComponent(b.name)}`}
+                                        sx={{
+                                            display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1.5,
+                                            py: 1.5, borderBottom: RULE, color: 'text.primary', textDecoration: 'none',
+                                            '&:hover .designer-name': { color: 'primary.dark' }
+                                        }}
+                                    >
+                                        <Typography className="designer-name" sx={{ fontFamily: serif, fontSize: { xs: '1.05rem', md: '1.2rem' }, transition: 'color 0.2s', minWidth: 0, overflowWrap: 'anywhere' }}>
+                                            {b.name}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>{b.count}</Typography>
+                                    </Box>
+                                ))}
+                            </Box>
+                        )}
+
+                        {activeTab === 'color' && (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 2.5, md: 3.5 } }}>
+                                {colors.map((c) => (
+                                    <Box
+                                        key={c} component={Link} to={`/search?colors=${encodeURIComponent(c)}`}
+                                        sx={{
+                                            display: 'flex', flexDirection: 'column', alignItems: 'center', width: 72,
+                                            color: 'text.primary', textDecoration: 'none',
+                                            '&:hover .swatch': { boxShadow: '0 0 0 2px #fff, 0 0 0 3px rgba(156, 78, 88, 0.6)' }
+                                        }}
+                                    >
+                                        <Box className="swatch" sx={{
+                                            width: 52, height: 52, borderRadius: '50%', background: SWATCH[c],
+                                            border: '1px solid rgba(74, 52, 57, 0.12)', transition: 'box-shadow 0.2s'
+                                        }} />
+                                        <Typography sx={{ fontSize: '0.8rem', mt: 1, textAlign: 'center', lineHeight: 1.3 }}>{c}</Typography>
+                                    </Box>
+                                ))}
+                            </Box>
+                        )}
+                    </Box>
+                )}
+
+                {/* Just listed — one row, so it teases rather than adds another long scroll */}
+                {newest.length > 0 && (
+                    <Box component="section" sx={{ mb: { xs: 7, md: 10 } }}>
+                        <SectionHeading eyebrow="Just listed" title="Newest arrivals" linkTo="/search" linkLabel="Browse all" />
+                        <Box sx={{
+                            display: { xs: 'flex', sm: 'grid' }, gap: 3,
+                            overflowX: { xs: 'auto', sm: 'visible' }, scrollSnapType: 'x mandatory',
+                            mx: { xs: -2, sm: 0 }, px: { xs: 2, sm: 0 }, pb: { xs: 1, sm: 0 },
+                            gridTemplateColumns: { sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+                            scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' }
+                        }}>
+                            {newest.map((gown) => (
+                                <Box key={gown.id} sx={{ flex: { xs: '0 0 78%', sm: 'none' }, scrollSnapAlign: 'start', minWidth: 0 }}>
+                                    <GownCard gown={gown} navigate={navigate} />
+                                </Box>
+                            ))}
+                        </Box>
+                    </Box>
+                )}
+
+                {/* Sellers */}
+                <Box component="section" sx={{ mb: { xs: 8, md: 11 } }}>
+                    <Grid container spacing={{ xs: 2, md: 3 }}>
+                        {[
+                            {
+                                eyebrow: 'For sellers', title: 'Have a gown in your closet?',
+                                body: 'Rent it out or sell it, and let it shine at someone else’s simcha.',
+                                to: '/postagown', cta: 'Post a Gown', variant: 'contained'
+                            },
+                            {
+                                eyebrow: 'Concierge', title: 'Rather we handle it?',
+                                body: 'Send us a few photos and the basics. We’ll write and post your listing for you.',
+                                to: '/concierge', cta: 'Let Us Post It', variant: 'outlined'
+                            },
+                        ].map((card) => (
+                            <Grid key={card.title} size={{ xs: 12, md: 6 }}>
+                                <Box sx={{
+                                    height: '100%', bgcolor: 'background.paper', border: RULE, borderRadius: 3,
+                                    p: { xs: 3.5, md: 5 }, display: 'flex', flexDirection: 'column', alignItems: 'flex-start'
+                                }}>
+                                    <Eyebrow sx={{ mb: 1.5 }}>{card.eyebrow}</Eyebrow>
+                                    <Typography variant="h4" component="h2" sx={{ fontSize: { xs: '1.6rem', md: '2rem' }, mb: 1.5 }}>
+                                        {card.title}
+                                    </Typography>
+                                    <Typography color="text.secondary" sx={{ mb: 3, maxWidth: 420 }}>{card.body}</Typography>
+                                    <Button component={Link} to={card.to} variant={card.variant} size="large" sx={{ px: 4, mt: 'auto' }}>
+                                        {card.cta}
+                                    </Button>
+                                </Box>
+                            </Grid>
+                        ))}
+                    </Grid>
+                </Box>
+
+                {/* Notify me */}
+                <Box component="section" sx={{ textAlign: 'center', py: { xs: 6, md: 8 }, borderTop: RULE, borderBottom: RULE, mb: { xs: 6, md: 8 } }}>
+                    <Eyebrow sx={{ mb: 1.5 }}>Still searching?</Eyebrow>
+                    <Typography variant="h4" component="h2" sx={{ fontSize: { xs: '1.7rem', md: '2.3rem' }, mb: 1.5 }}>
+                        Be the first to know
+                    </Typography>
+                    <Typography color="text.secondary" sx={{ maxWidth: 480, mx: 'auto', mb: 3.5 }}>
+                        Tell us your size, color, and style, and we’ll email you the moment a match is posted.
+                    </Typography>
+                    <Button component={Link} to="/search?notify=1" variant="contained" size="large" sx={{ px: 4.5, py: 1.4 }}>
+                        Notify Me
+                    </Button>
+                </Box>
+
+                {/* Ad directory */}
+                <Box sx={{ textAlign: 'center', pb: 2 }}>
+                    <Typography color="text.secondary">
+                        Planning a simcha?{' '}
+                        <Box component={Link} to="/ads" sx={{ color: 'primary.dark', textDecoration: 'none', borderBottom: '1px solid currentColor' }}>
+                            Explore our Ad Directory
+                        </Box>
+                        {' '}for makeup, hair, sheitels, and more.
+                    </Typography>
+                </Box>
+            </Box>
 
             <Snackbar
                 open={noticeOpen}
