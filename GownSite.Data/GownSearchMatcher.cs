@@ -49,7 +49,8 @@ namespace GownSite.Data
         private static readonly (string, string)[] RelatedStylePairs =
         {
             ("MotherOfBrideOrGroom", "Evening"), ("SisterOfBrideOrGroom", "Evening"), ("SisterOfBrideOrGroom", "ALine"),
-            ("Evening", "BallGown"), ("Evening", "ALine"), ("BallGown", "Bridal"), ("ALine", "Bridal")
+            ("Evening", "BallGown"), ("Evening", "ALine"), ("BallGown", "Bridal"), ("ALine", "Bridal"),
+            ("Engagement", "Evening")
         };
 
         private const int SizeWeight = 4, StyleWeight = 3, ColorWeight = 3, KeywordWeight = 2;
