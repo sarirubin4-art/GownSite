@@ -53,7 +53,9 @@ namespace GownSite.Data
     public class HomeShowcaseBrand
     {
         public string Name { get; set; }
+        public string SearchTerm { get; set; }
         public int Count { get; set; }
+        public int Tier { get; set; }
     }
 
     public class GownRepository
@@ -158,17 +160,29 @@ namespace GownSite.Data
                     .ToList(),
                 Styles = styleTiles,
                 Colors = available.SelectMany(g => SplitTags(g.Color)).Distinct().ToList(),
-                // Brand is free text typed by the seller, so "Sherri Hill" and "sherri hill "
-                // are grouped as one designer, shown under its most common spelling.
+                // Brand is free text typed by the seller: non-designers ("Custom", "N/A") are
+                // dropped, spellings of the same designer are grouped, and the best-known names
+                // lead (see DesignerDirectory), then whichever has the most gowns. The button
+                // searches by the sellers' own most common spelling, since that's what the
+                // keyword search will find in their listings.
                 Brands = available
-                    .Where(g => !string.IsNullOrWhiteSpace(g.Brand))
-                    .GroupBy(g => string.Join(" ", g.Brand.Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant())
-                    .Select(grp => new HomeShowcaseBrand
+                    .Where(g => DesignerDirectory.IsDesigner(g.Brand))
+                    .Select(g => (Spelling: g.Brand.Trim(), Known: DesignerDirectory.Lookup(g.Brand)))
+                    .GroupBy(x => x.Known?.Name ?? DesignerDirectory.Normalize(x.Spelling))
+                    .Select(grp =>
                     {
-                        Name = grp.GroupBy(g => g.Brand.Trim()).OrderByDescending(s => s.Count()).First().Key,
-                        Count = grp.Count()
+                        var commonSpelling = grp.GroupBy(x => x.Spelling).OrderByDescending(s => s.Count()).First().Key;
+                        var known = grp.First().Known;
+                        return new HomeShowcaseBrand
+                        {
+                            Name = known?.Name ?? commonSpelling,
+                            SearchTerm = commonSpelling,
+                            Count = grp.Count(),
+                            Tier = known?.Tier ?? DesignerDirectory.Unranked
+                        };
                     })
-                    .OrderByDescending(b => b.Count)
+                    .OrderByDescending(b => b.Tier)
+                    .ThenByDescending(b => b.Count)
                     .ThenBy(b => b.Name)
                     .Take(maxBrands)
                     .ToList()

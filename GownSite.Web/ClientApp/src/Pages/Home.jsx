@@ -203,24 +203,32 @@ const Home = () => {
                         )}
 
                         {activeTab === 'designer' && (
-                            <Box sx={{
-                                display: 'grid', columnGap: 4,
-                                gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)', lg: 'repeat(4, 1fr)' }
-                            }}>
+                            // Already ordered best-known first by the server (see DesignerDirectory).
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 1.25, md: 1.5 } }}>
                                 {brands.map((b) => (
-                                    <Box
-                                        key={b.name} component={Link} to={`/search?keywords=${encodeURIComponent(b.name)}`}
+                                    <Button
+                                        key={b.name} component={Link} to={`/search?keywords=${encodeURIComponent(b.searchTerm)}`}
+                                        variant="outlined"
                                         sx={{
-                                            display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1.5,
-                                            py: 1.5, borderBottom: RULE, color: 'text.primary', textDecoration: 'none',
-                                            '&:hover .designer-name': { color: 'primary.dark' }
+                                            bgcolor: 'background.paper', color: 'text.primary',
+                                            borderColor: 'rgba(156, 78, 88, 0.3)',
+                                            px: { xs: 2.25, md: 3 }, py: { xs: 1, md: 1.25 }, gap: 1.25,
+                                            fontFamily: serif, fontWeight: 600, fontSize: { xs: '1rem', md: '1.1rem' },
+                                            transition: 'all 0.2s',
+                                            '&:hover': {
+                                                bgcolor: 'primary.main', borderColor: 'primary.main', color: '#fff',
+                                                '& .designer-count': { color: 'rgba(255,255,255,0.8)' }
+                                            }
                                         }}
                                     >
-                                        <Typography className="designer-name" sx={{ fontFamily: serif, fontSize: { xs: '1.05rem', md: '1.2rem' }, transition: 'color 0.2s', minWidth: 0, overflowWrap: 'anywhere' }}>
-                                            {b.name}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>{b.count}</Typography>
-                                    </Box>
+                                        {b.name}
+                                        <Box component="span" className="designer-count" sx={{
+                                            fontFamily: `'Poppins', sans-serif`, fontWeight: 400, fontSize: '0.75rem',
+                                            color: 'text.secondary', transition: 'color 0.2s'
+                                        }}>
+                                            {b.count}
+                                        </Box>
+                                    </Button>
                                 ))}
                             </Box>
                         )}
