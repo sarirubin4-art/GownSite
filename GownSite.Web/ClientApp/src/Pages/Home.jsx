@@ -10,7 +10,16 @@ import { COLOR_OPTIONS, styleLabel } from '../constants/gownOptions';
 import { parsedToSearchParams } from '../utils/parseSearchQuery';
 
 // How long each Shop by tab stays up before rotating to the next.
-const ROTATE_MS = 6000;
+const ROTATE_MS = 4000;
+
+// Below desktop width, each Shop by panel is a sideways-swipe row (bleeding to the screen
+// edges) rather than wrapping into a tall stack. The three panels share one fixed-height
+// area, so keeping them all about the same height is what avoids a big empty gap.
+const SWIPE_ROW = {
+    overflowX: { xs: 'auto', md: 'visible' }, scrollSnapType: { xs: 'x proximity', md: 'none' },
+    mx: { xs: -2, sm: -3, md: 0 }, px: { xs: 2, sm: 3, md: 0 }, pb: { xs: 1, md: 0 },
+    scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' }
+};
 const RULE = '1px solid rgba(156, 78, 88, 0.18)';
 const serif = `'Playfair Display', serif`;
 
@@ -111,7 +120,11 @@ const Home = () => {
     };
 
     const renderColors = () => (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 2.5, md: 3.5 } }}>
+        <Box sx={{
+            ...SWIPE_ROW, display: { xs: 'grid', md: 'flex' }, flexWrap: 'wrap',
+            gridAutoFlow: 'column', gridTemplateRows: 'repeat(2, auto)', gridAutoColumns: '72px',
+            columnGap: { xs: 2, md: 3.5 }, rowGap: { xs: 2, md: 3.5 }
+        }}>
             {colors.map((c) => (
                 <Box
                     key={c} component={Link} to={`/search?colors=${encodeURIComponent(c)}`}
@@ -134,7 +147,11 @@ const Home = () => {
     // Already ordered best-known first by the server (see DesignerDirectory). Each button
     // carries a small photo of that designer's newest available gown.
     const renderDesigners = () => (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 1.25, md: 1.5 } }}>
+        <Box sx={{
+            ...SWIPE_ROW, display: { xs: 'grid', md: 'flex' }, flexWrap: 'wrap',
+            gridAutoFlow: 'column', gridTemplateRows: 'repeat(3, auto)', gridAutoColumns: 'max-content',
+            justifyItems: 'start', gap: { xs: 1.25, md: 1.5 }
+        }}>
             {brands.map((b) => (
                 <Button
                     key={b.name} component={Link} to={`/search?keywords=${encodeURIComponent(b.searchTerm)}`}
@@ -172,35 +189,32 @@ const Home = () => {
         </Box>
     );
 
-    // A swipeable row on phones (seven tall photos stacked two-up would be a very long
-    // scroll); a grid from tablet width up.
+    // One row of photos at every width (a swipe row below desktop) — two rows of tall
+    // photos made this panel several times taller than the other two.
     const renderOccasions = () => (
         <Box sx={{
-            display: { xs: 'flex', sm: 'grid' }, gap: { xs: 1.5, md: 2.5 },
-            overflowX: { xs: 'auto', sm: 'visible' }, scrollSnapType: 'x mandatory',
-            mx: { xs: -2, sm: 0 }, px: { xs: 2, sm: 0 }, pb: { xs: 1, sm: 0 },
-            gridTemplateColumns: { sm: 'repeat(3, 1fr)', md: `repeat(${Math.min(4, styles.length)}, 1fr)` },
-            maxWidth: styles.length < 3 ? 720 : 'none',
-            scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' }
+            ...SWIPE_ROW, display: { xs: 'flex', md: 'grid' }, gap: { xs: 1.5, md: 2.5 },
+            gridTemplateColumns: { md: `repeat(${styles.length}, minmax(0, 1fr))` },
+            maxWidth: { md: styles.length * 230 }
         }}>
             {styles.map((s) => (
                 <Box
                     key={s.style} component={Link} to={`/search?styles=${s.style}`}
                     sx={{
-                        display: 'block', flex: { xs: '0 0 44%', sm: 'none' }, scrollSnapAlign: 'start',
+                        display: 'block', flex: { xs: '0 0 38%', sm: '0 0 22%', md: 'none' }, scrollSnapAlign: 'start',
                         color: 'inherit', textDecoration: 'none',
                         '&:hover img': { transform: 'scale(1.04)' },
                         '&:hover .occasion-label': { color: 'primary.dark' }
                     }}
                 >
-                    <Box sx={{ overflow: 'hidden', borderRadius: 2, aspectRatio: '3 / 4', bgcolor: 'background.paper' }}>
+                    <Box sx={{ overflow: 'hidden', borderRadius: 2, aspectRatio: '4 / 5', bgcolor: 'background.paper' }}>
                         <Box
                             component="img" src={s.imageUrl} alt={styleLabel(s.style)} loading="lazy"
                             sx={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%',
                                 display: 'block', transition: 'transform 0.6s ease' }}
                         />
                     </Box>
-                    <Typography className="occasion-label" sx={{ fontFamily: serif, fontSize: { xs: '1.05rem', md: '1.2rem' }, mt: 1.25, transition: 'color 0.2s' }}>
+                    <Typography className="occasion-label" sx={{ fontFamily: serif, fontSize: { xs: '1rem', md: '1.1rem' }, mt: 1, transition: 'color 0.2s' }}>
                         {styleLabel(s.style)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
