@@ -15,7 +15,7 @@ import { wallpaperBackground } from '../theme';
 import { trackPageView } from '../utils/analytics';
 
 // Three tiers, each styled differently so they don't blend together: the shopper/seller
-// calls to action are real buttons; the business links live in a slim strip above the
+// calls to action are real buttons; the business links live in a slim strip under the
 // header (desktop) or their own drawer section (phone); the visitor's own pages sit with
 // their account avatar.
 const SHOPPER_LINKS = [
@@ -106,21 +106,35 @@ const Layout = ({ children }) => {
             backgroundColor: 'background.default'
         }}>
             {/* Desktop: a white header so the logo sits on it as-is and the pink calls to
-                action stand out, with business links in a slim strip above. Phone: the pink
-                bar stays, with the logo knocked out to white and Post a Gown as a white
-                button so it still pops. */}
+                action stand out, with business links in a slim frosted strip just under it
+                (CSS `order` puts it below the Toolbar). The strip is see-through with a blur
+                rather than fully clear: the header is sticky, so page content scrolls behind
+                it and plain transparent text would become unreadable. Phone: the pink bar
+                stays, with the logo knocked out to white and Post a Gown as a white button
+                so it still pops. */}
             <AppBar
                 position="sticky"
                 elevation={0}
                 sx={{
-                    bgcolor: { xs: 'primary.main', md: 'background.paper' },
-                    color: { xs: '#fff', md: 'text.primary' },
-                    borderBottom: { xs: 'none', md: HEADER_RULE }
+                    bgcolor: { xs: 'primary.main', md: 'transparent' },
+                    color: { xs: '#fff', md: 'text.primary' }
                 }}
             >
                 <Box sx={{
-                    display: { xs: 'none', md: 'flex' }, alignItems: 'center', justifyContent: 'flex-end', gap: 2.75,
-                    height: BUSINESS_STRIP_HEIGHT, px: 3, bgcolor: '#F6E1DF', color: '#7A4E55', fontSize: '0.8rem', letterSpacing: 0.2
+                    display: { xs: 'none', md: 'flex' }, order: 2, alignItems: 'center', justifyContent: 'flex-end', gap: 2.75,
+                    height: BUSINESS_STRIP_HEIGHT, px: 3, color: '#7A4E55', fontSize: '0.8rem', letterSpacing: 0.2,
+                    position: 'relative', isolation: 'isolate',
+                    // The frosted backdrop lives on a pseudo-element so it can fade out
+                    // toward (and a little past) the strip's bottom edge — no hard line —
+                    // while the links on top stay crisp.
+                    '&::before': {
+                        content: '""', position: 'absolute', top: 0, left: 0, right: 0, bottom: -14, zIndex: -1,
+                        pointerEvents: 'none',
+                        background: 'linear-gradient(to bottom, rgba(255, 246, 243, 0.6), rgba(255, 246, 243, 0))',
+                        backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)',
+                        maskImage: 'linear-gradient(to bottom, #000 45%, transparent)',
+                        WebkitMaskImage: 'linear-gradient(to bottom, #000 45%, transparent)'
+                    }
                 }}>
                     <Box component="span">For businesses:</Box>
                     {BUSINESS_LINKS.map((link) => (
@@ -137,7 +151,7 @@ const Layout = ({ children }) => {
                         </Box>
                     ))}
                 </Box>
-                <Toolbar sx={{ gap: { xs: 1, md: 2 } }}>
+                <Toolbar sx={{ gap: { xs: 1, md: 2 }, bgcolor: { md: 'background.paper' }, borderBottom: { md: HEADER_RULE } }}>
                     <IconButton
                         onClick={() => setDrawerOpen(true)}
                         color="inherit"
