@@ -44,6 +44,11 @@ namespace GownSite.Data
             ("Jenny Packham", Luxury, new string[0]),
             ("Self-Portrait", Luxury, new[] { "self portrait" }),
             ("Ralph Lauren", Luxury, new[] { "polo ralph lauren", "lauren ralph lauren" }),
+            ("Zimmermann", Luxury, new string[0]),
+            ("Alberta Ferretti", Luxury, new string[0]),
+            ("Blumarine", Luxury, new string[0]),
+            ("Ermanno Scervino", Luxury, new string[0]),
+            ("Khaite", Luxury, new string[0]),
 
             // Established evening & bridal designers
             ("Pronovias", Designer, new string[0]),
@@ -72,6 +77,11 @@ namespace GownSite.Data
             ("BCBG", Designer, new[] { "bcbgmaxazria", "bcbg max azria" }),
             ("Kate Spade", Designer, new string[0]),
             ("Eliza J", Designer, new string[0]),
+            ("Philosophy di Lorenzo Serafini", Designer, new[] { "philosophy di lorenzo", "philosophy" }),
+            ("Costarellos", Designer, new string[0]),
+            ("Pamella Roland", Designer, new string[0]),
+            ("Rachel Gilbert", Designer, new string[0]),
+            ("The Vampire's Wife", Designer, new[] { "vampires wife", "the vampires wife" }),
 
             // Popular occasion-wear brands
             ("Adrianna Papell", Popular, new string[0]),
@@ -103,6 +113,7 @@ namespace GownSite.Data
             ("Morgan & Co", Popular, new[] { "morgan and co" }),
             ("Blondie Nites", Popular, new string[0]),
             ("Jasmine", Popular, new[] { "jasmine bridal" }),
+            ("JNBY", Popular, new string[0]),
         };
 
         // Normalized seller entries that mean "no designer". Matched on the whole entry, plus
@@ -160,7 +171,8 @@ namespace GownSite.Data
         }
 
         // A known designer's canonical name and tier, matched on the whole entry or on its
-        // leading words ("Sherri Hill 2023 collection" -> Sherri Hill). Null when unknown.
+        // leading words ("Sherri Hill 2023 collection" -> Sherri Hill), allowing for a typo or
+        // two ("Monique Ihullier", "Zimmerman" — see IsCloseSpelling). Null when unknown.
         public static (string Name, int Tier)? Lookup(string raw)
         {
             var words = Normalize(raw).Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -168,7 +180,47 @@ namespace GownSite.Data
             {
                 if (KnownByKey.TryGetValue(string.Join(" ", words.Take(n)), out var match)) return match;
             }
+            for (var n = words.Length; n >= 1; n--)
+            {
+                var prefix = string.Join(" ", words.Take(n));
+                foreach (var (key, match) in KnownByKey)
+                {
+                    if (IsCloseSpelling(prefix, key)) return match;
+                }
+            }
             return null;
+        }
+
+        // Same name allowing for small typos: one letter off for names of 6+ characters, two
+        // for 12+. Short names must match exactly — "Prada" vs "Prado" aren't the same label.
+        public static bool IsCloseSpelling(string a, string b)
+        {
+            a = Normalize(a);
+            b = Normalize(b);
+            if (a == b) return true;
+            var len = Math.Min(a.Length, b.Length);
+            var allowed = len >= 12 ? 2 : len >= 6 ? 1 : 0;
+            return allowed > 0 && Math.Abs(a.Length - b.Length) <= allowed && EditDistance(a, b) <= allowed;
+        }
+
+        // Levenshtein distance — the fewest single-letter insertions, deletions or swaps
+        // that turn one string into the other.
+        private static int EditDistance(string a, string b)
+        {
+            var prev = new int[b.Length + 1];
+            var curr = new int[b.Length + 1];
+            for (var j = 0; j <= b.Length; j++) prev[j] = j;
+            for (var i = 1; i <= a.Length; i++)
+            {
+                curr[0] = i;
+                for (var j = 1; j <= b.Length; j++)
+                {
+                    var cost = a[i - 1] == b[j - 1] ? 0 : 1;
+                    curr[j] = Math.Min(Math.Min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+                }
+                (prev, curr) = (curr, prev);
+            }
+            return prev[b.Length];
         }
     }
 }

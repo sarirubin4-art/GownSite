@@ -163,7 +163,7 @@ namespace GownSite.Web.Controllers
         [HttpGet("home-showcase")]
         public HomeShowcase HomeShowcase()
         {
-            return new GownRepository(_connectionString).GetHomeShowcase(ShowcaseStyles, 4, 12);
+            return new GownRepository(_connectionString).GetHomeShowcase(ShowcaseStyles, 4, 16);
         }
 
         [HttpGet("get")]

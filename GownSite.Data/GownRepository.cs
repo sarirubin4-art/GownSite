@@ -54,6 +54,7 @@ namespace GownSite.Data
     {
         public string Name { get; set; }
         public string SearchTerm { get; set; }
+        public string ImageUrl { get; set; }
         public int Count { get; set; }
         public int Tier { get; set; }
     }
@@ -165,28 +166,51 @@ namespace GownSite.Data
                 // lead (see DesignerDirectory), then whichever has the most gowns. The button
                 // searches by the sellers' own most common spelling, since that's what the
                 // keyword search will find in their listings.
-                Brands = available
-                    .Where(g => DesignerDirectory.IsDesigner(g.Brand))
-                    .Select(g => (Spelling: g.Brand.Trim(), Known: DesignerDirectory.Lookup(g.Brand)))
-                    .GroupBy(x => x.Known?.Name ?? DesignerDirectory.Normalize(x.Spelling))
-                    .Select(grp =>
-                    {
-                        var commonSpelling = grp.GroupBy(x => x.Spelling).OrderByDescending(s => s.Count()).First().Key;
-                        var known = grp.First().Known;
-                        return new HomeShowcaseBrand
-                        {
-                            Name = known?.Name ?? commonSpelling,
-                            SearchTerm = commonSpelling,
-                            Count = grp.Count(),
-                            Tier = known?.Tier ?? DesignerDirectory.Unranked
-                        };
-                    })
-                    .OrderByDescending(b => b.Tier)
-                    .ThenByDescending(b => b.Count)
-                    .ThenBy(b => b.Name)
+                Brands = GroupDesigners(available.Select(g => (g.Brand, g.PrimaryPictureUrl)))
                     .Take(maxBrands)
                     .ToList()
             };
+        }
+
+        // `gowns` must be newest-first: each designer's photo is its newest gown's. Known
+        // designers group under their proper name; unknown ones group with any earlier entry
+        // spelled within a typo or two ("Isabella Sanchez" / "Isabella Sanchiz").
+        private static IEnumerable<HomeShowcaseBrand> GroupDesigners(IEnumerable<(string Brand, string PictureUrl)> gowns)
+        {
+            var groups = new List<(string Key, (string Name, int Tier)? Known, List<(string Spelling, string PictureUrl)> Gowns)>();
+            foreach (var (brand, pictureUrl) in gowns)
+            {
+                if (!DesignerDirectory.IsDesigner(brand)) continue;
+                var spelling = brand.Trim();
+                var known = DesignerDirectory.Lookup(spelling);
+                var key = known?.Name ?? DesignerDirectory.Normalize(spelling);
+                var group = groups.FirstOrDefault(g => known != null
+                    ? g.Known?.Name == known.Value.Name
+                    : g.Known == null && DesignerDirectory.IsCloseSpelling(g.Key, key));
+                if (group.Gowns == null)
+                {
+                    group = (key, known, new List<(string, string)>());
+                    groups.Add(group);
+                }
+                group.Gowns.Add((spelling, pictureUrl));
+            }
+
+            return groups
+                .Select(g =>
+                {
+                    var commonSpelling = g.Gowns.GroupBy(x => x.Spelling).OrderByDescending(s => s.Count()).First().Key;
+                    return new HomeShowcaseBrand
+                    {
+                        Name = g.Known?.Name ?? commonSpelling,
+                        SearchTerm = commonSpelling,
+                        ImageUrl = g.Gowns[0].PictureUrl,
+                        Count = g.Gowns.Count,
+                        Tier = g.Known?.Tier ?? DesignerDirectory.Unranked
+                    };
+                })
+                .OrderByDescending(b => b.Tier)
+                .ThenByDescending(b => b.Count)
+                .ThenBy(b => b.Name);
         }
 
         public List<string> GetDistinctLocations()

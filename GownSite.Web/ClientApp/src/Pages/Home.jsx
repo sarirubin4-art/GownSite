@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { Box, Typography, Button, Stack, Snackbar, Alert, Grid } from '@mui/material';
+import { Box, Typography, Button, Stack, Snackbar, Alert, Grid, useMediaQuery } from '@mui/material';
 import usePageTitle from '../hooks/usePageTitle';
 import { useAdLane } from '../context/AdLaneContext';
 import SmartSearchBar from '../components/SmartSearchBar';
@@ -9,6 +9,8 @@ import GownCard from '../components/GownCard';
 import { COLOR_OPTIONS, styleLabel } from '../constants/gownOptions';
 import { parsedToSearchParams } from '../utils/parseSearchQuery';
 
+// How long each Shop by tab stays up before rotating to the next.
+const ROTATE_MS = 6000;
 const RULE = '1px solid rgba(156, 78, 88, 0.18)';
 const serif = `'Playfair Display', serif`;
 
@@ -87,6 +89,128 @@ const Home = () => {
     const [shopBy, setShopBy] = useState('color');
     const activeTab = shopTabs.some((t) => t.key === shopBy) ? shopBy : shopTabs[0]?.key;
 
+    // The tabs advance on their own until the visitor shows interest: hovering or focusing
+    // the section pauses it, and picking a tab (or touching the section on a phone, e.g. to
+    // swipe the occasion photos) stops it for good. Off entirely for reduced-motion users.
+    const [autoRotate, setAutoRotate] = useState(true);
+    const [paused, setPaused] = useState(false);
+    const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+    const rotating = autoRotate && !paused && !reduceMotion && shopTabs.length > 1;
+    useEffect(() => {
+        if (!rotating) return undefined;
+        const timer = setTimeout(() => {
+            const i = shopTabs.findIndex((t) => t.key === activeTab);
+            setShopBy(shopTabs[(i + 1) % shopTabs.length].key);
+        }, ROTATE_MS);
+        return () => clearTimeout(timer);
+    }, [rotating, activeTab, shopTabs.length]);
+
+    const pickTab = (key) => {
+        setAutoRotate(false);
+        setShopBy(key);
+    };
+
+    const renderColors = () => (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 2.5, md: 3.5 } }}>
+            {colors.map((c) => (
+                <Box
+                    key={c} component={Link} to={`/search?colors=${encodeURIComponent(c)}`}
+                    sx={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', width: 72,
+                        color: 'text.primary', textDecoration: 'none',
+                        '&:hover .swatch': { boxShadow: '0 0 0 2px #fff, 0 0 0 3px rgba(156, 78, 88, 0.6)' }
+                    }}
+                >
+                    <Box className="swatch" sx={{
+                        width: 52, height: 52, borderRadius: '50%', background: SWATCH[c],
+                        border: '1px solid rgba(74, 52, 57, 0.12)', transition: 'box-shadow 0.2s'
+                    }} />
+                    <Typography sx={{ fontSize: '0.8rem', mt: 1, textAlign: 'center', lineHeight: 1.3 }}>{c}</Typography>
+                </Box>
+            ))}
+        </Box>
+    );
+
+    // Already ordered best-known first by the server (see DesignerDirectory). Each button
+    // carries a small photo of that designer's newest available gown.
+    const renderDesigners = () => (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 1.25, md: 1.5 } }}>
+            {brands.map((b) => (
+                <Button
+                    key={b.name} component={Link} to={`/search?keywords=${encodeURIComponent(b.searchTerm)}`}
+                    variant="outlined"
+                    sx={{
+                        bgcolor: 'background.paper', color: 'text.primary',
+                        borderColor: 'rgba(156, 78, 88, 0.3)',
+                        pl: 0.75, pr: { xs: 2.25, md: 2.75 }, py: 0.75, gap: 1.25,
+                        fontFamily: serif, fontWeight: 600, fontSize: { xs: '1rem', md: '1.1rem' },
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                            bgcolor: 'primary.main', borderColor: 'primary.main', color: '#fff',
+                            '& .designer-count': { color: 'rgba(255,255,255,0.8)' }
+                        }
+                    }}
+                >
+                    <Box
+                        component="img" src={b.imageUrl} alt="" loading="lazy"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        sx={{
+                            width: { xs: 32, md: 36 }, height: { xs: 32, md: 36 }, borderRadius: '50%', flexShrink: 0,
+                            objectFit: 'cover', objectPosition: 'center 20%', bgcolor: 'background.default',
+                            border: '1px solid rgba(74, 52, 57, 0.08)'
+                        }}
+                    />
+                    {b.name}
+                    <Box component="span" className="designer-count" sx={{
+                        fontFamily: `'Poppins', sans-serif`, fontWeight: 400, fontSize: '0.75rem',
+                        color: 'text.secondary', transition: 'color 0.2s'
+                    }}>
+                        {b.count}
+                    </Box>
+                </Button>
+            ))}
+        </Box>
+    );
+
+    // A swipeable row on phones (seven tall photos stacked two-up would be a very long
+    // scroll); a grid from tablet width up.
+    const renderOccasions = () => (
+        <Box sx={{
+            display: { xs: 'flex', sm: 'grid' }, gap: { xs: 1.5, md: 2.5 },
+            overflowX: { xs: 'auto', sm: 'visible' }, scrollSnapType: 'x mandatory',
+            mx: { xs: -2, sm: 0 }, px: { xs: 2, sm: 0 }, pb: { xs: 1, sm: 0 },
+            gridTemplateColumns: { sm: 'repeat(3, 1fr)', md: `repeat(${Math.min(4, styles.length)}, 1fr)` },
+            maxWidth: styles.length < 3 ? 720 : 'none',
+            scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' }
+        }}>
+            {styles.map((s) => (
+                <Box
+                    key={s.style} component={Link} to={`/search?styles=${s.style}`}
+                    sx={{
+                        display: 'block', flex: { xs: '0 0 44%', sm: 'none' }, scrollSnapAlign: 'start',
+                        color: 'inherit', textDecoration: 'none',
+                        '&:hover img': { transform: 'scale(1.04)' },
+                        '&:hover .occasion-label': { color: 'primary.dark' }
+                    }}
+                >
+                    <Box sx={{ overflow: 'hidden', borderRadius: 2, aspectRatio: '3 / 4', bgcolor: 'background.paper' }}>
+                        <Box
+                            component="img" src={s.imageUrl} alt={styleLabel(s.style)} loading="lazy"
+                            sx={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%',
+                                display: 'block', transition: 'transform 0.6s ease' }}
+                        />
+                    </Box>
+                    <Typography className="occasion-label" sx={{ fontFamily: serif, fontSize: { xs: '1.05rem', md: '1.2rem' }, mt: 1.25, transition: 'color 0.2s' }}>
+                        {styleLabel(s.style)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        {s.count} {s.count === 1 ? 'gown' : 'gowns'}
+                    </Typography>
+                </Box>
+            ))}
+        </Box>
+    );
+
     return (
         <Box>
             {/* Hero */}
@@ -138,7 +262,15 @@ const Home = () => {
                     page doesn't turn into a long scroll of separate shortcut sections. Each
                     tab only lists what currently has available gowns. */}
                 {shopTabs.length > 0 && (
-                    <Box component="section" sx={{ mb: { xs: 7, md: 10 } }}>
+                    <Box
+                        component="section"
+                        sx={{ mb: { xs: 7, md: 10 } }}
+                        onMouseEnter={() => setPaused(true)}
+                        onMouseLeave={() => setPaused(false)}
+                        onFocus={() => setPaused(true)}
+                        onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setPaused(false); }}
+                        onTouchStart={() => setAutoRotate(false)}
+                    >
                         <Box sx={{ pb: 1.5, mb: 3.5, borderBottom: RULE }}>
                             <Eyebrow sx={{ mb: 0.75 }}>Shop by</Eyebrow>
                             <Box role="tablist" sx={{ display: 'flex', flexWrap: 'wrap', columnGap: { xs: 2.5, md: 4 }, rowGap: 0.5 }}>
@@ -147,112 +279,54 @@ const Home = () => {
                                     return (
                                         <Box
                                             key={t.key} component="button" type="button" role="tab" aria-selected={active}
-                                            onClick={() => setShopBy(t.key)}
+                                            onClick={() => pickTab(t.key)}
                                             sx={{
-                                                p: 0, border: 0, background: 'none', cursor: 'pointer',
+                                                position: 'relative', p: 0, border: 0, background: 'none', cursor: 'pointer',
                                                 fontFamily: serif, fontWeight: 600, fontSize: { xs: '1.5rem', md: '2.1rem' },
                                                 color: active ? 'text.primary' : 'rgba(74, 52, 57, 0.35)',
-                                                transition: 'color 0.2s',
+                                                transition: 'color 0.4s',
                                                 '&:hover': { color: active ? 'text.primary' : 'rgba(74, 52, 57, 0.6)' }
                                             }}
                                         >
                                             {t.label}
+                                            {/* Fills over the time this tab stays up, so the switch
+                                                never comes as a surprise. Restarts when resumed. */}
+                                            {active && rotating && (
+                                                <Box component="span" key={activeTab} sx={{
+                                                    position: 'absolute', left: 0, bottom: -2, height: 2, borderRadius: 1,
+                                                    bgcolor: 'primary.main', opacity: 0.6,
+                                                    animation: `shopByProgress ${ROTATE_MS}ms linear forwards`,
+                                                    '@keyframes shopByProgress': { from: { width: '0%' }, to: { width: '100%' } }
+                                                }} />
+                                            )}
                                         </Box>
                                     );
                                 })}
                             </Box>
                         </Box>
 
-                        {activeTab === 'occasion' && (
-                            // A swipeable row on phones (seven tall photos stacked two-up would be
-                            // a very long scroll); a grid from tablet width up.
-                            <Box sx={{
-                                display: { xs: 'flex', sm: 'grid' }, gap: { xs: 1.5, md: 2.5 },
-                                overflowX: { xs: 'auto', sm: 'visible' }, scrollSnapType: 'x mandatory',
-                                mx: { xs: -2, sm: 0 }, px: { xs: 2, sm: 0 }, pb: { xs: 1, sm: 0 },
-                                gridTemplateColumns: { sm: 'repeat(3, 1fr)', md: `repeat(${Math.min(4, styles.length)}, 1fr)` },
-                                maxWidth: styles.length < 3 ? 720 : 'none',
-                                scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' }
-                            }}>
-                                {styles.map((s) => (
+                        {/* All panels sit in the same grid cell, so the section is always as tall
+                            as its tallest panel — the page below doesn't jump on every switch —
+                            and switching is a cross-fade. */}
+                        <Box sx={{ display: 'grid' }}>
+                            {shopTabs.map((t) => {
+                                const active = t.key === activeTab;
+                                return (
                                     <Box
-                                        key={s.style} component={Link} to={`/search?styles=${s.style}`}
+                                        key={t.key} role="tabpanel" aria-hidden={!active}
                                         sx={{
-                                            display: 'block', flex: { xs: '0 0 44%', sm: 'none' }, scrollSnapAlign: 'start',
-                                            color: 'inherit', textDecoration: 'none',
-                                            '&:hover img': { transform: 'scale(1.04)' },
-                                            '&:hover .occasion-label': { color: 'primary.dark' }
+                                            gridArea: '1 / 1', minWidth: 0,
+                                            opacity: active ? 1 : 0, visibility: active ? 'visible' : 'hidden',
+                                            transition: 'opacity 0.5s ease, visibility 0.5s'
                                         }}
                                     >
-                                        <Box sx={{ overflow: 'hidden', borderRadius: 2, aspectRatio: '3 / 4', bgcolor: 'background.paper' }}>
-                                            <Box
-                                                component="img" src={s.imageUrl} alt={styleLabel(s.style)} loading="lazy"
-                                                sx={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%',
-                                                    display: 'block', transition: 'transform 0.6s ease' }}
-                                            />
-                                        </Box>
-                                        <Typography className="occasion-label" sx={{ fontFamily: serif, fontSize: { xs: '1.05rem', md: '1.2rem' }, mt: 1.25, transition: 'color 0.2s' }}>
-                                            {styleLabel(s.style)}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            {s.count} {s.count === 1 ? 'gown' : 'gowns'}
-                                        </Typography>
+                                        {t.key === 'color' && renderColors()}
+                                        {t.key === 'designer' && renderDesigners()}
+                                        {t.key === 'occasion' && renderOccasions()}
                                     </Box>
-                                ))}
-                            </Box>
-                        )}
-
-                        {activeTab === 'designer' && (
-                            // Already ordered best-known first by the server (see DesignerDirectory).
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 1.25, md: 1.5 } }}>
-                                {brands.map((b) => (
-                                    <Button
-                                        key={b.name} component={Link} to={`/search?keywords=${encodeURIComponent(b.searchTerm)}`}
-                                        variant="outlined"
-                                        sx={{
-                                            bgcolor: 'background.paper', color: 'text.primary',
-                                            borderColor: 'rgba(156, 78, 88, 0.3)',
-                                            px: { xs: 2.25, md: 3 }, py: { xs: 1, md: 1.25 }, gap: 1.25,
-                                            fontFamily: serif, fontWeight: 600, fontSize: { xs: '1rem', md: '1.1rem' },
-                                            transition: 'all 0.2s',
-                                            '&:hover': {
-                                                bgcolor: 'primary.main', borderColor: 'primary.main', color: '#fff',
-                                                '& .designer-count': { color: 'rgba(255,255,255,0.8)' }
-                                            }
-                                        }}
-                                    >
-                                        {b.name}
-                                        <Box component="span" className="designer-count" sx={{
-                                            fontFamily: `'Poppins', sans-serif`, fontWeight: 400, fontSize: '0.75rem',
-                                            color: 'text.secondary', transition: 'color 0.2s'
-                                        }}>
-                                            {b.count}
-                                        </Box>
-                                    </Button>
-                                ))}
-                            </Box>
-                        )}
-
-                        {activeTab === 'color' && (
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 2.5, md: 3.5 } }}>
-                                {colors.map((c) => (
-                                    <Box
-                                        key={c} component={Link} to={`/search?colors=${encodeURIComponent(c)}`}
-                                        sx={{
-                                            display: 'flex', flexDirection: 'column', alignItems: 'center', width: 72,
-                                            color: 'text.primary', textDecoration: 'none',
-                                            '&:hover .swatch': { boxShadow: '0 0 0 2px #fff, 0 0 0 3px rgba(156, 78, 88, 0.6)' }
-                                        }}
-                                    >
-                                        <Box className="swatch" sx={{
-                                            width: 52, height: 52, borderRadius: '50%', background: SWATCH[c],
-                                            border: '1px solid rgba(74, 52, 57, 0.12)', transition: 'box-shadow 0.2s'
-                                        }} />
-                                        <Typography sx={{ fontSize: '0.8rem', mt: 1, textAlign: 'center', lineHeight: 1.3 }}>{c}</Typography>
-                                    </Box>
-                                ))}
-                            </Box>
-                        )}
+                                );
+                            })}
+                        </Box>
                     </Box>
                 )}
 

@@ -52,7 +52,7 @@ const SmartSearchBar = ({ initialText = '', onSearch, large = false, placeholder
                 <InputBase
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    placeholder={narrow || !placeholder ? 'Describe your dream dress' : placeholder}
+                    placeholder={narrow || !placeholder ? 'Describe your dress' : placeholder}
                     inputProps={{ 'aria-label': 'Search gowns', enterKeyHint: 'search' }}
                     sx={{ flex: 1, fontSize: large ? { xs: '1rem', sm: '1.1rem' } : '0.95rem', py: large ? 0.75 : 0.25 }}
                 />
