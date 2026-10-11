@@ -248,6 +248,15 @@ namespace GownSite.Data
                 .FirstOrDefault(g => g.Id == id);
         }
 
+        // Whether My Listings would show this owner anything at all — any gown or ad, in any
+        // state (same unfiltered sets as GetByOwner and AdRepository.GetByOwner). Backs the
+        // header's My Listings link, which only appears once there's something to manage.
+        public bool OwnerHasListingsOrAds(int ownerId)
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Gowns.Any(g => g.OwnerId == ownerId) || context.Ads.Any(a => a.OwnerId == ownerId);
+        }
+
         public List<GownPosting> GetByOwner(int ownerId)
         {
             using var context = new GownDataContext(_connectionString);

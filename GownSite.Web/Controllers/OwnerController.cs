@@ -287,6 +287,13 @@ namespace GownSite.Web.Controllers
             return Ok(ToViewModel(owner));
         }
 
+        [HttpGet("has-listings")]
+        [Authorize]
+        public bool HasListings()
+        {
+            return new GownRepository(_connectionString).OwnerHasListingsOrAds(CurrentOwnerId());
+        }
+
         [HttpPost("update-profile")]
         [Authorize]
         public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)

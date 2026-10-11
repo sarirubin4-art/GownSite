@@ -7,7 +7,9 @@ import { orderAdsForDisplay } from '../utils/shuffle';
 import { focalObjectPosition } from '../utils/imageFocal';
 import { trackAdImpression, trackEvent } from '../utils/analytics';
 
-export const AD_TOP = 84;
+// Desktop-only (the card is md+): 20px below the sticky header, which on desktop is the
+// 64px toolbar plus Layout's 32px "For businesses" strip (BUSINESS_STRIP_HEIGHT there).
+export const AD_TOP = 116;
 const STACK_GAP = 16;
 
 const FloatingAds = ({ onVisibilityChange, onStackTopChange }) => {

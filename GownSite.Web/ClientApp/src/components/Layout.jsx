@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import {
     AppBar, Toolbar, Typography, Button, Box, Container, Paper,
-    Avatar, IconButton, Menu, MenuItem, Divider, Drawer, List, ListItemButton, ListItemText
+    Avatar, IconButton, Menu, MenuItem, Divider, Drawer, List, ListItemButton, ListItemText, ListSubheader
 } from '@mui/material';
 import MarkEmailUnreadIcon from '@mui/icons-material/MarkEmailUnread';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -14,12 +14,28 @@ import ContactAdminDialog from './ContactAdminDialog';
 import { wallpaperBackground } from '../theme';
 import { trackPageView } from '../utils/analytics';
 
-const NAV_LINKS = [
+// Three tiers, each styled differently so they don't blend together: the shopper/seller
+// calls to action are real buttons; the business links live in a slim strip above the
+// header (desktop) or their own drawer section (phone); the visitor's own pages sit with
+// their account avatar.
+const SHOPPER_LINKS = [
     { to: '/search', label: 'Browse Gowns' },
+    { to: '/postagown', label: 'Post a Gown' }
+];
+const BUSINESS_LINKS = [
     { to: '/ads', label: 'Ad Directory' },
-    { to: '/postagown', label: 'Post a Gown' },
     { to: '/advertise', label: 'Advertise' }
 ];
+
+// Desktop only. FloatingAds' AD_TOP accounts for it — keep the two in sync.
+const BUSINESS_STRIP_HEIGHT = 32;
+const HEADER_RULE = '1px solid #EFD9D8';
+
+const DrawerHeading = ({ children }) => (
+    <ListSubheader disableSticky sx={{ lineHeight: 1, pt: 2, pb: 1, fontSize: '0.7rem', letterSpacing: 2, textTransform: 'uppercase', color: 'primary.dark', bgcolor: 'transparent' }}>
+        {children}
+    </ListSubheader>
+);
 
 const initialsFor = (name) => (name || '')
     .split(' ')
@@ -44,6 +60,18 @@ const Layout = ({ children }) => {
     useEffect(() => {
         trackPageView(location.pathname);
     }, [location.pathname]);
+
+    // My Listings only appears once the owner has something to manage (a gown or ad in any
+    // state). Re-checked on navigation until it turns true, so the link shows up right
+    // after someone posts their first listing; once true it stays put for that owner.
+    const [hasListings, setHasListings] = useState(false);
+    useEffect(() => { setHasListings(false); }, [owner?.id]);
+    useEffect(() => {
+        if (!owner || hasListings) return;
+        axios.get('/api/owner/has-listings').then(({ data }) => setHasListings(!!data)).catch(() => {});
+    }, [owner?.id, location.pathname, hasListings]);
+    // Always reachable while actually on the page (e.g. a shared /mylistings link).
+    const showMyListings = !!owner && (hasListings || location.pathname === '/mylistings');
 
     const onContactUsClick = () => {
         if (owner) {
@@ -77,8 +105,39 @@ const Layout = ({ children }) => {
             minHeight: '100vh',
             backgroundColor: 'background.default'
         }}>
-            <AppBar position="sticky" color="primary" elevation={0}>
-                <Toolbar sx={{ gap: 1 }}>
+            {/* Desktop: a white header so the logo sits on it as-is and the pink calls to
+                action stand out, with business links in a slim strip above. Phone: the pink
+                bar stays, with the logo knocked out to white and Post a Gown as a white
+                button so it still pops. */}
+            <AppBar
+                position="sticky"
+                elevation={0}
+                sx={{
+                    bgcolor: { xs: 'primary.main', md: 'background.paper' },
+                    color: { xs: '#fff', md: 'text.primary' },
+                    borderBottom: { xs: 'none', md: HEADER_RULE }
+                }}
+            >
+                <Box sx={{
+                    display: { xs: 'none', md: 'flex' }, alignItems: 'center', justifyContent: 'flex-end', gap: 2.75,
+                    height: BUSINESS_STRIP_HEIGHT, px: 3, bgcolor: '#F6E1DF', color: '#7A4E55', fontSize: '0.8rem', letterSpacing: 0.2
+                }}>
+                    <Box component="span">For businesses:</Box>
+                    {BUSINESS_LINKS.map((link) => (
+                        <Box
+                            key={link.to} component={Link} to={link.to}
+                            sx={{
+                                color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3,
+                                textDecorationColor: 'rgba(122, 78, 85, 0.4)',
+                                fontWeight: location.pathname.startsWith(link.to) ? 600 : 400,
+                                '&:hover': { color: 'primary.dark', textDecorationColor: 'currentColor' }
+                            }}
+                        >
+                            {link.label}
+                        </Box>
+                    ))}
+                </Box>
+                <Toolbar sx={{ gap: { xs: 1, md: 2 } }}>
                     <IconButton
                         onClick={() => setDrawerOpen(true)}
                         color="inherit"
@@ -93,40 +152,76 @@ const Layout = ({ children }) => {
                         sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', minWidth: 0 }}
                     >
                         <Box
+                            component="img"
+                            src="/logo.webp"
+                            alt="Regowned"
                             sx={{
-                                bgcolor: 'background.paper', borderRadius: 2,
-                                px: { xs: 1, md: 1.5 }, py: { xs: 0.5, md: 0.75 }, display: 'flex', alignItems: 'center'
+                                height: { xs: 32, md: 44 }, width: 'auto', display: 'block',
+                                filter: { xs: 'brightness(0) invert(1)', md: 'none' }
                             }}
-                        >
-                            <Box
-                                component="img"
-                                src="/logo.webp"
-                                alt="Regowned"
-                                sx={{ height: { xs: 30, md: 40 }, width: 'auto', display: 'block' }}
-                            />
-                        </Box>
+                        />
                     </Box>
-                    <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1 }}>
-                        {NAV_LINKS.map((link) => (
-                            <Button key={link.to} component={Link} to={link.to} color="inherit">{link.label}</Button>
-                        ))}
-                        {owner && (
+
+                    {/* Desktop: the visitor's own pages, then the two main calls to action. */}
+                    <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 2 }}>
+                        {(showMyListings || owner?.isAdmin) && (
                             <>
-                                <Button component={Link} to="/mylistings" color="inherit">My Listings</Button>
-                                {owner.isAdmin && (
-                                    <Button component={Link} to="/admin" color="inherit" variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.6)' }}>
+                                {showMyListings && (
+                                    <Button
+                                        component={Link} to="/mylistings" color="inherit"
+                                        sx={{
+                                            fontWeight: location.pathname === '/mylistings' ? 700 : 500,
+                                            '&:hover': { bgcolor: 'rgba(198, 113, 122, 0.08)' }
+                                        }}
+                                    >
+                                        My Listings
+                                    </Button>
+                                )}
+                                {owner?.isAdmin && (
+                                    <Button component={Link} to="/admin" color="inherit" size="small" variant="outlined" sx={{ borderColor: '#E3C3C3' }}>
                                         Admin
                                     </Button>
                                 )}
+                                <Box sx={{ width: '1px', height: 26, bgcolor: '#EFD9D8' }} />
                             </>
                         )}
+                        <Button
+                            component={Link} to={SHOPPER_LINKS[0].to} variant="contained" disableElevation
+                            sx={{
+                                px: 2.75, py: 1,
+                                boxShadow: '0 4px 14px rgba(198, 113, 122, 0.35)',
+                                '&:hover': { boxShadow: '0 6px 18px rgba(198, 113, 122, 0.45)' }
+                            }}
+                        >
+                            {SHOPPER_LINKS[0].label}
+                        </Button>
+                        <Button
+                            component={Link} to={SHOPPER_LINKS[1].to} variant="outlined"
+                            sx={{ px: 2.5, py: 0.9, borderWidth: 1.5, color: 'primary.dark', '&:hover': { borderWidth: 1.5 } }}
+                        >
+                            {SHOPPER_LINKS[1].label}
+                        </Button>
                     </Box>
+
+                    {/* Phone: Post a Gown stays one tap away; browsing already starts from the
+                        home page search. */}
+                    <Button
+                        component={Link} to="/postagown" variant="contained" size="small" disableElevation
+                        sx={{
+                            display: { xs: 'inline-flex', md: 'none' }, flexShrink: 0,
+                            bgcolor: '#fff', color: 'primary.dark', px: 1.75,
+                            '&:hover': { bgcolor: '#FFF6F3' }
+                        }}
+                    >
+                        Post a Gown
+                    </Button>
+
                     {owner ? (
                         <>
-                            <IconButton onClick={(e) => setMenuAnchor(e.currentTarget)} sx={{ ml: 0.5 }}>
+                            <IconButton onClick={(e) => setMenuAnchor(e.currentTarget)} sx={{ ml: { xs: 0, md: -0.5 }, p: 0.5 }} aria-label="Account menu">
                                 <Avatar sx={{
                                     width: 36, height: 36, fontSize: 14, fontWeight: 700,
-                                    bgcolor: 'secondary.light', color: 'primary.dark'
+                                    bgcolor: { xs: 'secondary.light', md: '#F2D5D3' }, color: 'primary.dark'
                                 }}>
                                     {initialsFor(owner.name)}
                                 </Avatar>
@@ -143,14 +238,16 @@ const Layout = ({ children }) => {
                                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{owner.name}</Typography>
                                 </Box>
                                 <Divider />
-                                <MenuItem
-                                    component={Link}
-                                    to="/mylistings"
-                                    onClick={() => setMenuAnchor(null)}
-                                    sx={{ display: { xs: 'flex', md: 'none' } }}
-                                >
-                                    My Listings
-                                </MenuItem>
+                                {showMyListings && (
+                                    <MenuItem
+                                        component={Link}
+                                        to="/mylistings"
+                                        onClick={() => setMenuAnchor(null)}
+                                        sx={{ display: { xs: 'flex', md: 'none' } }}
+                                    >
+                                        My Listings
+                                    </MenuItem>
+                                )}
                                 {owner.isAdmin && (
                                     <MenuItem
                                         component={Link}
@@ -170,9 +267,8 @@ const Layout = ({ children }) => {
                             component={Link}
                             to="/login"
                             color="inherit"
-                            variant="outlined"
                             size="small"
-                            sx={{ borderColor: 'rgba(255,255,255,0.6)', flexShrink: 0 }}
+                            sx={{ flexShrink: 0, fontWeight: 600, '&:hover': { bgcolor: { xs: 'rgba(255,255,255,0.12)', md: 'rgba(198, 113, 122, 0.08)' } } }}
                         >
                             Log In
                         </Button>
@@ -180,22 +276,31 @@ const Layout = ({ children }) => {
                 </Toolbar>
             </AppBar>
             <Drawer anchor="left" open={drawerOpen} onClose={closeDrawer}>
-                <Box sx={{ width: 260 }} role="presentation">
+                <Box sx={{ width: 270 }} role="presentation">
                     <Box sx={{ p: 2 }}>
                         <Box component="img" src="/logo.webp" alt="Regowned" sx={{ height: 32, width: 'auto', display: 'block' }} />
                     </Box>
                     <Divider />
-                    <List>
-                        {NAV_LINKS.map((link) => (
-                            <ListItemButton key={link.to} component={Link} to={link.to} onClick={closeDrawer}>
-                                <ListItemText primary={link.label} />
-                            </ListItemButton>
-                        ))}
+                    {[
+                        { heading: 'Shop and sell', links: SHOPPER_LINKS },
+                        { heading: 'For businesses', links: BUSINESS_LINKS },
+                    ].map((group) => (
+                        <List key={group.heading} subheader={<DrawerHeading>{group.heading}</DrawerHeading>}>
+                            {group.links.map((link) => (
+                                <ListItemButton key={link.to} component={Link} to={link.to} onClick={closeDrawer}>
+                                    <ListItemText primary={link.label} />
+                                </ListItemButton>
+                            ))}
+                        </List>
+                    ))}
+                    <List subheader={<DrawerHeading>Your account</DrawerHeading>}>
                         {owner ? (
                             <>
-                                <ListItemButton component={Link} to="/mylistings" onClick={closeDrawer}>
-                                    <ListItemText primary="My Listings" />
-                                </ListItemButton>
+                                {showMyListings && (
+                                    <ListItemButton component={Link} to="/mylistings" onClick={closeDrawer}>
+                                        <ListItemText primary="My Listings" />
+                                    </ListItemButton>
+                                )}
                                 {owner.isAdmin && (
                                     <ListItemButton component={Link} to="/admin" onClick={closeDrawer}>
                                         <ListItemText primary="Admin" />
@@ -204,7 +309,6 @@ const Layout = ({ children }) => {
                                 <ListItemButton component={Link} to="/account" onClick={closeDrawer}>
                                     <ListItemText primary="My Account" />
                                 </ListItemButton>
-                                <Divider sx={{ my: 1 }} />
                                 <ListItemButton onClick={onLogoutClick}>
                                     <ListItemText primary="Log Out" />
                                 </ListItemButton>
