@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { LANE_SX } from '../context/AdLaneContext';
 import { TrafficBubble } from '../components/TrafficWidgets';
 import TrafficTab from '../components/TrafficTab';
+import OccasionCoversTab from '../components/OccasionCoversTab';
 import useFullScreenDialog from '../hooks/useFullScreenDialog';
 import { COLOR_OPTIONS, SIZE_OPTIONS, STYLE_OPTIONS, LISTING_TYPE_OPTIONS, AD_CATEGORY_OPTIONS, formatPriceRange, sortSizes, adCategoryLabels } from '../constants/gownOptions';
 import LocationField from '../components/LocationField';
@@ -32,6 +33,7 @@ import useFormError from '../hooks/useFormError';
 const MAX_POST_FOR_PATRON_GOWNS = 20;
 const PATRONS_TAB = 5;
 const TRAFFIC_TAB = 9;
+const HOME_PAGE_TAB = 10;
 
 const DISCOUNT_TYPE_OPTIONS = [
     { value: 'PercentOff', label: 'Percent off' },
@@ -1052,9 +1054,11 @@ const AdminDashboard = () => {
                 <Tab label={`Inbox${openContactCount ? ` (${openContactCount})` : ''}`} />
                 <Tab label={`Concierge Requests${conciergeQueue.length ? ` (${conciergeQueue.length})` : ''}`} />
                 <Tab label="Traffic" />
+                <Tab label="Home Page" />
             </Tabs>
 
             {tab === TRAFFIC_TAB && <TrafficTab filterRequest={trafficFilterRequest} onFilterRequestHandled={() => setTrafficFilterRequest(null)} laneSx={laneSx} />}
+            {tab === HOME_PAGE_TAB && <OccasionCoversTab laneSx={laneSx} />}
 
             {tab === 0 && (
                 <PendingList

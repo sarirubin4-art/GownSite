@@ -12,6 +12,13 @@ namespace GownSite.Web.Controllers
         public string Reason { get; set; }
     }
 
+    public class SetOccasionCoverRequest
+    {
+        public string Style { get; set; }
+        // Null = go back to the automatic (newest gown) photo.
+        public int? GownId { get; set; }
+    }
+
     public class AdminApplyPromoRequest
     {
         public string PromoCode { get; set; }
@@ -699,6 +706,21 @@ namespace GownSite.Web.Controllers
             }
 
             return Ok();
+        }
+
+        // Home page "Shop by occasion" photos — see GownRepository.GetOccasionCoverChoices.
+        [HttpGet("occasion-covers")]
+        public IActionResult GetOccasionCovers()
+        {
+            return Ok(new GownRepository(_connectionString).GetOccasionCoverChoices());
+        }
+
+        [HttpPost("occasion-covers")]
+        public IActionResult SetOccasionCover([FromBody] SetOccasionCoverRequest request)
+        {
+            if (request == null || string.IsNullOrEmpty(request.Style)) return BadRequest();
+            var ok = new GownRepository(_connectionString).SetOccasionCover(request.Style, request.GownId);
+            return ok ? Ok() : BadRequest(new { message = "That gown isn't available for this occasion anymore." });
         }
 
         [HttpGet("promocodes")]

@@ -50,6 +50,24 @@ namespace GownSite.Data
         public List<HomeShowcaseBrand> Brands { get; set; }
     }
 
+    public class OccasionCoverCandidate
+    {
+        public int GownId { get; set; }
+        public string ImageUrl { get; set; }
+        public string Description { get; set; }
+        public string Brand { get; set; }
+    }
+
+    public class OccasionCoverChoice
+    {
+        public string Style { get; set; }
+        // The gown whose photo the home page is showing for this occasion right now.
+        public int ShownGownId { get; set; }
+        // True when that's the admin's pick; false when it's the automatic newest-gown choice.
+        public bool IsPicked { get; set; }
+        public List<OccasionCoverCandidate> Candidates { get; set; }
+    }
+
     public class HomeShowcaseBrand
     {
         public string Name { get; set; }
@@ -129,34 +147,19 @@ namespace GownSite.Data
             using var context = new GownDataContext(_connectionString);
             // This runs on every home page view, so the style/color/brand scan reads only the
             // columns it needs; full rows (with pictures) are loaded just for the newest few.
-            var available = context.Gowns
-                .Where(g => g.IsActive && !g.IsSold)
-                .OrderByDescending(g => g.CreatedDate)
+            var available = AvailableGowns(context)
                 .Select(g => new { g.Id, g.StyleTags, g.Color, g.PrimaryPictureUrl, g.Brand })
                 .ToList();
 
-            List<string> SplitTags(string s) => (s ?? "")
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-
-            // A gown tagged with several styles would otherwise put the same photo on several
-            // tiles — prefer the newest gown not already used for another tile.
-            var usedIds = new HashSet<int>();
-            var styleTiles = new List<HomeShowcaseStyle>();
-            foreach (var style in styles)
-            {
-                var gowns = available.Where(g => SplitTags(g.StyleTags).Contains(style)).ToList();
-                if (gowns.Count == 0) continue;
-                var cover = gowns.FirstOrDefault(g => !usedIds.Contains(g.Id)) ?? gowns[0];
-                usedIds.Add(cover.Id);
-                styleTiles.Add(new HomeShowcaseStyle { Style = style, ImageUrl = cover.PrimaryPictureUrl, Count = gowns.Count });
-            }
+            var styleTiles = PickOccasionTiles(
+                    styles, available.Select(g => (g.Id, g.StyleTags, g.PrimaryPictureUrl)).ToList(), LoadOccasionPicks(context))
+                .Select(t => new HomeShowcaseStyle { Style = t.Style, ImageUrl = t.ImageUrl, Count = t.Count })
+                .ToList();
 
             return new HomeShowcase
             {
-                Newest = context.Gowns
+                Newest = AvailableGowns(context)
                     .Include(g => g.MorePictures)
-                    .Where(g => g.IsActive && !g.IsSold)
-                    .OrderByDescending(g => g.CreatedDate)
                     .Take(newestCount)
                     .ToList(),
                 Styles = styleTiles,
@@ -170,6 +173,128 @@ namespace GownSite.Data
                     .Take(maxBrands)
                     .ToList()
             };
+        }
+
+        // The home page's "Shop by occasion" tiles, in display order. Shared by the public
+        // home-showcase endpoint and the admin's cover picker, so both agree on what's shown.
+        public static readonly string[] OccasionStyles =
+        {
+            "MotherOfBrideOrGroom", "SisterOfBrideOrGroom", "Evening", "Bridal", "Engagement", "BallGown", "ALine", "Maternity"
+        };
+
+        private static List<string> SplitTags(string s) => (s ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+        // "Available" for the home page and the admin's cover picker: live and unsold, newest
+        // first. One definition, so the picker never offers a gown the home page won't show.
+        private static IQueryable<GownPosting> AvailableGowns(GownDataContext context) =>
+            context.Gowns.Where(g => g.IsActive && !g.IsSold).OrderByDescending(g => g.CreatedDate);
+
+        private static Dictionary<string, int> LoadOccasionPicks(GownDataContext context) =>
+            context.OccasionCovers.ToDictionary(c => c.Style, c => c.GownPostingId);
+
+        // Picks each occasion tile's photo from `available` (live, unsold, newest-first).
+        // The admin's pick wins while that gown is still available and still tagged with the
+        // style; otherwise the tile falls back to the newest gown not already shown on
+        // another tile (a gown tagged with several styles would otherwise repeat a photo).
+        // Admin picks are reserved first, so an automatic tile never takes a picked gown.
+        private static List<(string Style, int GownId, string ImageUrl, int Count, bool IsPicked)> PickOccasionTiles(
+            IEnumerable<string> styles, List<(int Id, string StyleTags, string PictureUrl)> available, Dictionary<string, int> picks)
+        {
+            var byStyle = styles
+                .Select(style => (Style: style, Gowns: available.Where(g => SplitTags(g.StyleTags).Contains(style)).ToList()))
+                .Where(x => x.Gowns.Count > 0)
+                .ToList();
+
+            var validPicks = byStyle
+                .Where(x => picks.TryGetValue(x.Style, out var id) && x.Gowns.Any(g => g.Id == id))
+                .ToDictionary(x => x.Style, x => picks[x.Style]);
+            var usedIds = new HashSet<int>(validPicks.Values);
+
+            var tiles = new List<(string, int, string, int, bool)>();
+            foreach (var (style, gowns) in byStyle)
+            {
+                var isPicked = validPicks.TryGetValue(style, out var pickedId);
+                (int Id, string StyleTags, string PictureUrl) cover;
+                if (isPicked)
+                {
+                    cover = gowns.First(g => g.Id == pickedId);
+                }
+                else
+                {
+                    var unused = gowns.Where(g => !usedIds.Contains(g.Id)).ToList();
+                    cover = unused.Count > 0 ? unused[0] : gowns[0];
+                }
+                usedIds.Add(cover.Id);
+                tiles.Add((style, cover.Id, cover.PictureUrl, gowns.Count, isPicked));
+            }
+            return tiles;
+        }
+
+        // Everything the admin's "Home Page" tab needs to choose occasion covers: for each
+        // occasion with available gowns, every candidate gown and which one is showing now.
+        public List<OccasionCoverChoice> GetOccasionCoverChoices()
+        {
+            using var context = new GownDataContext(_connectionString);
+            var available = AvailableGowns(context)
+                .Select(g => new { g.Id, g.StyleTags, g.PrimaryPictureUrl, g.Description, g.Brand })
+                .ToList();
+            var tiles = PickOccasionTiles(
+                OccasionStyles, available.Select(g => (g.Id, g.StyleTags, g.PrimaryPictureUrl)).ToList(), LoadOccasionPicks(context));
+
+            return tiles.Select(t => new OccasionCoverChoice
+            {
+                Style = t.Style,
+                ShownGownId = t.GownId,
+                IsPicked = t.IsPicked,
+                Candidates = available
+                    .Where(g => SplitTags(g.StyleTags).Contains(t.Style))
+                    .Select(g => new OccasionCoverCandidate { GownId = g.Id, ImageUrl = g.PrimaryPictureUrl, Description = g.Description, Brand = g.Brand })
+                    .ToList()
+            }).ToList();
+        }
+
+        // gownId null = back to automatic. Returns false if the style isn't an occasion tile
+        // or the gown isn't a live, unsold gown tagged with that style.
+        public bool SetOccasionCover(string style, int? gownId)
+        {
+            if (!OccasionStyles.Contains(style)) return false;
+            using var context = new GownDataContext(_connectionString);
+            if (gownId.HasValue)
+            {
+                var gown = context.Gowns
+                    .Where(g => g.Id == gownId.Value && g.IsActive && !g.IsSold)
+                    .Select(g => new { g.StyleTags })
+                    .FirstOrDefault();
+                if (gown == null || !SplitTags(gown.StyleTags).Contains(style)) return false;
+            }
+
+            var existing = context.OccasionCovers.FirstOrDefault(c => c.Style == style);
+            if (!gownId.HasValue)
+            {
+                if (existing != null) context.OccasionCovers.Remove(existing);
+            }
+            else if (existing != null)
+            {
+                existing.GownPostingId = gownId.Value;
+            }
+            else
+            {
+                context.OccasionCovers.Add(new OccasionCover { Style = style, GownPostingId = gownId.Value });
+            }
+            try
+            {
+                context.SaveChanges();
+            }
+            catch (DbUpdateException) when (existing == null && gownId.HasValue)
+            {
+                // Another save created this occasion's row between our read and insert (the
+                // unique index on Style rejects the second one) — overwrite it instead.
+                using var retry = new GownDataContext(_connectionString);
+                retry.OccasionCovers.First(c => c.Style == style).GownPostingId = gownId.Value;
+                retry.SaveChanges();
+            }
+            return true;
         }
 
         // `gowns` must be newest-first: each designer's photo is its newest gown's. Known

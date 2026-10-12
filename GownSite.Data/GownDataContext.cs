@@ -60,6 +60,9 @@ public class GownDataContext : DbContext
         modelBuilder.Entity<SiteEvent>().HasIndex(e => new { e.Type, e.CreatedDate });
         modelBuilder.Entity<SiteEvent>().HasIndex(e => new { e.Type, e.EntityId });
 
+        modelBuilder.Entity<OccasionCover>().HasIndex(c => c.Style).IsUnique();
+        modelBuilder.Entity<OccasionCover>().Property(c => c.Style).HasMaxLength(64).IsRequired();
+
         foreach (var relationship in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetForeignKeys()))
         {
             relationship.DeleteBehavior = DeleteBehavior.Restrict;
@@ -75,4 +78,5 @@ public class GownDataContext : DbContext
     public DbSet<ContactMessage> ContactMessages { get; set; }
     public DbSet<PageView> PageViews { get; set; }
     public DbSet<SiteEvent> SiteEvents { get; set; }
+    public DbSet<OccasionCover> OccasionCovers { get; set; }
 }

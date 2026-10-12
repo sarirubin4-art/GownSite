@@ -155,15 +155,10 @@ namespace GownSite.Web.Controllers
             return repo.Search(filters ?? new GownSearchFilters());
         }
 
-        private static readonly string[] ShowcaseStyles =
-        {
-            "MotherOfBrideOrGroom", "SisterOfBrideOrGroom", "Evening", "Bridal", "BallGown", "ALine", "Maternity"
-        };
-
         [HttpGet("home-showcase")]
         public HomeShowcase HomeShowcase()
         {
-            return new GownRepository(_connectionString).GetHomeShowcase(ShowcaseStyles, 4, 16);
+            return new GownRepository(_connectionString).GetHomeShowcase(GownRepository.OccasionStyles, 4, 16);
         }
 
         [HttpGet("get")]

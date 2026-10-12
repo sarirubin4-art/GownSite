@@ -310,4 +310,16 @@ namespace GownSite.Data
         public string ReplyMessage { get; set; }
         public DateTime? RepliedDate { get; set; }
     }
+
+    // The admin's hand-picked photo for one home page "Shop by occasion" tile. Style is a
+    // StyleTags value ("MotherOfBrideOrGroom"). GownPostingId is deliberately a plain int,
+    // not a foreign key: a cover gown that later sells, is removed, or is deleted outright
+    // just stops qualifying and the tile falls back to the automatic pick (see
+    // GownRepository.GetHomeShowcase), rather than blocking the gown's own lifecycle.
+    public class OccasionCover
+    {
+        public int Id { get; set; }
+        public string Style { get; set; }
+        public int GownPostingId { get; set; }
+    }
 }

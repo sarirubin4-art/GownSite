@@ -301,6 +301,30 @@ namespace GownSite.Data.Migrations
                     b.ToTable("Gowns");
                 });
 
+            modelBuilder.Entity("GownSite.Data.OccasionCover", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("GownPostingId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Style")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Style")
+                        .IsUnique();
+
+                    b.ToTable("OccasionCovers");
+                });
+
             modelBuilder.Entity("GownSite.Data.Owner", b =>
                 {
                     b.Property<int>("Id")
