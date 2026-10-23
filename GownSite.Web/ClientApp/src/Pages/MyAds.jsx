@@ -18,6 +18,7 @@ import MorePicturesInput, { MAX_AD_GALLERY_PICTURES, AD_GALLERY_HELPER_TEXT } fr
 import { focalObjectPosition } from '../utils/imageFocal';
 import useFormError from '../hooks/useFormError';
 import { adPlan, isPrepaidPlan, nextRenewalDate, formatPlanDate } from '../constants/adPlans';
+import AdPlanPicker from '../components/AdPlanPicker';
 
 // The Ads section of My Listings (it was its own My Ads page). Renders nothing for someone
 // with no ads, and reports its count up so My Listings can decide what headings to show.
@@ -87,6 +88,31 @@ const MyAds = ({ onLoaded, scrollIntoViewOnLoad }) => {
             window.alert(err?.response?.data?.message || 'Could not cancel.');
         }
         load();
+    };
+
+    // Changing plans before the ad is charged (Draft or PendingReview) — same rules as the
+    // payment-setup picker: switching to a prepaid plan drops any promo.
+    const [planTarget, setPlanTarget] = useState(null);
+    const [pricing, setPricing] = useState(null);
+    const [planSaving, setPlanSaving] = useState(false);
+    const onChangePlanClick = (ad) => {
+        setPlanTarget(ad);
+        if (!pricing) axios.get('/api/payment/pricing').then(({ data }) => setPricing(data)).catch(() => {});
+    };
+    const onPlanPicked = async (value) => {
+        if (value === planTarget.billingPlan) return;
+        if (planTarget.promoCode && isPrepaidPlan(value)
+            && !window.confirm(`Promo codes only apply to the monthly plan, so switching will remove ${planTarget.promoCode.code}. Continue?`)) return;
+        setPlanSaving(true);
+        try {
+            await axios.post('/api/payment/set-ad-plan', { id: planTarget.id, plan: value });
+            setPlanTarget(null);
+            load();
+        } catch (err) {
+            window.alert(err?.response?.data?.message || 'Could not change your plan.');
+        } finally {
+            setPlanSaving(false);
+        }
     };
 
     const onKeepPlanClick = async (id) => {
@@ -269,9 +295,14 @@ const MyAds = ({ onLoaded, scrollIntoViewOnLoad }) => {
                                             </Button>
                                         </>
                                     ) : a.moderationStatus === 'PendingReview' ? (
-                                        <Button size="small" color="error" variant="outlined" onClick={() => onDeleteDraftClick(a.id, true)}>
-                                            Delete
-                                        </Button>
+                                        <>
+                                            <Button size="small" variant="outlined" onClick={() => onChangePlanClick(a)}>
+                                                Change Plan
+                                            </Button>
+                                            <Button size="small" color="error" variant="outlined" onClick={() => onDeleteDraftClick(a.id, true)}>
+                                                Delete
+                                            </Button>
+                                        </>
                                     ) : a.moderationStatus === 'Rejected' || a.moderationStatus === 'Removed' ? null : a.isActive && a.cancelsAt ? (
                                         <Button size="small" color="success" variant="outlined" onClick={() => onKeepPlanClick(a.id)}>
                                             Keep My Plan
@@ -382,6 +413,21 @@ const MyAds = ({ onLoaded, scrollIntoViewOnLoad }) => {
                     >
                         Save Changes
                     </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={!!planTarget} onClose={() => setPlanTarget(null)} maxWidth="xs" fullWidth>
+                <DialogTitle>Change Plan</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        You won't be charged until your ad is approved. 6-month and yearly plans are paid upfront then, and renew at the same price.
+                    </Typography>
+                    {planTarget && (
+                        <AdPlanPicker pricing={pricing} value={planTarget.billingPlan} onChange={onPlanPicked} disabled={planSaving} />
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setPlanTarget(null)}>Close</Button>
                 </DialogActions>
             </Dialog>
 

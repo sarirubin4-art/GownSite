@@ -32,9 +32,19 @@ import useFormError from '../hooks/useFormError';
 import { adPlan, isPrepaidPlan, formatPlanDate } from '../constants/adPlans';
 
 const MAX_POST_FOR_PATRON_GOWNS = 20;
-const PATRONS_TAB = 5;
-const TRAFFIC_TAB = 9;
-const HOME_PAGE_TAB = 10;
+// Tabs are identified by name, not position, so they can be reordered in the <Tabs>
+// list below without renumbering every panel.
+const TRAFFIC_TAB = 'traffic';
+const PENDING_GOWNS_TAB = 'pending-gowns';
+const PENDING_ADS_TAB = 'pending-ads';
+const LIVE_GOWNS_TAB = 'live-gowns';
+const LIVE_ADS_TAB = 'live-ads';
+const PROMO_CODES_TAB = 'promo-codes';
+const PATRONS_TAB = 'patrons';
+const SEND_EMAILS_TAB = 'send-emails';
+const INBOX_TAB = 'inbox';
+const CONCIERGE_TAB = 'concierge';
+const HOME_PAGE_TAB = 'home-page';
 
 const DISCOUNT_TYPE_OPTIONS = [
     { value: 'PercentOff', label: 'Percent off' },
@@ -1049,23 +1059,23 @@ const AdminDashboard = () => {
             {/* The bubble is a summary of the Traffic tab, so it's redundant while that tab is open. */}
             {tab !== TRAFFIC_TAB && <TrafficBubble onOpenTraffic={openTraffic} />}
             <Tabs value={tab} onChange={(e, v) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ mb: 1, mr: laneSx }}>
-                <Tab label={`Pending Gowns${pendingGowns.length ? ` (${pendingGowns.length})` : ''}`} />
-                <Tab label={`Pending Ads${pendingAds.length ? ` (${pendingAds.length})` : ''}`} />
-                <Tab label={`Live Gowns${activeGowns.length ? ` (${activeGowns.length})` : ''}`} />
-                <Tab label={`Live Ads${activeAds.length ? ` (${activeAds.length})` : ''}`} />
-                <Tab label="Promo Codes" />
-                <Tab label={`Patrons${owners.length ? ` (${owners.length})` : ''}`} />
-                <Tab label="Send Emails" />
-                <Tab label={`Inbox${openContactCount ? ` (${openContactCount})` : ''}`} />
-                <Tab label={`Concierge Requests${conciergeQueue.length ? ` (${conciergeQueue.length})` : ''}`} />
-                <Tab label="Traffic" />
-                <Tab label="Home Page" />
+                <Tab value={TRAFFIC_TAB} label="Traffic" />
+                <Tab value={PENDING_GOWNS_TAB} label={`Pending Gowns${pendingGowns.length ? ` (${pendingGowns.length})` : ''}`} />
+                <Tab value={PENDING_ADS_TAB} label={`Pending Ads${pendingAds.length ? ` (${pendingAds.length})` : ''}`} />
+                <Tab value={LIVE_GOWNS_TAB} label={`Live Gowns${activeGowns.length ? ` (${activeGowns.length})` : ''}`} />
+                <Tab value={LIVE_ADS_TAB} label={`Live Ads${activeAds.length ? ` (${activeAds.length})` : ''}`} />
+                <Tab value={PROMO_CODES_TAB} label="Promo Codes" />
+                <Tab value={PATRONS_TAB} label={`Patrons${owners.length ? ` (${owners.length})` : ''}`} />
+                <Tab value={SEND_EMAILS_TAB} label="Send Emails" />
+                <Tab value={INBOX_TAB} label={`Inbox${openContactCount ? ` (${openContactCount})` : ''}`} />
+                <Tab value={CONCIERGE_TAB} label={`Concierge Requests${conciergeQueue.length ? ` (${conciergeQueue.length})` : ''}`} />
+                <Tab value={HOME_PAGE_TAB} label="Home Page" />
             </Tabs>
 
             {tab === TRAFFIC_TAB && <TrafficTab filterRequest={trafficFilterRequest} onFilterRequestHandled={() => setTrafficFilterRequest(null)} laneSx={laneSx} />}
             {tab === HOME_PAGE_TAB && <OccasionCoversTab laneSx={laneSx} />}
 
-            {tab === 0 && (
+            {tab === PENDING_GOWNS_TAB && (
                 <PendingList
                     items={pendingGowns}
                     loaded={loaded.pending}
@@ -1078,7 +1088,7 @@ const AdminDashboard = () => {
                     laneSx={laneSx}
                 />
             )}
-            {tab === 1 && (
+            {tab === PENDING_ADS_TAB && (
                 <PendingList
                     items={pendingAds}
                     loaded={loaded.pending}
@@ -1091,7 +1101,7 @@ const AdminDashboard = () => {
                     laneSx={laneSx}
                 />
             )}
-            {tab === 2 && (
+            {tab === LIVE_GOWNS_TAB && (
                 <ActiveList
                     items={activeGowns}
                     loaded={loaded.active}
@@ -1102,7 +1112,7 @@ const AdminDashboard = () => {
                     laneSx={laneSx}
                 />
             )}
-            {tab === 3 && (
+            {tab === LIVE_ADS_TAB && (
                 <ActiveList
                     items={activeAds}
                     loaded={loaded.active}
@@ -1113,7 +1123,7 @@ const AdminDashboard = () => {
                     laneSx={laneSx}
                 />
             )}
-            {tab === 4 && (
+            {tab === PROMO_CODES_TAB && (
                 <Box sx={{ mt: 3 }}>
                     <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2, mr: laneSx, flexWrap: 'wrap', rowGap: 1 }}>
                         <TextField
@@ -1267,7 +1277,7 @@ const AdminDashboard = () => {
                     )}
                 </Box>
             )}
-            {tab === 6 && (
+            {tab === SEND_EMAILS_TAB && (
                 <Stack spacing={4} sx={{ mt: 3, maxWidth: 640 }}>
                     <Box sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
                         <Typography variant="h6" gutterBottom>Promotional Email</Typography>
@@ -1331,7 +1341,7 @@ const AdminDashboard = () => {
                     </Box>
                 </Stack>
             )}
-            {tab === 7 && (
+            {tab === INBOX_TAB && (
                 <Box sx={{ mt: 3, mr: laneSx }}>
                     <Stack direction="row" sx={{ justifyContent: 'flex-end', mb: 2 }}>
                         <FormControlLabel
@@ -1405,7 +1415,7 @@ const AdminDashboard = () => {
                 </Box>
             )}
 
-            {tab === 8 && (
+            {tab === CONCIERGE_TAB && (
                 <Box sx={{ mt: 3, mr: laneSx }}>
                     {!loaded.conciergeQueue ? (
                         <LoadingSpinner />
