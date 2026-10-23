@@ -14,8 +14,10 @@ import FilterAutocomplete from '../components/FilterAutocomplete';
 import PromoApplyBox from '../components/PromoApplyBox';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
 import ImagePositionEditor from '../components/ImagePositionEditor';
+import MorePicturesInput, { MAX_AD_GALLERY_PICTURES, AD_GALLERY_HELPER_TEXT } from '../components/MorePicturesInput';
 import { focalObjectPosition } from '../utils/imageFocal';
 import useFormError from '../hooks/useFormError';
+import { adPlan, isPrepaidPlan, nextRenewalDate, formatPlanDate } from '../constants/adPlans';
 
 // The Ads section of My Listings (it was its own My Ads page). Renders nothing for someone
 // with no ads, and reports its count up so My Listings can decide what headings to show.
@@ -32,6 +34,8 @@ const MyAds = ({ onLoaded, scrollIntoViewOnLoad }) => {
     const [promoMessage, setPromoMessage] = useState(null); // { type: 'success'|'error', text }
     const [newImage, setNewImage] = useState(null);
     const [newImagePreview, setNewImagePreview] = useState(null);
+    const [newGalleryFiles, setNewGalleryFiles] = useState([]);
+    const [removeGalleryIds, setRemoveGalleryIds] = useState([]);
     const [editError, setEditError, editErrorRef] = useFormError();
 
     const [adStats, setAdStats] = useState({}); // { [adId]: { impressions, cardClicks, views, viewsLast30Days, websiteClicks } }
@@ -72,10 +76,36 @@ const MyAds = ({ onLoaded, scrollIntoViewOnLoad }) => {
         }
     }, []);
 
-    const onCancelClick = async (id) => {
-        if (!window.confirm('This will cancel your subscription and take the ad down. Continue?')) return;
-        await axios.post('/api/ad/cancel', { id });
+    const onCancelClick = async (ad) => {
+        const message = isPrepaidPlan(ad.billingPlan)
+            ? `Your ad will stay live until ${formatPlanDate(nextRenewalDate(ad.planStartedAt, ad.billingPlan)) || 'the end of the period you paid for'}, then come down — it won't renew. There's no refund for the remaining time. Continue?`
+            : 'This will cancel your subscription and take the ad down. Continue?';
+        if (!window.confirm(message)) return;
+        try {
+            await axios.post('/api/ad/cancel', { id: ad.id });
+        } catch (err) {
+            window.alert(err?.response?.data?.message || 'Could not cancel.');
+        }
         load();
+    };
+
+    const onKeepPlanClick = async (id) => {
+        try {
+            await axios.post('/api/ad/keep-plan', { id });
+        } catch (err) {
+            window.alert(err?.response?.data?.message || 'Could not restore your plan.');
+        }
+        load();
+    };
+
+    // Drafts haven't reached the plan picker yet, so there's no choice to show.
+    const planLine = (a) => {
+        if (a.moderationStatus === 'Draft') return null;
+        if (a.moderationStatus !== 'Approved') return `${adPlan(a.billingPlan).label} plan`;
+        if (a.cancelsAt) return `${adPlan(a.billingPlan).label} plan · ${a.isActive ? 'ends' : 'ended'} ${formatPlanDate(a.cancelsAt)}`;
+        if (a.isActive && isPrepaidPlan(a.billingPlan) && a.planStartedAt)
+            return `${adPlan(a.billingPlan).label} plan · renews ${formatPlanDate(nextRenewalDate(a.planStartedAt, a.billingPlan))}`;
+        return `${adPlan(a.billingPlan).label} plan`;
     };
 
     const onDeleteDraftClick = async (id, isPendingReview) => {
@@ -103,12 +133,12 @@ const MyAds = ({ onLoaded, scrollIntoViewOnLoad }) => {
         if (newImage) data.append('Image', newImage);
         data.append('ImageFocalX', editTarget.imageFocalX);
         data.append('ImageFocalY', editTarget.imageFocalY);
+        newGalleryFiles.forEach((file) => data.append('MorePictures', file));
+        removeGalleryIds.forEach((id) => data.append('RemovePictureIds', id));
 
         try {
             await axios.post('/api/ad/edit', data, { headers: { 'Content-Type': 'multipart/form-data' } });
-            setEditTarget(null);
-            setNewImage(null);
-            setNewImagePreview(null);
+            onCloseEditDialog();
             load();
         } catch (err) {
             setEditError(err?.response?.data?.message || 'Could not save changes.');
@@ -127,6 +157,8 @@ const MyAds = ({ onLoaded, scrollIntoViewOnLoad }) => {
         setPromoMessage(null);
         setNewImage(null);
         setNewImagePreview(null);
+        setNewGalleryFiles([]);
+        setRemoveGalleryIds([]);
         setEditError('');
     };
 
@@ -184,6 +216,11 @@ const MyAds = ({ onLoaded, scrollIntoViewOnLoad }) => {
                                     <Typography variant="body2" color="text.secondary">{adCategoryLabels(a.categories).join(', ')}</Typography>
                                 </Stack>
                                 <Typography variant="h6">{a.title}</Typography>
+                                {planLine(a) && (
+                                    <Typography variant="caption" color={a.cancelsAt && a.isActive ? 'warning.main' : 'text.secondary'} display="block" sx={{ mb: 0.5 }}>
+                                        {planLine(a)}
+                                    </Typography>
+                                )}
                                 <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>{a.description}</Typography>
                                 {adStats[a.id] && a.moderationStatus === 'Approved' && (
                                     <Box sx={{ mt: 1.5, p: 1.25, borderRadius: 1, bgcolor: 'background.default' }}>
@@ -216,7 +253,9 @@ const MyAds = ({ onLoaded, scrollIntoViewOnLoad }) => {
                                         location: a.location || '', servesAllLocations: !!a.servesAllLocations,
                                         isActive: a.isActive, imageUrl: a.imageUrl, promoCode: a.promoCode,
                                         imageFocalX: a.imageFocalX ?? 0.5, imageFocalY: a.imageFocalY ?? 0.5,
-                                        showName: a.showName, showPhone: a.showPhone, showEmail: a.showEmail
+                                        showName: a.showName, showPhone: a.showPhone, showEmail: a.showEmail,
+                                        billingPlan: a.billingPlan,
+                                        morePictures: [...(a.morePictures || [])].sort((x, y) => x.sortOrder - y.sortOrder)
                                     })}>
                                         Edit
                                     </Button>
@@ -233,9 +272,13 @@ const MyAds = ({ onLoaded, scrollIntoViewOnLoad }) => {
                                         <Button size="small" color="error" variant="outlined" onClick={() => onDeleteDraftClick(a.id, true)}>
                                             Delete
                                         </Button>
-                                    ) : a.moderationStatus === 'Rejected' || a.moderationStatus === 'Removed' ? null : a.isActive ? (
-                                        <Button size="small" color="error" variant="outlined" onClick={() => onCancelClick(a.id)}>
-                                            Cancel & Remove
+                                    ) : a.moderationStatus === 'Rejected' || a.moderationStatus === 'Removed' ? null : a.isActive && a.cancelsAt ? (
+                                        <Button size="small" color="success" variant="outlined" onClick={() => onKeepPlanClick(a.id)}>
+                                            Keep My Plan
+                                        </Button>
+                                    ) : a.isActive ? (
+                                        <Button size="small" color="error" variant="outlined" onClick={() => onCancelClick(a)}>
+                                            {isPrepaidPlan(a.billingPlan) ? 'Cancel Renewal' : 'Cancel & Remove'}
                                         </Button>
                                     ) : (
                                         <Button size="small" color="success" variant="outlined" onClick={() => navigate(`/advertise/payment/${a.id}`)}>
@@ -255,7 +298,7 @@ const MyAds = ({ onLoaded, scrollIntoViewOnLoad }) => {
                     <DialogContent>
                         <Stack spacing={2} sx={{ mt: 1 }}>
                             {editError && <Alert ref={editErrorRef} severity="error">{editError}</Alert>}
-                            {editTarget.isActive && (
+                            {editTarget.isActive && !isPrepaidPlan(editTarget.billingPlan) && (
                                 <PromoApplyBox
                                     currentPromoCode={editTarget.promoCode?.code}
                                     onApply={onApplyPromo}
@@ -284,6 +327,15 @@ const MyAds = ({ onLoaded, scrollIntoViewOnLoad }) => {
                                 focal={{ x: editTarget.imageFocalX, y: editTarget.imageFocalY }}
                                 onChange={(f) => setEditTarget({ ...editTarget, imageFocalX: f.x, imageFocalY: f.y })}
                                 size={200}
+                            />
+                            <MorePicturesInput
+                                label="Photo Gallery"
+                                helperText={AD_GALLERY_HELPER_TEXT}
+                                max={MAX_AD_GALLERY_PICTURES}
+                                files={newGalleryFiles}
+                                onFilesChange={setNewGalleryFiles}
+                                existing={editTarget.morePictures.filter((p) => !removeGalleryIds.includes(p.id))}
+                                onRemoveExisting={(id) => setRemoveGalleryIds((prev) => [...prev, id])}
                             />
                             <TextField label="Title" value={editTarget.title}
                                 onChange={(e) => setEditTarget({ ...editTarget, title: e.target.value })} />

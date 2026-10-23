@@ -4,6 +4,8 @@ import axios from 'axios';
 import { Container, Typography, Button, Paper, Alert, Stack, CircularProgress } from '@mui/material';
 import PriceSummary from '../components/PriceSummary';
 import PromoApplyBox from '../components/PromoApplyBox';
+import AdPlanPicker from '../components/AdPlanPicker';
+import { adPlan, isPrepaidPlan } from '../constants/adPlans';
 
 const AdPaymentSetupPage = () => {
     const { adId } = useParams();
@@ -12,6 +14,9 @@ const AdPaymentSetupPage = () => {
     const [error, setError] = useState('');
     const [stripeUnavailable, setStripeUnavailable] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [pricing, setPricing] = useState(null);
+    const [plan, setPlan] = useState('Monthly');
+    const [planSaving, setPlanSaving] = useState(false);
     const [adFee, setAdFee] = useState(null);
     const [fullFee, setFullFee] = useState(null);
     const [durationMonths, setDurationMonths] = useState(null);
@@ -27,13 +32,18 @@ const AdPaymentSetupPage = () => {
 
     const loadFee = async () => {
         try {
-            const [{ data: pricing }, { data: ads }] = await Promise.all([
+            const [{ data: pricingData }, { data: ads }] = await Promise.all([
                 axios.get('/api/payment/pricing'),
                 axios.get('/api/ad/myads')
             ]);
             const ad = ads.find((a) => a.id === Number(adId));
-            setAdFee(ad?.monthlyFeeOverride ?? pricing.adMonthlyFee);
-            setFullFee(pricing.adMonthlyFee);
+            const adPlanValue = ad?.billingPlan || 'Monthly';
+            const planFee = pricingData[adPlan(adPlanValue).priceKey];
+            setPricing(pricingData);
+            setPlan(adPlanValue);
+            // Promos only ever apply to Monthly (the server clears them on other plans).
+            setAdFee(isPrepaidPlan(adPlanValue) ? planFee : (ad?.monthlyFeeOverride ?? planFee));
+            setFullFee(planFee);
             setDurationMonths(ad?.promoDurationMonths ?? null);
             setCurrentPromoCode(ad?.promoCode?.code ?? null);
         } catch {
@@ -45,6 +55,23 @@ const AdPaymentSetupPage = () => {
         loadFee();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const onPlanChange = async (value) => {
+        if (value === plan) return;
+        const dropsPromo = currentPromoCode && isPrepaidPlan(value);
+        if (dropsPromo && !window.confirm(`Promo codes only apply to the monthly plan, so switching will remove ${currentPromoCode}. Continue?`)) return;
+        setPlanSaving(true);
+        setError('');
+        try {
+            await axios.post('/api/payment/set-ad-plan', { id: Number(adId), plan: value });
+            setPromoMessage(null);
+            await loadFee();
+        } catch (err) {
+            setError(err?.response?.data?.message || 'Could not change your plan.');
+        } finally {
+            setPlanSaving(false);
+        }
+    };
 
     const onApplyPromo = async (promoCode) => {
         setPromoApplying(true);
@@ -89,22 +116,37 @@ const AdPaymentSetupPage = () => {
         }
     };
 
+    const prepaid = isPrepaidPlan(plan);
+    const { months, label: planLabel } = adPlan(plan);
+
     return (
         <Container maxWidth="xs" sx={{ py: 8 }}>
             <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
                 <Typography variant="h5" gutterBottom>One Last Step</Typography>
                 <Typography color="text.secondary" sx={{ mb: 3 }}>
-                    Every ad is reviewed before it goes live. Add a card to hold your spot — here's what you'll be charged once it's approved:
+                    Choose how you'd like to pay. Every ad is reviewed before it goes live — add a card to hold your spot, and you'll be charged once it's approved:
                 </Typography>
-                <PriceSummary label="Monthly Ad Fee" fullFee={fullFee} resolvedFee={adFee} durationMonths={durationMonths} />
-                <Stack sx={{ mb: 3, textAlign: 'left' }}>
-                    <PromoApplyBox
-                        currentPromoCode={currentPromoCode}
-                        onApply={onApplyPromo}
-                        applying={promoApplying}
-                        message={promoMessage}
-                    />
-                </Stack>
+                <AdPlanPicker pricing={pricing} value={plan} onChange={onPlanChange} disabled={planSaving} />
+                <PriceSummary
+                    label={`${planLabel} Ad Fee`}
+                    fullFee={fullFee} resolvedFee={adFee} durationMonths={durationMonths}
+                    period={months === 12 ? 'year' : months === 6 ? '6 months' : 'month'}
+                />
+                {prepaid ? (
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 3, textAlign: 'left' }}>
+                        Paid upfront when your ad is approved, then renews automatically every {months === 12 ? 'year' : '6 months'} at the same price.
+                        If you cancel, your ad stays up until the end of the period you've paid for — no refunds for unused time.
+                    </Typography>
+                ) : (
+                    <Stack sx={{ mb: 3, textAlign: 'left' }}>
+                        <PromoApplyBox
+                            currentPromoCode={currentPromoCode}
+                            onApply={onApplyPromo}
+                            applying={promoApplying}
+                            message={promoMessage}
+                        />
+                    </Stack>
+                )}
                 {error && <Alert severity="warning" sx={{ mb: 2, textAlign: 'left' }}>{error}</Alert>}
                 {stripeUnavailable ? (
                     <Stack spacing={2}>
@@ -116,7 +158,7 @@ const AdPaymentSetupPage = () => {
                         </Button>
                     </Stack>
                 ) : (
-                    <Button variant="contained" size="large" onClick={onContinueClick} disabled={loading} sx={{ px: 4 }}>
+                    <Button variant="contained" size="large" onClick={onContinueClick} disabled={loading || planSaving} sx={{ px: 4 }}>
                         {loading ? <CircularProgress size={24} color="inherit" /> : 'Add Card & Submit for Review'}
                     </Button>
                 )}

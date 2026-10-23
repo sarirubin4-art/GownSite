@@ -131,23 +131,19 @@ namespace GownSite.Web.Controllers
             _geo = geo;
         }
 
-        private string FrontendBaseUrl()
-        {
-            var frontendBaseUrl = _configuration["Frontend:BaseUrl"];
-            return string.IsNullOrEmpty(frontendBaseUrl) ? $"{Request.Scheme}://{Request.Host}" : frontendBaseUrl;
-        }
+        private string FrontendBaseUrl() => FrontendUrls.BaseUrl(_configuration, Request);
 
         // Creates a fresh Stripe Price (with an inline ad-hoc Product) for the resolved
-        // monthly amount. Subscriptions created via the API — unlike Checkout Sessions —
+        // amount, billed every intervalCount intervals (monthly unless an ad plan says otherwise). Subscriptions created via the API — unlike Checkout Sessions —
         // require a real Price/Product reference, not inline price_data on the item itself,
         // so this is the simplest way to keep supporting a per-listing (promo-adjusted) amount.
-        private static async Task<string> CreateMonthlyPriceAsync(decimal amountUsd, string productName)
+        private static async Task<string> CreateRecurringPriceAsync(decimal amountUsd, string productName, string interval = "month", long intervalCount = 1)
         {
             var price = await new PriceService().CreateAsync(new PriceCreateOptions
             {
                 Currency = "usd",
                 UnitAmountDecimal = amountUsd * 100,
-                Recurring = new PriceRecurringOptions { Interval = "month" },
+                Recurring = new PriceRecurringOptions { Interval = interval, IntervalCount = intervalCount },
                 ProductData = new PriceProductDataOptions { Name = productName }
             });
             return price.Id;
@@ -168,7 +164,7 @@ namespace GownSite.Web.Controllers
             var promoAmount = monthlyFeeOverride ?? fullFeeUsd;
             var subscriptionAmount = hasDuration ? fullFeeUsd : promoAmount;
 
-            var priceId = await CreateMonthlyPriceAsync(subscriptionAmount, productName);
+            var priceId = await CreateRecurringPriceAsync(subscriptionAmount, productName);
             var options = new SubscriptionCreateOptions
             {
                 Customer = customerId,
@@ -520,6 +516,8 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "Please allow a phone number or email so interested customers can actually contact this patron." });
             if (request.Image != null && !ImageUploadValidator.IsValidImage(request.Image))
                 return BadRequest(new { message = ImageUploadValidator.ErrorMessage });
+            var galleryError = AdController.ValidateGalleryChange(existing, request.MorePictures, request.RemovePictureIds);
+            if (galleryError != null) return BadRequest(new { message = galleryError });
 
             repo.Update(new Ad
             {
@@ -538,6 +536,7 @@ namespace GownSite.Web.Controllers
                 repo.SetImage(request.Id, await _storage.SaveAsync(request.Image, "ads"), request.ImageFocalX ?? 0.5, request.ImageFocalY ?? 0.5);
             else if (request.ImageFocalX.HasValue || request.ImageFocalY.HasValue)
                 repo.SetImageFocal(request.Id, request.ImageFocalX ?? 0.5, request.ImageFocalY ?? 0.5);
+            await AdController.ApplyGalleryChangeAsync(repo, _storage, request.Id, request.MorePictures, request.RemovePictureIds);
 
             return Ok();
         }
@@ -553,6 +552,8 @@ namespace GownSite.Web.Controllers
 
             if (string.IsNullOrWhiteSpace(request.PromoCode))
                 return BadRequest(new { message = "Enter a promo code." });
+            if (AdPlans.IsPrepaid(ad.BillingPlan))
+                return BadRequest(new { message = AdPlans.PromoMonthlyOnlyMessage });
 
             var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m);
 
@@ -604,14 +605,29 @@ namespace GownSite.Web.Controllers
             if (!ad.ShowPhone && !ad.ShowEmail)
                 return BadRequest(new { message = "This ad has no phone or email enabled — edit it to allow one before approving." });
 
-            var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m);
-
             Subscription subscription;
             try
             {
-                subscription = await CreatePromoAwareSubscriptionAsync(
-                    ad.StripeCustomerId, ad.StripePaymentMethodId, feeUsd,
-                    ad.MonthlyFeeOverride, ad.PromoDurationMonths, "Regowned Monthly Ad Placement");
+                if (AdPlans.IsPrepaid(ad.BillingPlan))
+                {
+                    // Charges the full 6-month/yearly price now; Stripe renews it at the same
+                    // price every period. No promo path — SetBillingPlan clears any promo.
+                    var (interval, intervalCount) = AdPlans.Recurrence(ad.BillingPlan);
+                    var priceId = await CreateRecurringPriceAsync(AdPlans.Fee(_configuration, ad.BillingPlan), AdPlans.ProductName(ad.BillingPlan), interval, intervalCount);
+                    subscription = await new SubscriptionService().CreateAsync(new SubscriptionCreateOptions
+                    {
+                        Customer = ad.StripeCustomerId,
+                        DefaultPaymentMethod = ad.StripePaymentMethodId,
+                        Items = new List<SubscriptionItemOptions> { new() { Price = priceId } },
+                        PaymentBehavior = "error_if_incomplete"
+                    });
+                }
+                else
+                {
+                    subscription = await CreatePromoAwareSubscriptionAsync(
+                        ad.StripeCustomerId, ad.StripePaymentMethodId, AdPlans.Fee(_configuration, AdBillingPlan.Monthly),
+                        ad.MonthlyFeeOverride, ad.PromoDurationMonths, AdPlans.ProductName(AdBillingPlan.Monthly));
+                }
             }
             catch (StripeException ex)
             {

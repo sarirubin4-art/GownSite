@@ -103,6 +103,33 @@ namespace GownSite.Web.Services
                 $"<p>Your subscription has been canceled and you will not be charged further.</p>",
                 frontendBaseUrl);
 
+        // Sent from StripeWebhookController when a renewal charge fails. Stripe keeps
+        // retrying on its own schedule; payUrl is Stripe's hosted page for this invoice,
+        // where the owner can pay it with a different card.
+        public static string PaymentFailed(string itemDescription, string payUrl, DateTime? nextAttemptUtc, string frontendBaseUrl) =>
+            EmailLayout.Wrap(
+                EmailLayout.Heading("Payment Problem") +
+                $"<p>We couldn't process the renewal payment for your {EmailLayout.UserText(itemDescription)} on Regowned. " +
+                "This usually means the card on file expired or was declined.</p>" +
+                (nextAttemptUtc.HasValue
+                    ? $"<p>We'll try again on {nextAttemptUtc.Value:MMMM d}. To keep it live, please update your payment before then.</p>"
+                    : "<p>To keep it live, please update your payment as soon as you can.</p>") +
+                (string.IsNullOrEmpty(payUrl) ? "" : EmailLayout.Button("Update Payment", payUrl)),
+                frontendBaseUrl);
+
+        public static string TakenDownForNonPayment(string itemDescription, string myListingsUrl, string frontendBaseUrl) =>
+            EmailLayout.Wrap(
+                $"<p>Your {EmailLayout.UserText(itemDescription)} on Regowned has been taken down because we weren't able to collect payment after several tries.</p>" +
+                "<p>You won't be charged anything further. You can bring it back anytime from My Listings.</p>" +
+                EmailLayout.Button("Go to My Listings", myListingsUrl),
+                frontendBaseUrl);
+
+        public static string PaymentProblemAdmin(string summary, string frontendBaseUrl) =>
+            EmailLayout.Wrap(
+                EmailLayout.Heading("Payment Problem") +
+                $"<p>{EmailLayout.UserText(summary)}</p>",
+                frontendBaseUrl);
+
         public static string Rejected(string type, string reason, string frontendBaseUrl) =>
             EmailLayout.Wrap(
                 $"<p>Your {type} submission on Regowned was not approved.</p>" +

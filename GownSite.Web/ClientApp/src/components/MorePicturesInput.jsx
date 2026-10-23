@@ -4,6 +4,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ImageZoomDialog from './ImageZoomDialog';
 
 export const MAX_MORE_PICTURES = 5;
+// Ads' Photo Gallery — must match AdController.MaxMorePictures.
+export const MAX_AD_GALLERY_PICTURES = 8;
+export const AD_GALLERY_HELPER_TEXT = 'Optional — extra photos showing your work. They appear in a gallery on your ad\'s page, separate from the main ad image.';
 
 const Thumb = ({ src, onRemove, onClick }) => (
     <Box sx={{ position: 'relative' }}>
@@ -37,7 +40,8 @@ const Thumb = ({ src, onRemove, onClick }) => (
 // `files` / `onFilesChange`: staged File objects not yet uploaded (always used).
 // `existing` / `onRemoveExisting`: already-saved pictures ({id, url}), only passed by
 // edit dialogs — omitted entirely for brand-new listings, which have none yet.
-const MorePicturesInput = ({ files, onFilesChange, existing = [], onRemoveExisting, max = MAX_MORE_PICTURES }) => {
+// `label` / `helperText` let the ad forms present the same picker as a "Photo Gallery".
+const MorePicturesInput = ({ files, onFilesChange, existing = [], onRemoveExisting, max = MAX_MORE_PICTURES, label = 'Additional Photos', helperText }) => {
     const [error, setError] = useState('');
     const [zoomIndex, setZoomIndex] = useState(null);
     const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
@@ -65,7 +69,8 @@ const MorePicturesInput = ({ files, onFilesChange, existing = [], onRemoveExisti
 
     return (
         <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>Additional Photos</Typography>
+            <Typography variant="subtitle2" sx={{ mb: helperText ? 0 : 1 }}>{label}</Typography>
+            {helperText && <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>{helperText}</Typography>}
             {(existing.length > 0 || files.length > 0) && (
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
                     {existing.map((p, i) => (

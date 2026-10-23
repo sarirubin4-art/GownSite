@@ -22,6 +22,14 @@ namespace GownSite.Web.Controllers
     public class CreateAdCheckoutSessionRequest
     {
         public int AdId { get; set; }
+        // Only read by create-ad-checkout-session (reactivation); null keeps the ad's current plan.
+        public AdBillingPlan? Plan { get; set; }
+    }
+
+    public class SetAdPlanRequest
+    {
+        public int Id { get; set; }
+        public AdBillingPlan Plan { get; set; }
     }
 
     public class CreateBatchSetupSessionRequest
@@ -33,6 +41,8 @@ namespace GownSite.Web.Controllers
     {
         public decimal GownMonthlyFee { get; set; }
         public decimal AdMonthlyFee { get; set; }
+        public decimal AdSixMonthFee { get; set; }
+        public decimal AdYearlyFee { get; set; }
         public decimal GownPostingSetupFee { get; set; }
     }
 
@@ -66,11 +76,7 @@ namespace GownSite.Web.Controllers
             _colorScoreService = colorScoreService;
         }
 
-        private string FrontendBaseUrl()
-        {
-            var frontendBaseUrl = _configuration["Frontend:BaseUrl"];
-            return string.IsNullOrEmpty(frontendBaseUrl) ? $"{Request.Scheme}://{Request.Host}" : frontendBaseUrl;
-        }
+        private string FrontendBaseUrl() => FrontendUrls.BaseUrl(_configuration, Request);
 
         [HttpGet("pricing")]
         public IActionResult Pricing()
@@ -78,7 +84,9 @@ namespace GownSite.Web.Controllers
             return Ok(new PricingResponse
             {
                 GownMonthlyFee = _configuration.GetValue<decimal>("Stripe:MonthlyListingFeeUsd", 9.99m),
-                AdMonthlyFee = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m),
+                AdMonthlyFee = AdPlans.Fee(_configuration, AdBillingPlan.Monthly),
+                AdSixMonthFee = AdPlans.Fee(_configuration, AdBillingPlan.SixMonth),
+                AdYearlyFee = AdPlans.Fee(_configuration, AdBillingPlan.Yearly),
                 GownPostingSetupFee = _configuration.GetValue<decimal>("Stripe:GownPostingSetupFeeUsd", 0m)
             });
         }
@@ -132,6 +140,8 @@ namespace GownSite.Web.Controllers
                 return BadRequest(new { message = "This ad doesn't have an active subscription to apply a promo to." });
             if (string.IsNullOrWhiteSpace(request.PromoCode))
                 return BadRequest(new { message = "Enter a promo code." });
+            if (AdPlans.IsPrepaid(ad.BillingPlan))
+                return BadRequest(new { message = AdPlans.PromoMonthlyOnlyMessage });
 
             var promoRepo = new PromoCodeRepository(_connectionString);
             var promo = promoRepo.GetByCode(request.PromoCode);
@@ -236,12 +246,31 @@ namespace GownSite.Web.Controllers
             if (ad.OwnerId != CurrentOwnerId()) return Forbid();
             if (ad.ModerationStatus != ModerationStatus.Draft && ad.ModerationStatus != ModerationStatus.PendingReview)
                 return BadRequest(new { message = "This ad has already started billing — use the promo box on your ad in My Listings instead." });
+            if (AdPlans.IsPrepaid(ad.BillingPlan))
+                return BadRequest(new { message = AdPlans.PromoMonthlyOnlyMessage });
 
             var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m);
             var result = DraftPromoApplier.ApplyToAd(_connectionString, feeUsd, ad, request.PromoCode);
             if (!result.Success) return BadRequest(new { message = result.Error });
 
             return Ok(new { resolvedFee = result.ResolvedFee, fullFee = result.FullFee, durationMonths = result.DurationMonths });
+        }
+
+        // The plan picker on the payment-setup screen. Like the draft promo above, nothing
+        // goes to Stripe yet — ApproveAd reads the plan off the row when it charges.
+        [HttpPost("set-ad-plan")]
+        public IActionResult SetAdPlan([FromBody] SetAdPlanRequest request)
+        {
+            if (!Enum.IsDefined(request.Plan)) return BadRequest(new { message = "Unknown plan." });
+            var adRepo = new AdRepository(_connectionString);
+            var ad = adRepo.Get(request.Id);
+            if (ad == null) return NotFound();
+            if (ad.OwnerId != CurrentOwnerId()) return Forbid();
+            if (ad.ModerationStatus != ModerationStatus.Draft && ad.ModerationStatus != ModerationStatus.PendingReview)
+                return BadRequest(new { message = "This ad has already started billing, so its plan can't be changed here." });
+
+            adRepo.SetBillingPlan(request.Id, request.Plan);
+            return Ok();
         }
 
         [HttpPost("create-checkout-session")]
@@ -504,7 +533,10 @@ namespace GownSite.Web.Controllers
             var ownerRepo = new OwnerRepository(_connectionString);
             var owner = ownerRepo.Get(CurrentOwnerId());
 
-            var feeUsd = _configuration.GetValue<decimal>("Stripe:MonthlyAdFeeUsd", 14.99m);
+            var plan = request.Plan ?? ad.BillingPlan;
+            if (!Enum.IsDefined(plan)) return BadRequest(new { message = "Unknown plan." });
+            var feeUsd = AdPlans.Fee(_configuration, plan);
+            var (interval, intervalCount) = AdPlans.Recurrence(plan);
             var frontendBaseUrl = _configuration["Frontend:BaseUrl"];
             if (string.IsNullOrEmpty(frontendBaseUrl))
                 frontendBaseUrl = $"{Request.Scheme}://{Request.Host}";
@@ -522,10 +554,10 @@ namespace GownSite.Web.Controllers
                         {
                             Currency = "usd",
                             UnitAmountDecimal = feeUsd * 100,
-                            Recurring = new SessionLineItemPriceDataRecurringOptions { Interval = "month" },
+                            Recurring = new SessionLineItemPriceDataRecurringOptions { Interval = interval, IntervalCount = intervalCount },
                             ProductData = new SessionLineItemPriceDataProductDataOptions
                             {
-                                Name = "Regowned Monthly Ad Placement",
+                                Name = AdPlans.ProductName(plan),
                                 Description = ad.Title
                             }
                         }
@@ -536,7 +568,8 @@ namespace GownSite.Web.Controllers
                 Metadata = new Dictionary<string, string>
                 {
                     { "adId", ad.Id.ToString() },
-                    { "ownerId", ad.OwnerId.ToString() }
+                    { "ownerId", ad.OwnerId.ToString() },
+                    { "plan", plan.ToString() }
                 }
             };
 
@@ -562,6 +595,9 @@ namespace GownSite.Web.Controllers
             if (ad == null) return NotFound();
             if (ad.OwnerId != CurrentOwnerId()) return Forbid();
 
+            // The plan that was actually paid for travels on the session, not the ad row.
+            if (session.Metadata.TryGetValue("plan", out var planStr) && Enum.TryParse<AdBillingPlan>(planStr, out var plan))
+                adRepo.SetBillingPlan(adId, plan);
             adRepo.Activate(adId, session.SubscriptionId, session.CustomerId);
             return Ok(new { adId });
         }

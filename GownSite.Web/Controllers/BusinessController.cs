@@ -37,11 +37,7 @@ namespace GownSite.Web.Controllers
             _connectionString = configuration.GetConnectionString("ConStr");
         }
 
-        private string FrontendBaseUrl()
-        {
-            var frontendBaseUrl = _configuration["Frontend:BaseUrl"];
-            return string.IsNullOrEmpty(frontendBaseUrl) ? $"{Request.Scheme}://{Request.Host}" : frontendBaseUrl;
-        }
+        private string FrontendBaseUrl() => FrontendUrls.BaseUrl(_configuration, Request);
 
         [HttpPost("create-setup-session")]
         public async Task<IActionResult> CreateSetupSession()

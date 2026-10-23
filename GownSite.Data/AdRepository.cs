@@ -48,6 +48,7 @@ namespace GownSite.Data
             return context.Ads
                 .Include(a => a.Owner)
                 .Include(a => a.PromoCode)
+                .Include(a => a.MorePictures)
                 .Where(a => a.IsActive)
                 .OrderByDescending(a => a.CreatedDate)
                 .ToList();
@@ -68,7 +69,7 @@ namespace GownSite.Data
         public Ad Get(int id)
         {
             using var context = new GownDataContext(_connectionString);
-            return context.Ads.FirstOrDefault(a => a.Id == id);
+            return context.Ads.Include(a => a.MorePictures).FirstOrDefault(a => a.Id == id);
         }
 
         // Used only by the Inquire endpoint, which needs Owner.Name/Number/Email to build
@@ -84,11 +85,23 @@ namespace GownSite.Data
                 .FirstOrDefault(a => a.Id == id);
         }
 
+        // For the Stripe webhook, which only knows the subscription. Includes Owner for the
+        // notification email — never returned to a client.
+        public List<Ad> GetBySubscriptionId(string stripeSubscriptionId)
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Ads
+                .Include(a => a.Owner)
+                .Where(a => a.StripeSubscriptionId == stripeSubscriptionId)
+                .ToList();
+        }
+
         public List<Ad> GetByOwner(int ownerId)
         {
             using var context = new GownDataContext(_connectionString);
             return context.Ads
                 .Include(a => a.PromoCode)
+                .Include(a => a.MorePictures)
                 .Where(a => a.OwnerId == ownerId)
                 .OrderByDescending(a => a.CreatedDate)
                 .ToList();
@@ -184,10 +197,58 @@ namespace GownSite.Data
             var existing = context.Ads.FirstOrDefault(a => a.Id == id);
             if (existing == null) return;
 
+            // Only a new subscription restarts the plan's renewal anchor — confirm-ad-session
+            // can run again for the same one (e.g. the success page reloaded days later).
+            if (existing.StripeSubscriptionId != stripeSubscriptionId || existing.PlanStartedAt == null)
+            {
+                existing.PlanStartedAt = DateTime.UtcNow;
+                existing.CancelsAt = null;
+            }
             existing.IsActive = true;
             existing.StripeSubscriptionId = stripeSubscriptionId;
             existing.StripeCustomerId = stripeCustomerId;
             existing.ModerationStatus = ModerationStatus.Approved;
+            context.SaveChanges();
+        }
+
+        // Only before billing starts (Draft/PendingReview — see PaymentController.SetAdPlan).
+        // Switching to a prepaid plan drops any promo, since promos only apply to Monthly;
+        // nothing to un-count, because redemptions are only counted at approval.
+        public void SetBillingPlan(int id, AdBillingPlan plan)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var existing = context.Ads.FirstOrDefault(a => a.Id == id);
+            if (existing == null) return;
+
+            existing.BillingPlan = plan;
+            if (plan != AdBillingPlan.Monthly)
+            {
+                existing.PromoCodeId = null;
+                existing.MonthlyFeeOverride = null;
+                existing.PromoDurationMonths = null;
+            }
+            context.SaveChanges();
+        }
+
+        // Backstop for the Stripe webhook (see AdPlanExpiryService): a cancelled prepaid ad
+        // whose paid period is over comes down even if the subscription.deleted event never
+        // arrived. Returns how many it took down.
+        public int ExpireEndedPrepaidAds()
+        {
+            using var context = new GownDataContext(_connectionString);
+            var now = DateTime.UtcNow;
+            return context.Ads
+                .Where(a => a.IsActive && a.CancelsAt != null && a.CancelsAt <= now)
+                .ExecuteUpdate(s => s.SetProperty(a => a.IsActive, false));
+        }
+
+        public void SetCancelsAt(int id, DateTime? cancelsAt)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var existing = context.Ads.FirstOrDefault(a => a.Id == id);
+            if (existing == null) return;
+
+            existing.CancelsAt = cancelsAt;
             context.SaveChanges();
         }
 
@@ -209,6 +270,7 @@ namespace GownSite.Data
             return context.Ads
                 .Include(a => a.Owner)
                 .Include(a => a.PromoCode)
+                .Include(a => a.MorePictures)
                 .Where(a => a.ModerationStatus == ModerationStatus.PendingReview)
                 .OrderBy(a => a.CreatedDate)
                 .ToList();
@@ -223,6 +285,8 @@ namespace GownSite.Data
             existing.ModerationStatus = ModerationStatus.Approved;
             existing.IsActive = true;
             existing.StripeSubscriptionId = stripeSubscriptionId;
+            existing.PlanStartedAt = DateTime.UtcNow;
+            existing.CancelsAt = null;
             context.SaveChanges();
         }
 
@@ -247,15 +311,41 @@ namespace GownSite.Data
             context.SaveChanges();
         }
 
+        // Appends after whatever's already in the gallery (unlike GownRepository.AddPictures,
+        // which restarts at 0) so photos added in a later edit stay after the earlier ones.
+        public void AddPictures(int adId, List<string> urls)
+        {
+            using var context = new GownDataContext(_connectionString);
+            var order = (context.AdPictures.Where(p => p.AdId == adId).Max(p => (int?)p.SortOrder) ?? -1) + 1;
+            foreach (var url in urls)
+            {
+                context.AdPictures.Add(new AdPicture { AdId = adId, Url = url, SortOrder = order++ });
+            }
+            context.SaveChanges();
+        }
+
+        public void RemovePictures(int adId, List<int> pictureIds)
+        {
+            if (pictureIds == null || pictureIds.Count == 0) return;
+            using var context = new GownDataContext(_connectionString);
+            var toRemove = context.AdPictures
+                .Where(p => p.AdId == adId && pictureIds.Contains(p.Id))
+                .ToList();
+            context.AdPictures.RemoveRange(toRemove);
+            context.SaveChanges();
+        }
+
         // Only ever called on a Draft or a still-PendingReview ad (see
         // AdController.DeleteDraft) — neither has gone live yet, so there's no active
-        // Stripe subscription to cancel first.
+        // Stripe subscription to cancel first. AdPicture's FK uses DeleteBehavior.Restrict
+        // (see GownDataContext), so its rows must be removed before the Ad row itself.
         public void DeleteDraft(int id)
         {
             using var context = new GownDataContext(_connectionString);
-            var existing = context.Ads.FirstOrDefault(a => a.Id == id);
+            var existing = context.Ads.Include(a => a.MorePictures).FirstOrDefault(a => a.Id == id);
             if (existing == null) return;
 
+            context.AdPictures.RemoveRange(existing.MorePictures);
             context.Ads.Remove(existing);
             context.SaveChanges();
         }

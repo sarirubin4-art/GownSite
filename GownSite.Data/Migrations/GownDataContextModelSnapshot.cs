@@ -30,6 +30,12 @@ namespace GownSite.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("BillingPlan")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CancelsAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Categories")
                         .HasColumnType("nvarchar(max)");
 
@@ -67,6 +73,9 @@ namespace GownSite.Data.Migrations
 
                     b.Property<int?>("OwnerId")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("PlanStartedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<int?>("PromoCodeId")
                         .HasColumnType("int");
@@ -111,6 +120,30 @@ namespace GownSite.Data.Migrations
                     b.HasIndex("PromoCodeId");
 
                     b.ToTable("Ads");
+                });
+
+            modelBuilder.Entity("GownSite.Data.AdPicture", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AdId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Url")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdId");
+
+                    b.ToTable("AdPictures");
                 });
 
             modelBuilder.Entity("GownSite.Data.ContactMessage", b =>
@@ -593,6 +626,17 @@ namespace GownSite.Data.Migrations
                     b.Navigation("PromoCode");
                 });
 
+            modelBuilder.Entity("GownSite.Data.AdPicture", b =>
+                {
+                    b.HasOne("GownSite.Data.Ad", "Ad")
+                        .WithMany("MorePictures")
+                        .HasForeignKey("AdId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Ad");
+                });
+
             modelBuilder.Entity("GownSite.Data.ContactMessage", b =>
                 {
                     b.HasOne("GownSite.Data.Owner", "Owner")
@@ -631,6 +675,11 @@ namespace GownSite.Data.Migrations
                     b.Navigation("Owner");
 
                     b.Navigation("PromoCode");
+                });
+
+            modelBuilder.Entity("GownSite.Data.Ad", b =>
+                {
+                    b.Navigation("MorePictures");
                 });
 
             modelBuilder.Entity("GownSite.Data.GownPosting", b =>

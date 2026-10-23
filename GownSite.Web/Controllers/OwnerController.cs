@@ -106,11 +106,7 @@ namespace GownSite.Web.Controllers
             _emailChangeProtector = dataProtection.CreateProtector("Regowned.EmailChange.v1").ToTimeLimitedDataProtector();
         }
 
-        private string FrontendBaseUrl()
-        {
-            var frontendBaseUrl = _configuration["Frontend:BaseUrl"];
-            return string.IsNullOrEmpty(frontendBaseUrl) ? $"{Request.Scheme}://{Request.Host}" : frontendBaseUrl;
-        }
+        private string FrontendBaseUrl() => FrontendUrls.BaseUrl(_configuration, Request);
 
         private static readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
 

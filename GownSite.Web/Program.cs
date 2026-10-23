@@ -66,6 +66,7 @@ public class Program
                 sp.GetRequiredService<ILogger<SessionStampValidator>>());
         });
         builder.Services.AddHostedService<GeoDatabaseUpdater>();
+        builder.Services.AddHostedService<AdPlanExpiryService>();
 
         var emailConnectionString = builder.Configuration["Email:ConnectionString"];
         if (!string.IsNullOrEmpty(emailConnectionString))

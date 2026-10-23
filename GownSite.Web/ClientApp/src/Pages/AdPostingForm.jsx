@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Container, Typography, TextField, Button, Stack, Grid, Paper, Alert, Box, FormControlLabel, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Chip } from '@mui/material';
@@ -10,7 +10,9 @@ import LocationField from '../components/LocationField';
 import FilterAutocomplete from '../components/FilterAutocomplete';
 import ContactVisibilityCheckboxes from '../components/ContactVisibilityCheckboxes';
 import ImagePositionEditor from '../components/ImagePositionEditor';
+import MorePicturesInput, { MAX_AD_GALLERY_PICTURES, AD_GALLERY_HELPER_TEXT } from '../components/MorePicturesInput';
 import { focalObjectPosition } from '../utils/imageFocal';
+import AdGallery from '../components/AdGallery';
 import useFormError from '../hooks/useFormError';
 
 // Renders the in-progress ad two ways — the full details page and the floating
@@ -18,7 +20,7 @@ import useFormError from '../hooks/useFormError';
 // look before paying and submitting for review. No backend call. Also where the
 // drag-to-reposition crop editor lives, since this is the one place the owner sees
 // the image at full square size before it goes live.
-const AdPreviewDialog = ({ open, onClose, form, imagePreview, imageFocal, onImageFocalChange }) => {
+const AdPreviewDialog = ({ open, onClose, form, imagePreview, imageFocal, onImageFocalChange, galleryUrls }) => {
     const objectPosition = focalObjectPosition(imageFocal.x, imageFocal.y);
     return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -57,6 +59,7 @@ const AdPreviewDialog = ({ open, onClose, form, imagePreview, imageFocal, onImag
                 <Typography variant="body1" sx={{ mb: 3, whiteSpace: 'pre-line' }}>
                     {form.description || 'Your description will appear here.'}
                 </Typography>
+                {galleryUrls.length > 0 && <AdGallery urls={galleryUrls} />}
                 {form.targetUrl && <Button variant="contained" size="large" disabled>Learn More</Button>}
             </Box>
 
@@ -102,11 +105,25 @@ const AdPostingForm = () => {
     const [imageFocal, setImageFocal] = useState({ x: 0.5, y: 0.5 });
     const [hasExistingImage, setHasExistingImage] = useState(false);
     const [previewOpen, setPreviewOpen] = useState(false);
+    // Photo Gallery: `galleryFiles` are picked but not yet uploaded; autosave uploads them
+    // to the draft and moves them into `existingGallery` (what the server has saved).
+    const [galleryFiles, setGalleryFiles] = useState([]);
+    const [existingGallery, setExistingGallery] = useState([]);
+    const [removeGalleryIds, setRemoveGalleryIds] = useState([]);
+    const galleryFilePreviews = useMemo(() => galleryFiles.map((f) => URL.createObjectURL(f)), [galleryFiles]);
+    useEffect(() => () => galleryFilePreviews.forEach((url) => URL.revokeObjectURL(url)), [galleryFilePreviews]);
 
-    const [draftId, setDraftId] = useState(resumeId ? Number(resumeId) : null);
     const [saveState, setSaveState] = useState('idle'); // idle | saving | saved
     const dirtyRef = useRef(false);
     const autosaveTimer = useRef(null);
+    // Files (main image + gallery) and removals already sent by an autosave — in flight or
+    // done — so neither a later autosave nor the final submit sends them a second time.
+    // A ref rather than state so queued autosaves and the final submit, whose closures
+    // were captured before the first save returned, still use the draft it created.
+    const draftIdRef = useRef(resumeId ? Number(resumeId) : null);
+    const sentFilesRef = useRef(new Set());
+    const sentRemoveIdsRef = useRef(new Set());
+    const savePromiseRef = useRef(null);
 
     const [form, setForm] = useState({
         title: '',
@@ -148,6 +165,7 @@ const AdPostingForm = () => {
                 setImagePreview(data.imageUrl);
                 setImageFocal({ x: data.imageFocalX ?? 0.5, y: data.imageFocalY ?? 0.5 });
             }
+            setExistingGallery([...(data.morePictures || [])].sort((a, b) => a.sortOrder - b.sortOrder));
         }).catch(() => {
             setError('Could not load your saved draft. Starting fresh instead.');
         });
@@ -166,16 +184,27 @@ const AdPostingForm = () => {
     // or a crash doesn't lose progress. Only runs once there's at least a description,
     // and only after the user has actually changed something (not on the initial load
     // when resuming an existing draft).
+    // (When a save moves uploaded photos out of galleryFiles, that state change schedules
+    // one more save; it sends nothing already uploaded, so it's just a cheap re-save.)
     useEffect(() => {
         if (!dirtyRef.current) return;
         if (!form.description.trim()) return;
 
         if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
         autosaveTimer.current = setTimeout(async () => {
+            // One save at a time, so two can't both upload the same new photo.
+            await savePromiseRef.current?.catch(() => {});
+            const sendImage = image && !sentFilesRef.current.has(image) ? image : null;
+            const sendFiles = galleryFiles.filter((f) => !sentFilesRef.current.has(f));
+            const sendRemoveIds = removeGalleryIds.filter((id) => !sentRemoveIdsRef.current.has(id));
+            if (sendImage) sentFilesRef.current.add(sendImage);
+            sendFiles.forEach((f) => sentFilesRef.current.add(f));
+            sendRemoveIds.forEach((id) => sentRemoveIdsRef.current.add(id));
+
             setSaveState('saving');
-            try {
+            const save = (async () => {
                 const data = new FormData();
-                if (draftId) data.append('Id', draftId);
+                if (draftIdRef.current) data.append('Id', draftIdRef.current);
                 data.append('Title', form.title);
                 data.append('Description', form.description);
                 data.append('TargetUrl', form.targetUrl);
@@ -185,23 +214,42 @@ const AdPostingForm = () => {
                 data.append('ShowName', form.showName);
                 data.append('ShowPhone', form.showPhone);
                 data.append('ShowEmail', form.showEmail);
-                if (image) data.append('Image', image);
+                if (sendImage) data.append('Image', sendImage);
                 data.append('ImageFocalX', imageFocal.x);
                 data.append('ImageFocalY', imageFocal.y);
+                sendFiles.forEach((file) => data.append('MorePictures', file));
+                sendRemoveIds.forEach((id) => data.append('RemovePictureIds', id));
 
                 const { data: result } = await axios.post('/api/ad/draft', data, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
-                if (!draftId) setDraftId(result.id);
+                draftIdRef.current = result.id;
+                if (sendImage) {
+                    setHasExistingImage(true);
+                    setImage((prev) => (prev === sendImage ? null : prev));
+                }
+                if (sendFiles.length > 0 || sendRemoveIds.length > 0) {
+                    setGalleryFiles((prev) => prev.filter((f) => !sendFiles.includes(f)));
+                    setRemoveGalleryIds((prev) => prev.filter((id) => !sendRemoveIds.includes(id)));
+                    setExistingGallery(result.morePictures || []);
+                }
+            })();
+            savePromiseRef.current = save;
+            try {
+                await save;
                 setSaveState('saved');
             } catch {
+                // Not uploaded after all — let the next save (or the final submit) send them.
+                if (sendImage) sentFilesRef.current.delete(sendImage);
+                sendFiles.forEach((f) => sentFilesRef.current.delete(f));
+                sendRemoveIds.forEach((id) => sentRemoveIdsRef.current.delete(id));
                 setSaveState('idle');
             }
         }, 2000);
 
         return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [form, image, imageFocal]);
+    }, [form, image, imageFocal, galleryFiles, removeGalleryIds]);
 
     const onImageChange = (e) => {
         markDirty();
@@ -235,9 +283,14 @@ const AdPostingForm = () => {
         }
         setError('');
         setSubmitting(true);
+        // Let any autosave already uploading finish first; whatever it sent is skipped below.
+        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+        await savePromiseRef.current?.catch(() => {});
         try {
             const data = new FormData();
-            if (draftId) data.append('Id', draftId);
+            // A ref, not state — that autosave may have just created the draft after this
+            // render, and this closure would still see the old value.
+            if (draftIdRef.current) data.append('Id', draftIdRef.current);
             data.append('Title', form.title);
             data.append('Description', form.description);
             data.append('Category', form.categories.join(','));
@@ -247,9 +300,11 @@ const AdPostingForm = () => {
             data.append('ShowName', form.showName);
             data.append('ShowPhone', form.showPhone);
             data.append('ShowEmail', form.showEmail);
-            if (image) data.append('Image', image);
+            if (image && !sentFilesRef.current.has(image)) data.append('Image', image);
             data.append('ImageFocalX', imageFocal.x);
             data.append('ImageFocalY', imageFocal.y);
+            galleryFiles.filter((f) => !sentFilesRef.current.has(f)).forEach((file) => data.append('MorePictures', file));
+            removeGalleryIds.filter((id) => !sentRemoveIdsRef.current.has(id)).forEach((id) => data.append('RemovePictureIds', id));
 
             const { data: result } = await axios.post('/api/ad/create', data, {
                 headers: { 'Content-Type': 'multipart/form-data' }
@@ -315,6 +370,7 @@ const AdPostingForm = () => {
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 1 }}>Ad Image</Typography>
                         <Button variant="outlined" component="label" fullWidth sx={{ py: 1.5 }}>
                             {image || hasExistingImage ? 'Change Image' : 'Upload Ad Image'}
                             <input type="file" accept="image/*" hidden onChange={onImageChange} />
@@ -335,6 +391,17 @@ const AdPostingForm = () => {
                             </Box>
                         </Grid>
                     )}
+                    <Grid size={12}>
+                        <MorePicturesInput
+                            label="Photo Gallery"
+                            helperText={AD_GALLERY_HELPER_TEXT}
+                            max={MAX_AD_GALLERY_PICTURES}
+                            files={galleryFiles}
+                            onFilesChange={setGalleryFiles}
+                            existing={existingGallery.filter((p) => !removeGalleryIds.includes(p.id))}
+                            onRemoveExisting={(id) => setRemoveGalleryIds((prev) => [...prev, id])}
+                        />
+                    </Grid>
                 </Grid>
             </Paper>
 
@@ -353,6 +420,10 @@ const AdPostingForm = () => {
                 open={previewOpen} onClose={() => setPreviewOpen(false)}
                 form={form} imagePreview={imagePreview}
                 imageFocal={imageFocal} onImageFocalChange={(f) => { markDirty(); setImageFocal(f); }}
+                galleryUrls={[
+                    ...existingGallery.filter((p) => !removeGalleryIds.includes(p.id)).map((p) => p.url),
+                    ...galleryFilePreviews
+                ]}
             />
         </Container>
     );

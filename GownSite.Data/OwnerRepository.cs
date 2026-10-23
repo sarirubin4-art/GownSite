@@ -127,6 +127,12 @@ namespace GownSite.Data
             return true;
         }
 
+        public Owner GetByBusinessSubscriptionId(string stripeSubscriptionId)
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Owners.FirstOrDefault(o => o.BusinessStripeSubscriptionId == stripeSubscriptionId);
+        }
+
         public bool SetBusinessStripeInfo(int ownerId, string customerId, string paymentMethodId, string subscriptionId)
         {
             using var context = new GownDataContext(_connectionString);

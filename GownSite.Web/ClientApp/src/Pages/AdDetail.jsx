@@ -13,6 +13,7 @@ import { getCachedInterest, setCachedInterest } from '../utils/interestCache';
 import { focalObjectPosition } from '../utils/imageFocal';
 import { trackEvent } from '../utils/analytics';
 import LoadingSpinner from '../components/LoadingSpinner';
+import AdGallery from '../components/AdGallery';
 
 const AdDetail = () => {
     const { id } = useParams();
@@ -96,6 +97,9 @@ const AdDetail = () => {
                 </Box>
             )}
             <Typography variant="body1" sx={{ mb: 4, whiteSpace: 'pre-line' }}>{ad.description}</Typography>
+            {ad.morePictures?.length > 0 && (
+                <AdGallery urls={[...ad.morePictures].sort((a, b) => a.sortOrder - b.sortOrder).map((p) => p.url)} />
+            )}
             <Stack direction="row" spacing={2} sx={{ justifyContent: 'center', flexWrap: 'wrap', rowGap: 2 }}>
                 {ad.targetUrl && (
                     <Button variant="contained" size="large" href={ad.targetUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent('AdLinkClick', ad.id)}>

@@ -73,6 +73,7 @@ public class GownDataContext : DbContext
     public DbSet<GownPosting> Gowns { get; set; }
     public DbSet<GownPicture> GownPictures { get; set; }
     public DbSet<Ad> Ads { get; set; }
+    public DbSet<AdPicture> AdPictures { get; set; }
     public DbSet<PromoCode> PromoCodes { get; set; }
     public DbSet<SearchAlert> SearchAlerts { get; set; }
     public DbSet<ContactMessage> ContactMessages { get; set; }

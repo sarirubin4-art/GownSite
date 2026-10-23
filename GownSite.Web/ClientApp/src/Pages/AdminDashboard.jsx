@@ -29,6 +29,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ImagePositionEditor from '../components/ImagePositionEditor';
 import { focalObjectPosition } from '../utils/imageFocal';
 import useFormError from '../hooks/useFormError';
+import { adPlan, isPrepaidPlan, formatPlanDate } from '../constants/adPlans';
 
 const MAX_POST_FOR_PATRON_GOWNS = 20;
 const PATRONS_TAB = 5;
@@ -142,6 +143,10 @@ const ItemDetailDialog = ({ item, type, onClose, fullScreen, onEditClick }) => {
                         <DetailRow label="Category" value={adCategoryLabels(item.categories).join(', ')} />
                         <DetailRow label="Location" value={item.servesAllLocations ? 'Serves All Locations' : item.location} />
                         <DetailRow label="Website/Contact" value={item.targetUrl} />
+                        <DetailRow
+                            label="Plan"
+                            value={`${adPlan(item.billingPlan).label}${isPrepaidPlan(item.billingPlan) ? ' — charged upfront on approval' : ''}${item.cancelsAt ? ` (ends ${formatPlanDate(item.cancelsAt)})` : ''}`}
+                        />
                     </>
                 )}
             </DialogContent>
@@ -747,7 +752,7 @@ const AdminDashboard = () => {
     const onEditAdClick = (a) => setEditAdTarget({
         id: a.id, title: a.title, description: a.description, targetUrl: a.targetUrl || '',
         categories: (a.categories || '').split(',').filter(Boolean), location: a.location || '', servesAllLocations: !!a.servesAllLocations,
-        imageUrl: a.imageUrl, promoCode: a.promoCode,
+        imageUrl: a.imageUrl, promoCode: a.promoCode, billingPlan: a.billingPlan,
         imageFocalX: a.imageFocalX ?? 0.5, imageFocalY: a.imageFocalY ?? 0.5,
         showName: a.showName, showPhone: a.showPhone, showEmail: a.showEmail
     });
@@ -1647,12 +1652,14 @@ const AdminDashboard = () => {
                     <DialogContent>
                         <Stack spacing={2} sx={{ mt: 1 }}>
                             {editAdError && <Alert ref={editAdErrorRef} severity="error">{editAdError}</Alert>}
-                            <PromoApplyBox
-                                currentPromoCode={editAdTarget.promoCode?.code}
-                                onApply={onApplyEditAdPromo}
-                                applying={editAdPromoApplying}
-                                message={editAdPromoMessage}
-                            />
+                            {!isPrepaidPlan(editAdTarget.billingPlan) && (
+                                <PromoApplyBox
+                                    currentPromoCode={editAdTarget.promoCode?.code}
+                                    onApply={onApplyEditAdPromo}
+                                    applying={editAdPromoApplying}
+                                    message={editAdPromoMessage}
+                                />
+                            )}
                             <Stack direction="row" spacing={2} alignItems="center">
                                 <Box
                                     component="img"

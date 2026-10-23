@@ -609,6 +609,17 @@ namespace GownSite.Data
             context.SaveChanges();
         }
 
+        // For the Stripe webhook, which only knows the subscription. Includes Owner for the
+        // notification email — never returned to a client.
+        public List<GownPosting> GetBySubscriptionId(string stripeSubscriptionId)
+        {
+            using var context = new GownDataContext(_connectionString);
+            return context.Gowns
+                .Include(g => g.Owner)
+                .Where(g => g.StripeSubscriptionId == stripeSubscriptionId)
+                .ToList();
+        }
+
         public void CancelListing(int id)
         {
             using var context = new GownDataContext(_connectionString);

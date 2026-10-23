@@ -228,6 +228,16 @@ namespace GownSite.Data
         public decimal? MonthlyFeeOverride { get; set; }
         public int? PromoDurationMonths { get; set; }
 
+        // How often the ad bills (see AdPlans for prices). SixMonth/Yearly are prepaid at
+        // approval, and promo codes only apply to Monthly — they're already discounted.
+        public AdBillingPlan BillingPlan { get; set; }
+        // When the current subscription began billing (approval or reactivation) — the
+        // anchor Stripe renews from, so the next renewal date can be shown without asking Stripe.
+        public DateTime? PlanStartedAt { get; set; }
+        // Set when the owner cancels a prepaid plan: the ad stays live until this date
+        // (the end of the period already paid for), then the Stripe webhook takes it down.
+        public DateTime? CancelsAt { get; set; }
+
         // Contact-reveal visibility, gating AdController.Inquire's response the same way
         // GownPosting.DisplayOwnerName/Number/Email gate GownController.Inquire's. Ads have
         // no prior "always shown" behavior to preserve, so all three default false on
@@ -236,6 +246,29 @@ namespace GownSite.Data
         public bool ShowPhone { get; set; }
         public bool ShowEmail { get; set; }
         public int InquiryCount { get; set; }
+
+        // Optional "Photo Gallery" of the advertiser's work, shown on the ad's details page
+        // below the description — separate from ImageUrl (the one square ad image used on
+        // the floating card and browse grid). Named MorePictures to match GownPosting so
+        // the admin review dialog renders both the same way.
+        public List<AdPicture> MorePictures { get; set; } = new();
+    }
+
+    public enum AdBillingPlan
+    {
+        Monthly,
+        SixMonth,
+        Yearly
+    }
+
+    public class AdPicture
+    {
+        public int Id { get; set; }
+        public int AdId { get; set; }
+        [JsonIgnore]
+        public Ad Ad { get; set; }
+        public string Url { get; set; }
+        public int SortOrder { get; set; }
     }
 
     public enum DiscountType

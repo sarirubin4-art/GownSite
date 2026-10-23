@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Container, Typography, Button, Paper, Alert, Stack, CircularProgress } from '@mui/material';
+import AdPlanPicker from '../components/AdPlanPicker';
+import { isPrepaidPlan } from '../constants/adPlans';
 
+// Reactivating an inactive ad — straight to Stripe Checkout, which charges right away.
 const AdPaymentPage = () => {
     const { adId } = useParams();
     const [searchParams] = useSearchParams();
@@ -10,18 +13,26 @@ const AdPaymentPage = () => {
     const [error, setError] = useState('');
     const [stripeUnavailable, setStripeUnavailable] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [pricing, setPricing] = useState(null);
+    const [plan, setPlan] = useState('Monthly');
 
     useEffect(() => {
         if (searchParams.get('canceled')) {
             setError('Checkout was canceled. You can try again whenever you\'re ready.');
         }
+        Promise.all([axios.get('/api/payment/pricing'), axios.get('/api/ad/myads')])
+            .then(([{ data: pricingData }, { data: ads }]) => {
+                setPricing(pricingData);
+                setPlan(ads.find((a) => a.id === Number(adId))?.billingPlan || 'Monthly');
+            })
+            .catch(() => {});
     }, []);
 
     const onPayClick = async () => {
         setError('');
         setLoading(true);
         try {
-            const { data } = await axios.post('/api/payment/create-ad-checkout-session', { adId: Number(adId) });
+            const { data } = await axios.post('/api/payment/create-ad-checkout-session', { adId: Number(adId), plan });
             window.location.href = data.url;
         } catch (err) {
             if (err?.response?.status === 503) {
@@ -51,8 +62,15 @@ const AdPaymentPage = () => {
             <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
                 <Typography variant="h5" gutterBottom>Almost There!</Typography>
                 <Typography color="text.secondary" sx={{ mb: 3 }}>
-                    A small monthly fee keeps your ad live and rotating across the site.
+                    Choose a plan to keep your ad live and rotating across the site.
                 </Typography>
+                <AdPlanPicker pricing={pricing} value={plan} onChange={setPlan} disabled={loading} />
+                {isPrepaidPlan(plan) && (
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 3, textAlign: 'left' }}>
+                        Paid upfront today, then renews automatically at the same price. If you cancel, your ad stays up until the
+                        end of the period you've paid for — no refunds for unused time.
+                    </Typography>
+                )}
                 {error && <Alert severity="warning" sx={{ mb: 2, textAlign: 'left' }}>{error}</Alert>}
                 {stripeUnavailable ? (
                     <Stack spacing={2}>
